@@ -1,7 +1,9 @@
-/**
- * Page de connexion — sera gérée par Clerk.
- * Clerk fournit un composant <SignIn /> prêt à l'emploi.
- */
+import { SignIn } from "@clerk/nextjs";
+
 export default function SignInPage() {
-  return <div>Sign In — Clerk à intégrer</div>;
+  return (
+    <div style={{ display: "flex", justifyContent: "center", paddingTop: "4rem" }}>
+      <SignIn />
+    </div>
+  );
 }
