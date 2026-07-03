@@ -1,9 +1,18 @@
 import Image from "next/image";
+import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import styles from "./page.module.css";
 
 export default function Home() {
   return (
     <div className={styles.page}>
+      <div style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
+        <Show when="signed-out">
+          <SignInButton mode="modal" />
+        </Show>
+      </div>
       <main className={styles.main}>
         <Image
           className={styles.logo}

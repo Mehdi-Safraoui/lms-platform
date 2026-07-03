@@ -1,10 +1,14 @@
 /**
  * Helpers Clerk : extraction du tenant (org), du rôle, et des metadata.
- * À implémenter lors de l'intégration Clerk.
  *
  * Clerk Organizations = Tenants.
- * Le rôle métier (super_admin, admin_tenant, tuteur, apprenant) est stocké
- * dans `organizationMembership.role` ou dans `publicMetadata`.
+ *
+ * Les rôles personnalisés (admin_tenant, tuteur, apprenant) ne sont pas encore configurés
+ * côté Clerk : on mappe pour l'instant les rôles génériques Clerk (org:admin / org:member)
+ * vers notre modèle de rôles. À remplacer par les rôles personnalisés Clerk plus tard.
  */
+import type { Role } from "@/types/database";
 
-export {}; // placeholder — sera implémenté lors de l'intégration Clerk
+export function mapClerkOrgRoleToAppRole(clerkRole: string): Role {
+  return clerkRole === "org:admin" ? "admin_tenant" : "apprenant";
+}

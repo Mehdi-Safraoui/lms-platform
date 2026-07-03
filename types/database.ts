@@ -39,11 +39,11 @@ export interface User {
   updated_at: string;
 }
 
-// --- Formation ---
+// --- Formation (catalogue global, créé uniquement par le Super-admin) ---
 export interface Formation {
   id: string;
-  tenant_id: string;
   title: string;
+  slug: string;
   description: string | null;
   thumbnail_url: string | null;
   is_published: boolean;
@@ -56,7 +56,6 @@ export interface Formation {
 export interface Module {
   id: string;
   formation_id: string;
-  tenant_id: string;
   title: string;
   order_index: number;
   created_at: string;
@@ -67,7 +66,6 @@ export interface Module {
 export interface Lesson {
   id: string;
   module_id: string;
-  tenant_id: string;
   title: string;
   content_type: LessonContentType;
   content_markdown: string | null;

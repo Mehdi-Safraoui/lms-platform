@@ -72,7 +72,7 @@ export default function InviteMembersPage() {
             background: "transparent",
             color: "inherit",
             font: "inherit",
-            resize: "vertical",
+            resize: "vertical", 
           }}
         />
         {error && <p style={{ color: "#f87171", fontSize: "0.875rem" }}>{error}</p>}

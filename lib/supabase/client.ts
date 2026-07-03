@@ -1,15 +1,13 @@
 /**
- * Client Supabase côté navigateur (Client Components).
- * À initialiser après installation : npm install @supabase/supabase-js
+ * Client Supabase côté navigateur (Client Components), avec la clé publique anon.
+ * Soumis aux policies RLS — voir l'intégration du JWT Clerk pour que la RLS
+ * identifie l'utilisateur courant.
  */
+import { createClient } from "@supabase/supabase-js";
 
-// import { createBrowserClient } from "@supabase/ssr";
-
-// export function createClient() {
-//   return createBrowserClient(
-//     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-//     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-//   );
-// }
-
-export {}; // placeholder — sera implémenté lors de l'intégration Supabase
+export function createBrowserSupabaseClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
