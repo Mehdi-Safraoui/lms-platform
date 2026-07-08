@@ -28,7 +28,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const body = await req.json();
-  const { title, slug, description, thumbnail_url, is_published, tenant_id } = body;
+  const { title, slug, description, thumbnail_url, is_published, tenant_id, niveau } = body;
 
   const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase
@@ -40,6 +40,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ...(thumbnail_url !== undefined && { thumbnail_url }),
       ...(is_published !== undefined && { is_published }),
       ...(tenant_id !== undefined && { tenant_id }),
+      ...(niveau !== undefined && { niveau }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

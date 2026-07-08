@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (guard instanceof NextResponse) return guard;
 
   const body = await req.json();
-  const { title, slug, description, thumbnail_url, is_published, tenant_id } = body;
+  const { title, slug, description, thumbnail_url, is_published, tenant_id, niveau } = body;
 
   if (!title || !slug) {
     return NextResponse.json({ error: "title et slug sont requis" }, { status: 400 });
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       thumbnail_url: thumbnail_url ?? null,
       is_published: is_published ?? false,
       tenant_id: tenant_id ?? null,
+      niveau: niveau ?? null,
       created_by: guard.userId,
     })
     .select()

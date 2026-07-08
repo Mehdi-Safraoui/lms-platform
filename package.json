@@ -13,9 +13,12 @@
   "dependencies": {
     "@clerk/nextjs": "^7.5.9",
     "@supabase/supabase-js": "^2.108.2",
+    "@uiw/react-md-editor": "^4.1.1",
+    "lucide-react": "^1.23.0",
     "next": "16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sonner": "^2.0.7"
   },
   "devDependencies": {
     "@types/node": "^20",
