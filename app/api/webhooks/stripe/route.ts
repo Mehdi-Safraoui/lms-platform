@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
+export async function POST(_req: NextRequest) {
   // TODO: implémenter lors de l'intégration Stripe
   return NextResponse.json({ received: true });
 }

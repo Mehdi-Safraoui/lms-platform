@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -113,34 +113,44 @@ export default function FormationEditorPage() {
   const [deleteLessonModal, setDeleteLessonModal] = useState<{ moduleId: string; lessonId: string } | null>(null);
 
   // ── Load data ──
-  const load = useCallback(async () => {
-    const [fRes, mRes] = await Promise.all([
-      fetch(`/api/formations/${id}`),
-      fetch(`/api/formations/${id}/modules`),
-    ]);
-    if (!fRes.ok) return;
-    const fJson = await fRes.json();
-    const mJson = mRes.ok ? await mRes.json() : { data: [] };
-    setFormation(fJson.data);
-    const mods: Module[] = mJson.data ?? [];
-    const sorted = mods.sort((a, b) => a.order_index - b.order_index);
-    setModules(sorted);
+  useEffect(() => {
+    let cancelled = false;
 
-    const lessonMap: Record<string, Lesson[]> = {};
-    await Promise.all(
-      sorted.map(async (m) => {
-        const lRes = await fetch(`/api/formations/${id}/modules/${m.id}/lecons`);
-        if (lRes.ok) {
-          const lJson = await lRes.json();
-          lessonMap[m.id] = (lJson.data ?? []).sort((a: Lesson, b: Lesson) => a.order_index - b.order_index);
-        }
-      })
-    );
-    setLessons(lessonMap);
-    setLoading(false);
+    (async () => {
+      const [fRes, mRes] = await Promise.all([
+        fetch(`/api/formations/${id}`),
+        fetch(`/api/formations/${id}/modules`),
+      ]);
+      if (cancelled || !fRes.ok) return;
+
+      const fJson = await fRes.json();
+      const mJson = mRes.ok ? await mRes.json() : { data: [] };
+      const sorted: Module[] = (mJson.data ?? []).sort(
+        (a: Module, b: Module) => a.order_index - b.order_index
+      );
+
+      const lessonMap: Record<string, Lesson[]> = {};
+      await Promise.all(
+        sorted.map(async (m) => {
+          const lRes = await fetch(`/api/formations/${id}/modules/${m.id}/lecons`);
+          if (lRes.ok) {
+            const lJson = await lRes.json();
+            lessonMap[m.id] = (lJson.data ?? []).sort(
+              (a: Lesson, b: Lesson) => a.order_index - b.order_index
+            );
+          }
+        })
+      );
+
+      if (cancelled) return;
+      setFormation(fJson.data);
+      setModules(sorted);
+      setLessons(lessonMap);
+      setLoading(false);
+    })();
+
+    return () => { cancelled = true; };
   }, [id]);
-
-  useEffect(() => { load(); }, [load]);
 
   // ── Module actions ──
   async function handleAddModule(title: string) {
@@ -345,6 +355,7 @@ export default function FormationEditorPage() {
                 )}
                 {selected.type === "module" && (
                   <ModulePanel
+                    key={selected.id}
                     module={modules.find((m) => m.id === selected.id)!}
                     formationId={id}
                     onSave={(updated) => setModules((prev) => prev.map((m) => m.id === updated.id ? updated : m))}
@@ -355,6 +366,7 @@ export default function FormationEditorPage() {
                   if (!lesson) return null;
                   return (
                     <LessonPanel
+                      key={lesson.id}
                       lesson={lesson}
                       formationId={id}
                       onSave={(updated) =>
@@ -463,8 +475,6 @@ function ModulePanel({ module, formationId, onSave }: { module: Module; formatio
   const [title, setTitle] = useState(module.title);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setTitle(module.title); }, [module.id, module.title]);
-
   async function save() {
     setSaving(true);
     const res = await fetch(`/api/formations/${formationId}/modules/${module.id}`, {
@@ -513,10 +523,6 @@ function LessonPanel({ lesson, formationId, onSave }: { lesson: Lesson; formatio
     content_markdown: lesson.content_markdown ?? "",
   });
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setForm({ title: lesson.title, content_type: lesson.content_type, content_markdown: lesson.content_markdown ?? "" });
-  }, [lesson.id]);
 
   async function save() {
     setSaving(true);
