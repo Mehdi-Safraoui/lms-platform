@@ -4,45 +4,40 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/formations — liste toutes les formations
-export async function GET() {
+type Params = { params: Promise<{ id: string }> };
+
+// GET /api/formations/[id]/modules
+export async function GET(_req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
+  const { id: formation_id } = await params;
   const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase
-    .from("formations")
+    .from("modules")
     .select("*")
-    .order("created_at", { ascending: false });
+    .eq("formation_id", formation_id)
+    .order("order_index", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data });
 }
 
-// POST /api/formations — crée une formation
-export async function POST(req: NextRequest) {
+// POST /api/formations/[id]/modules
+export async function POST(req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
+  const { id: formation_id } = await params;
   const body = await req.json();
-  const { title, slug, description, thumbnail_url, is_published, tenant_id } = body;
+  const { title, order_index } = body;
 
-  if (!title || !slug) {
-    return NextResponse.json({ error: "title et slug sont requis" }, { status: 400 });
-  }
+  if (!title) return NextResponse.json({ error: "title est requis" }, { status: 400 });
 
   const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase
-    .from("formations")
-    .insert({
-      title,
-      slug,
-      description: description ?? null,
-      thumbnail_url: thumbnail_url ?? null,
-      is_published: is_published ?? false,
-      tenant_id: tenant_id ?? null,
-      created_by: guard.userId,
-    })
+    .from("modules")
+    .insert({ formation_id, title, order_index: order_index ?? 0 })
     .select()
     .single();
 
