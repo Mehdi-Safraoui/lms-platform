@@ -50,6 +50,7 @@
 }
 
 .logoText span { color: var(--coral); }
+.logoText em { font-style: normal; font-weight: 500; opacity: 0.75; }
 
 /* Nav */
 .nav {

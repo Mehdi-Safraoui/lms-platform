@@ -3,17 +3,25 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { BookOpen, Building2 } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, Award } from "lucide-react";
 import { Toaster } from "sonner";
 import styles from "./layout.module.css";
 
-const navItems = [
+const adminNavItems = [
   { href: "/admin/catalog", label: "Catalogue IA", icon: BookOpen },
   { href: "/admin/tenants", label: "Tenants", icon: Building2 },
 ];
 
+const apprenantNavItems = [
+  { href: "/apprenant", label: "Mes formations", icon: GraduationCap },
+  { href: "/apprenant/attestations", label: "Mes attestations", icon: Award },
+];
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isApprenant = pathname.startsWith("/apprenant");
+  const navItems = isApprenant ? apprenantNavItems : adminNavItems;
+  const sectionLabel = isApprenant ? "Apprenant" : "Super-admin";
 
   return (
     <div className={styles.shell}>
@@ -25,17 +33,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <path d="M8 2L14 13H2L8 2Z" fill="white" strokeWidth="0" />
             </svg>
           </div>
-          <span className={styles.logoText}>ahead<span>.</span></span>
+          <span className={styles.logoText}>ahead<span>·</span><em>digital</em></span>
         </div>
 
         {/* Nav */}
         <nav className={styles.nav}>
-          <span className={styles.navSection}>Super-admin</span>
+          <span className={styles.navSection}>{sectionLabel}</span>
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`${styles.navItem} ${pathname.startsWith(item.href) ? styles.active : ""}`}
+              className={`${styles.navItem} ${pathname === item.href || pathname.startsWith(item.href + "/") ? styles.active : ""}`}
             >
               <item.icon size={17} strokeWidth={1.75} />
               {item.label}
@@ -57,7 +65,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className={styles.main}>
         <header className={styles.topbar}>
           <div className={styles.topbarLeft}>
-            <span className={styles.topbarBadge}>Super-admin</span>
+            <span className={styles.topbarBadge}>{isApprenant ? "Espace apprenant" : "Super-admin"}</span>
           </div>
           <div className={styles.topbarRight} />
         </header>

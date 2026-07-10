@@ -7,8 +7,9 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import {
   ChevronRight, ChevronUp, ChevronDown,
-  Trash2, Plus, FileText, Layers, Save, X,
+  Trash2, Plus, FileText, Layers, Save, X, Eye, CheckCircle, Circle,
 } from "lucide-react";
+import { getVideoEmbedUrl } from "@/lib/video";
 import styles from "./editor.module.css";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
@@ -16,7 +17,7 @@ const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 // ── Types ──────────────────────────────────────────────
 interface Formation { id: string; title: string; description: string | null; is_published: boolean; slug: string; niveau: "debutant" | "intermediaire" | "avance" | null; }
 interface Module { id: string; formation_id: string; title: string; order_index: number; }
-interface Lesson { id: string; module_id: string; title: string; content_type: string; content_markdown: string | null; order_index: number; }
+interface Lesson { id: string; module_id: string; title: string; content_type: string; content_markdown: string | null; video_url: string | null; order_index: number; }
 type Selection =
   | { type: "formation" }
   | { type: "module"; id: string }
@@ -515,21 +516,211 @@ function ModulePanel({ module, formationId, onSave }: { module: Module; formatio
   );
 }
 
+// ── Quiz builder ───────────────────────────────────────
+interface QuizOption { text: string; is_correct: boolean; }
+interface QuizQuestion { question_text: string; options: QuizOption[]; points: number; }
+interface QuizData { id: string; title: string; pass_score: number; quiz_questions: (QuizQuestion & { id: string })[]; }
+
+function QuizBuilder({ lesson, formationId }: { lesson: Lesson; formationId: string }) {
+  const [quizId, setQuizId] = useState<string | null>(null);
+  const [title, setTitle] = useState("Quiz");
+  const [passScore, setPassScore] = useState(70);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(
+        `/api/formations/${formationId}/modules/${lesson.module_id}/lecons/${lesson.id}/quiz`
+      );
+      if (cancelled) return;
+      const json = await res.json();
+      if (json.data) {
+        const q: QuizData = json.data;
+        setQuizId(q.id);
+        setTitle(q.title);
+        setPassScore(q.pass_score);
+        setQuestions(
+          [...(q.quiz_questions ?? [])].sort((a, b) => (a as never as { order_index: number }).order_index - (b as never as { order_index: number }).order_index)
+            .map(({ question_text, options, points }) => ({ question_text, options, points }))
+        );
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [lesson.id, lesson.module_id, formationId]);
+
+  function addQuestion() {
+    setQuestions((prev) => [
+      ...prev,
+      { question_text: "", options: [{ text: "", is_correct: true }, { text: "", is_correct: false }, { text: "", is_correct: false }, { text: "", is_correct: false }], points: 1 },
+    ]);
+  }
+
+  function removeQuestion(qi: number) {
+    setQuestions((prev) => prev.filter((_, i) => i !== qi));
+  }
+
+  function updateQuestionText(qi: number, text: string) {
+    setQuestions((prev) => prev.map((q, i) => i === qi ? { ...q, question_text: text } : q));
+  }
+
+  function setCorrect(qi: number, oi: number) {
+    setQuestions((prev) =>
+      prev.map((q, i) =>
+        i !== qi ? q : { ...q, options: q.options.map((o, j) => ({ ...o, is_correct: j === oi })) }
+      )
+    );
+  }
+
+  function updateOptionText(qi: number, oi: number, text: string) {
+    setQuestions((prev) =>
+      prev.map((q, i) =>
+        i !== qi ? q : { ...q, options: q.options.map((o, j) => j === oi ? { ...o, text } : o) }
+      )
+    );
+  }
+
+  function addOption(qi: number) {
+    setQuestions((prev) =>
+      prev.map((q, i) => i !== qi ? q : { ...q, options: [...q.options, { text: "", is_correct: false }] })
+    );
+  }
+
+  function removeOption(qi: number, oi: number) {
+    setQuestions((prev) =>
+      prev.map((q, i) => {
+        if (i !== qi) return q;
+        const newOptions = q.options.filter((_, j) => j !== oi);
+        const hasCorrect = newOptions.some((o) => o.is_correct);
+        if (!hasCorrect && newOptions.length > 0) newOptions[0].is_correct = true;
+        return { ...q, options: newOptions };
+      })
+    );
+  }
+
+  async function save() {
+    for (const q of questions) {
+      if (!q.question_text.trim()) { toast.error("Une question est vide."); return; }
+      if (q.options.length < 2) { toast.error("Chaque question doit avoir au moins 2 options."); return; }
+      if (!q.options.some((o) => o.is_correct)) { toast.error("Chaque question doit avoir une bonne réponse."); return; }
+    }
+    setSaving(true);
+    const body = { title, pass_score: passScore, questions };
+    const method = quizId ? "PUT" : "POST";
+    const res = await fetch(
+      `/api/formations/${formationId}/modules/${lesson.module_id}/lecons/${lesson.id}/quiz`,
+      { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+    );
+    if (res.ok) {
+      const json = await res.json();
+      setQuizId(json.data.id);
+      toast.success("Quiz enregistré", { description: `${questions.length} question(s)` });
+    } else {
+      toast.error("Erreur lors de l'enregistrement");
+    }
+    setSaving(false);
+  }
+
+  if (loading) return <div className={styles.loading}>Chargement du quiz…</div>;
+
+  return (
+    <>
+      <h2 className={styles.panelTitle}>Créer le quiz</h2>
+      <div className={styles.formCard}>
+        <div style={{ display: "flex", gap: 16 }}>
+          <div className={styles.field} style={{ flex: 1 }}>
+            <label className={styles.label}>Titre du quiz</label>
+            <input className={styles.input} value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className={styles.field} style={{ width: 140 }}>
+            <label className={styles.label}>Score minimum (%)</label>
+            <input className={styles.input} type="number" min={0} max={100} value={passScore} onChange={(e) => setPassScore(Number(e.target.value))} />
+          </div>
+        </div>
+
+        {questions.map((q, qi) => (
+          <div key={qi} className={styles.quizQuestion}>
+            <div className={styles.quizQuestionHeader}>
+              <span className={styles.quizQuestionIndex}>Question {qi + 1}</span>
+              <button className={styles.quizBtnRemove} onClick={() => removeQuestion(qi)}><Trash2 size={13} /></button>
+            </div>
+            <input
+              className={styles.input}
+              placeholder="Énoncé de la question…"
+              value={q.question_text}
+              onChange={(e) => updateQuestionText(qi, e.target.value)}
+              style={{ marginBottom: 10 }}
+            />
+            <div className={styles.quizOptions}>
+              {q.options.map((o, oi) => (
+                <div key={oi} className={styles.quizOption}>
+                  <button
+                    className={styles.quizRadio}
+                    onClick={() => setCorrect(qi, oi)}
+                    title="Définir comme bonne réponse"
+                  >
+                    {o.is_correct ? <CheckCircle size={16} color="var(--coral)" /> : <Circle size={16} color="var(--text-light)" />}
+                  </button>
+                  <input
+                    className={styles.input}
+                    placeholder={`Option ${oi + 1}`}
+                    value={o.text}
+                    onChange={(e) => updateOptionText(qi, oi, e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  {q.options.length > 2 && (
+                    <button className={styles.quizBtnRemove} onClick={() => removeOption(qi, oi)}><X size={12} /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {q.options.length < 5 && (
+              <button className={styles.quizAddOption} onClick={() => addOption(qi)}>
+                <Plus size={12} /> Ajouter une option
+              </button>
+            )}
+          </div>
+        ))}
+
+        <button className={styles.quizAddQuestion} onClick={addQuestion}>
+          <Plus size={14} /> Ajouter une question
+        </button>
+
+        <div className={styles.saveRow}>
+          <button className={styles.btnSave} onClick={save} disabled={saving || questions.length === 0}>
+            <Save size={14} />
+            {saving ? "Enregistrement…" : "Enregistrer le quiz"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Lesson panel ───────────────────────────────────────
 function LessonPanel({ lesson, formationId, onSave }: { lesson: Lesson; formationId: string; onSave: (l: Lesson) => void }) {
   const [form, setForm] = useState({
     title: lesson.title,
     content_type: lesson.content_type,
     content_markdown: lesson.content_markdown ?? "",
+    video_url: lesson.video_url ?? "",
   });
   const [saving, setSaving] = useState(false);
+
+  const embedUrl = form.content_type === "video" ? getVideoEmbedUrl(form.video_url) : null;
 
   async function save() {
     setSaving(true);
     const res = await fetch(`/api/formations/${formationId}/modules/${lesson.module_id}/lecons/${lesson.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        video_url: form.video_url.trim() || null,
+      }),
     });
     if (res.ok) {
       const json = await res.json();
@@ -578,13 +769,51 @@ function LessonPanel({ lesson, formationId, onSave }: { lesson: Lesson; formatio
             </div>
           </div>
         )}
+        {form.content_type === "video" && (
+          <div className={styles.field}>
+            <label className={styles.label}>URL de la vidéo</label>
+            <input
+              className={styles.input}
+              placeholder="https://www.youtube.com/watch?v=… ou https://vimeo.com/…"
+              value={form.video_url}
+              onChange={(e) => setForm((p) => ({ ...p, video_url: e.target.value }))}
+            />
+            <p className={styles.hint}>Formats acceptés : YouTube (youtube.com, youtu.be) et Vimeo</p>
+            {embedUrl && (
+              <div className={styles.videoPreview}>
+                <iframe
+                  src={embedUrl}
+                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                />
+              </div>
+            )}
+            {form.video_url && !embedUrl && (
+              <p className={styles.videoError}>URL non reconnue. Vérifiez le format.</p>
+            )}
+          </div>
+        )}
         <div className={styles.saveRow}>
+          <a
+            href={`/apprenant/${formationId}/${lesson.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.btnPreview}
+          >
+            <Eye size={14} />
+            Aperçu apprenant
+          </a>
           <button className={styles.btnSave} onClick={save} disabled={saving}>
             <Save size={14} />
             {saving ? "Enregistrement…" : "Enregistrer"}
           </button>
         </div>
       </div>
+      {form.content_type === "quiz" && (
+        <div style={{ marginTop: 32 }}>
+          <QuizBuilder lesson={lesson} formationId={formationId} />
+        </div>
+      )}
     </>
   );
 }
