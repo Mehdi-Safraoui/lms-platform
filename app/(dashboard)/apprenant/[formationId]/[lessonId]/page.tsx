@@ -36,6 +36,7 @@ export default async function ApprenantLessonPage({ params }: Props) {
 
   return (
     <LessonView
+      lessonId={lessonId}
       formationId={formationId}
       formationTitle={formation.title}
       lessonTitle={lecon.title}

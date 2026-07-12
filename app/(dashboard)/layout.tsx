@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import { BookOpen, Building2, GraduationCap, Award } from "lucide-react";
 import { Toaster } from "sonner";
 import styles from "./layout.module.css";
@@ -19,7 +19,9 @@ const apprenantNavItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user } = useUser();
   const isApprenant = pathname.startsWith("/apprenant");
+  const displayName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.primaryEmailAddress?.emailAddress : null;
   const navItems = isApprenant ? apprenantNavItems : adminNavItems;
   const sectionLabel = isApprenant ? "Apprenant" : "Super-admin";
 
@@ -54,11 +56,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Bottom */}
         <div className={styles.sidebarBottom}>
           <UserButton
+            afterSignOutUrl="/sign-in"
             appearance={{
               elements: { avatarBox: { width: 30, height: 30 } },
             }}
           />
-          <span className={styles.sidebarUser}>Mon compte</span>
+          <span className={styles.sidebarUser}>{displayName ?? "Mon compte"}</span>
         </div>
       </aside>
 

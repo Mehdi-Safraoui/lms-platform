@@ -1,12 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
-
-export default async function Home() {
-  const { userId } = await auth();
-
-  if (userId) {
-    redirect("/admin/catalog");
-  } else {
-    redirect("/sign-in");
-  }
+// Middleware handles all redirects at / (role-based routing)
+export default function Home() {
+  return null;
 }

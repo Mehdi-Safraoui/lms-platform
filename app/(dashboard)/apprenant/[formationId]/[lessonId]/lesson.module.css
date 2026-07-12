@@ -325,6 +325,45 @@
 
 .quizStartBtn:hover { opacity: 0.88; }
 
+/* ── Complete Button ── */
+.completeRow {
+  margin-top: 32px;
+  display: flex;
+}
+
+.completeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.completeBtn:hover:not(:disabled) {
+  border-color: #22c55e;
+  color: #15803d;
+}
+
+.completeBtnDone {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+  cursor: default;
+}
+
+.completeBtn:disabled:not(.completeBtnDone) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Lesson Nav ── */
 .lessonNav {
   display: flex;

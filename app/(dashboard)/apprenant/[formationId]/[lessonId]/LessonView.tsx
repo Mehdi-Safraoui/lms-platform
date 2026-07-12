@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Trophy, ClipboardList } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Trophy, ClipboardList, Check } from "lucide-react";
+import { toast } from "sonner";
 import { getVideoEmbedUrl } from "@/lib/video";
 import styles from "./lesson.module.css";
 
@@ -19,6 +20,7 @@ interface QuizData { id: string; title: string; pass_score: number; quiz_questio
 interface AdjacentLesson { id: string; title: string; }
 
 interface Props {
+  lessonId: string;
   formationId: string;
   formationTitle: string;
   lessonTitle: string;
@@ -44,7 +46,7 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
     setAnswers((prev) => ({ ...prev, [qi]: oi }));
   }
 
-  function submit() {
+  async function submit() {
     let earned = 0;
     let total = 0;
     for (let qi = 0; qi < questions.length; qi++) {
@@ -53,8 +55,25 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
       const oi = answers[qi] ?? -1;
       if (oi >= 0 && q.options[oi]?.is_correct === true) earned += q.points;
     }
-    setScorePercent(total > 0 ? Math.round((earned / total) * 100) : 0);
+    const percent = total > 0 ? Math.round((earned / total) * 100) : 0;
+    const isPassed = percent >= quiz.pass_score;
+
+    setScorePercent(percent);
     setSubmitted(true);
+
+    try {
+      const res = await fetch("/api/progress/quiz-passed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quiz_id: quiz.id, score: earned, max_score: total, passed: isPassed }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.points_awarded > 0) toast.success(`+${data.points_awarded} points remportés !`);
+      }
+    } catch {
+      // Ne pas bloquer l'affichage du résultat si l'API échoue
+    }
   }
 
   function retry() {
@@ -147,9 +166,32 @@ function QuizIntro({ quiz, onStart }: { quiz: QuizData; onStart: () => void }) {
 }
 
 // ── Lesson View ──────────────────────────────────────────
-export default function LessonView({ formationId, formationTitle, lessonTitle, contentType, contentMarkdown, videoUrl, quizData, prevLesson, nextLesson }: Props) {
+export default function LessonView({ lessonId, formationId, formationTitle, lessonTitle, contentType, contentMarkdown, videoUrl, quizData, prevLesson, nextLesson }: Props) {
   const embedUrl = videoUrl ? getVideoEmbedUrl(videoUrl) : null;
   const [quizStarted, setQuizStarted] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [completing, setCompleting] = useState(false);
+
+  async function completeLesson() {
+    setCompleting(true);
+    try {
+      const res = await fetch("/api/progress/complete-lesson", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lecon_id: lessonId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCompleted(true);
+        if (data.points_awarded > 0) toast.success(`+${data.points_awarded} points remportés !`);
+        else toast.success("Leçon marquée comme terminée ✓");
+      }
+    } catch {
+      toast.error("Erreur lors de la mise à jour.");
+    } finally {
+      setCompleting(false);
+    }
+  }
 
   return (
     <div className={styles.page}>
@@ -192,6 +234,19 @@ export default function LessonView({ formationId, formationTitle, lessonTitle, c
 
       {contentType === "quiz" && (!quizData || !quizData.quiz_questions?.length) && (
         <p className={styles.videoFallback}>Ce quiz n&apos;a pas encore été configuré.</p>
+      )}
+
+      {contentType !== "quiz" && (
+        <div className={styles.completeRow}>
+          <button
+            className={`${styles.completeBtn} ${completed ? styles.completeBtnDone : ""}`}
+            onClick={completeLesson}
+            disabled={completed || completing}
+          >
+            <Check size={15} />
+            {completed ? "Leçon terminée" : completing ? "Enregistrement…" : "Marquer comme terminé"}
+          </button>
+        </div>
       )}
 
       {(prevLesson || nextLesson) && (

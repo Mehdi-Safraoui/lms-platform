@@ -24,13 +24,35 @@
   flex-shrink: 0;
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
 .title {
   font-family: var(--font-barlow), sans-serif;
   font-size: 30px;
   font-weight: 800;
   color: var(--text);
   letter-spacing: -0.4px;
-  margin-bottom: 32px;
+  margin-bottom: 0;
+}
+
+.pointsBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #fff8ec;
+  border: 1px solid #fde68a;
+  color: #b45309;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .empty {

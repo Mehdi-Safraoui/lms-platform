@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Star } from "lucide-react";
+import { auth } from "@clerk/nextjs/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import styles from "./apprenant.module.css";
 
@@ -10,12 +11,21 @@ const NIVEAU_LABEL: Record<string, string> = {
 };
 
 export default async function ApprenantPage() {
+  const { userId: clerkUserId } = await auth();
   const supabase = createServiceRoleSupabaseClient();
-  const { data: formations } = await supabase
-    .from("formations")
-    .select("id, title, description, niveau")
-    .eq("is_published", true)
-    .order("created_at", { ascending: false });
+
+  const [{ data: formations }, { data: userRow }] = await Promise.all([
+    supabase
+      .from("formations")
+      .select("id, title, description, niveau")
+      .eq("is_published", true)
+      .order("created_at", { ascending: false }),
+    clerkUserId
+      ? supabase.from("users").select("total_points").eq("clerk_user_id", clerkUserId).single()
+      : { data: null },
+  ]);
+
+  const totalPoints = userRow?.total_points ?? 0;
 
   return (
     <div className={styles.page}>
@@ -23,7 +33,13 @@ export default async function ApprenantPage() {
         <span className={styles.dot} />
         Espace apprenant
       </div>
-      <h1 className={styles.title}>Mes formations</h1>
+      <div className={styles.titleRow}>
+        <h1 className={styles.title}>Mes formations</h1>
+        <div className={styles.pointsBadge}>
+          <Star size={13} />
+          <span>{totalPoints} points</span>
+        </div>
+      </div>
 
       {!formations?.length ? (
         <p className={styles.empty}>Aucune formation disponible pour le moment.</p>
