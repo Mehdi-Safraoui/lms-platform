@@ -56,7 +56,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Bottom */}
         <div className={styles.sidebarBottom}>
           <UserButton
-            afterSignOutUrl="/sign-in"
             appearance={{
               elements: { avatarBox: { width: 30, height: 30 } },
             }}
