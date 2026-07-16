@@ -2,14 +2,22 @@
 
 import { useOrganization } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function InviteMembersPage() {
-  const { organization, isLoaded } = useOrganization();
+  const { organization, membership, isLoaded } = useOrganization();
   const router = useRouter();
   const [emails, setEmails] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Redirect non-admins (apprenants, invited members) to their dashboard
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!organization || membership?.role !== "org:admin") {
+      router.replace("/");
+    }
+  }, [isLoaded, organization, membership, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +45,13 @@ export default function InviteMembersPage() {
     }
   }
 
-  if (!isLoaded) return null;
+  if (!isLoaded || !organization || membership?.role !== "org:admin") {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "#6b7280" }}>
+        Chargement…
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", justifyContent: "center", paddingTop: "4rem" }}>
@@ -72,7 +86,7 @@ export default function InviteMembersPage() {
             background: "transparent",
             color: "inherit",
             font: "inherit",
-            resize: "vertical", 
+            resize: "vertical",
           }}
         />
         {error && <p style={{ color: "#f87171", fontSize: "0.875rem" }}>{error}</p>}

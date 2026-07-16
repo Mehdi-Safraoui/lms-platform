@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Trophy, ClipboardList, Check } from "lucide-react";
@@ -171,6 +171,30 @@ export default function LessonView({ lessonId, formationId, formationTitle, less
   const [quizStarted, setQuizStarted] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const startTimeRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+
+    // Marquer la leçon comme "en cours"
+    fetch("/api/progress/start-lesson", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lecon_id: lessonId }),
+    }).catch(() => {});
+
+    return () => {
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      if (elapsed > 0) {
+        fetch("/api/progress/update-time", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lecon_id: lessonId, seconds: elapsed }),
+          keepalive: true,
+        }).catch(() => {});
+      }
+    };
+  }, [lessonId]);
 
   async function completeLesson() {
     setCompleting(true);

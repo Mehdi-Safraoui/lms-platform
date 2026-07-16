@@ -119,3 +119,109 @@
   font-size: 13px;
   color: var(--text-muted);
 }
+
+.progressBlock {
+  margin-bottom: 32px;
+}
+
+.progressMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.progressPct {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.progressBar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--coral);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.lessonTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lessonStatus {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.statusDone {
+  color: #16a34a;
+}
+
+.statusInProgress {
+  color: var(--coral);
+}
+
+/* Enroll CTA */
+.enrollCta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  background: #eff0ff;
+  border: 1px solid #c7d2fe;
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 32px;
+}
+
+.enrollCtaText {
+  font-size: 14px;
+  color: var(--navy);
+  line-height: 1.5;
+}
+
+.enrollBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 20px;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-jakarta), sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.enrollBtn:hover { opacity: 0.88; }
+.enrollBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Locked module */
+.moduleLocked {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.lockIcon {
+  color: var(--text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+}
