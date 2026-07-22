@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { hasActiveSubscription } from "@/lib/subscription";
 import CatalogueToggle from "./CatalogueToggle";
 import styles from "./catalogue.module.css";
 
@@ -23,6 +24,8 @@ export default async function CataloguePage() {
     .single();
 
   if (!dbUser?.tenant_id) notFound();
+
+  if (!(await hasActiveSubscription(dbUser.tenant_id))) redirect("/pricing");
 
   const [{ data: formations }, { data: tenant_formations }] = await Promise.all([
     supabase

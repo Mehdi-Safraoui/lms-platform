@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { LayoutDashboard, Users, BookOpen } from "lucide-react";
 import styles from "./layout.module.css";
+import SubscriptionModal from "./SubscriptionModal";
 
 const orgNavItems = [
   { href: "/org", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
@@ -15,10 +16,11 @@ const orgNavItems = [
 interface Props {
   tenantName: string;
   userRole: string;
+  hasSubscription: boolean;
   children: React.ReactNode;
 }
 
-export default function OrgShell({ tenantName, userRole, children }: Props) {
+export default function OrgShell({ tenantName, userRole, hasSubscription, children }: Props) {
   const pathname = usePathname();
   const { user } = useUser();
   const displayName = user
@@ -28,6 +30,7 @@ export default function OrgShell({ tenantName, userRole, children }: Props) {
 
   return (
     <div className={styles.shell}>
+      {!hasSubscription && <SubscriptionModal />}
       <aside className={styles.sidebar}>
         {/* Logo Ahead */}
         <div className={styles.logo}>

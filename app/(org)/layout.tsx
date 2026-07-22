@@ -16,12 +16,14 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
     .single();
 
   const { data: tenant } = user?.tenant_id
-    ? await supabase.from("tenants").select("name").eq("id", user.tenant_id).single()
+    ? await supabase.from("tenants").select("name, subscription_status").eq("id", user.tenant_id).single()
     : { data: null };
+
+  const hasSubscription = tenant?.subscription_status === "active" || tenant?.subscription_status === "trialing";
 
   return (
     <>
-      <OrgShell tenantName={tenant?.name ?? "Mon espace"} userRole={user?.role ?? ""}>
+      <OrgShell tenantName={tenant?.name ?? "Mon espace"} userRole={user?.role ?? ""} hasSubscription={hasSubscription}>
         {children}
       </OrgShell>
       <Toaster

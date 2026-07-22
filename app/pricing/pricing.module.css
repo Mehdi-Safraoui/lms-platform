@@ -1,0 +1,235 @@
+.page {
+  min-height: 100vh;
+  background: #f7f8fb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64px 24px 80px;
+}
+
+.logo {
+  font-family: "Barlow", sans-serif;
+  font-weight: 700;
+  font-size: 1.4rem;
+  color: #1e2d4f;
+  margin-bottom: 48px;
+  letter-spacing: -0.02em;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #f07c48;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f07c48;
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: "Barlow", sans-serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #1e2d4f;
+  line-height: 1.15;
+  margin: 0 0 12px;
+}
+
+.subtitle {
+  font-size: 1rem;
+  color: #6b7280;
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  width: 100%;
+  max-width: 960px;
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+  }
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  transition: box-shadow 0.2s;
+}
+
+.card:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+.cardPopular {
+  border-color: #1e2d4f;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(30, 45, 79, 0.12);
+}
+
+.popularBadge {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e2d4f;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 14px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.planName {
+  font-family: "Barlow", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e2d4f;
+  margin: 0 0 8px;
+}
+
+.planDesc {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.priceAmount {
+  font-family: "Barlow", sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1e2d4f;
+}
+
+.pricePeriod {
+  font-size: 0.82rem;
+  color: #9ca3af;
+}
+
+.divider {
+  height: 1px;
+  background: #f0f0f2;
+  margin-bottom: 20px;
+}
+
+.featureList {
+  list-style: none;
+  margin: 0 0 28px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.featureItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.83rem;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.checkIcon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: #f07c48;
+  margin-top: 1px;
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  padding: 12px 0;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  background: #1e2d4f;
+  color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: #2a3d66;
+}
+
+.btnOutline {
+  background: transparent;
+  color: #1e2d4f;
+  border: 1.5px solid #1e2d4f;
+}
+
+.btnOutline:hover:not(:disabled) {
+  background: #f0f2f7;
+}
+
+.btnContact {
+  background: #f07c48;
+  color: #fff;
+}
+
+.btnContact:hover:not(:disabled) {
+  background: #e06a38;
+}
+
+.backLink {
+  margin-top: 40px;
+  font-size: 0.82rem;
+  color: #9ca3af;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: #1e2d4f;
+}

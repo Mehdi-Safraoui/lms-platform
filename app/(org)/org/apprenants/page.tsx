@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { hasActiveSubscription } from "@/lib/subscription";
 import ApprenantTable from "./ApprenantTable";
 
 export default async function ApprenantPage() {
@@ -19,6 +20,8 @@ export default async function ApprenantPage() {
   }
 
   const tenantId = currentUser.tenant_id;
+
+  if (!(await hasActiveSubscription(tenantId))) redirect("/pricing");
 
   // Tous les apprenants du tenant
   const { data: apprenants } = await supabase

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api/require-auth";
+import { hasActiveSubscription } from "@/lib/subscription";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -8,6 +9,10 @@ export async function POST(req: Request) {
 
   if (!guard.tenantId) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
+
+  if (!(await hasActiveSubscription(guard.tenantId))) {
+    return NextResponse.json({ error: "Abonnement requis" }, { status: 403 });
   }
 
   const { formationId, enabled } = await req.json();
