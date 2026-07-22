@@ -6,6 +6,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { LayoutDashboard, Users, BookOpen } from "lucide-react";
 import styles from "./layout.module.css";
 import SubscriptionModal from "./SubscriptionModal";
+import NotificationBell from "@/components/shared/NotificationBell";
 
 const orgNavItems = [
   { href: "/org", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
@@ -81,7 +82,9 @@ export default function OrgShell({ tenantName, userRole, hasSubscription, childr
           <div className={styles.topbarLeft}>
             <span className={styles.topbarBadge}>{tenantName}</span>
           </div>
-          <div className={styles.topbarRight} />
+          <div className={styles.topbarRight}>
+            <NotificationBell />
+          </div>
         </header>
         <div className={styles.content}>{children}</div>
       </div>

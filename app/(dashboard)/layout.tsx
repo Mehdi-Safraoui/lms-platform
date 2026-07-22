@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { BookOpen, Building2, GraduationCap, Award } from "lucide-react";
 import { Toaster } from "sonner";
+import NotificationBell from "@/components/shared/NotificationBell";
 import styles from "./layout.module.css";
 
 const adminNavItems = [
@@ -69,7 +70,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className={styles.topbarLeft}>
             <span className={styles.topbarBadge}>{isApprenant ? "Espace apprenant" : "Super-admin"}</span>
           </div>
-          <div className={styles.topbarRight} />
+          <div className={styles.topbarRight}>
+            <NotificationBell />
+          </div>
         </header>
         <div className={styles.content}>{children}</div>
       </div>

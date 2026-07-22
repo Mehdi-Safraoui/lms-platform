@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { notifySubscriptionActivated } from "@/lib/notifications";
 
 const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.STRIPE_PRICE_DECOUVERTE ?? ""]: "decouverte",
@@ -38,17 +39,27 @@ export async function POST(req: NextRequest) {
       const priceId = subscription.items.data[0]?.price.id ?? "";
       const plan = PRICE_TO_PLAN[priceId] ?? null;
 
-      const { error } = await supabase
+      const { data: updatedTenant, error } = await supabase
         .from("tenants")
         .update({
           subscription_plan: plan,
           subscription_status: "active",
           stripe_subscription_id: subscriptionId,
         })
-        .eq("id", tenantId);
+        .eq("id", tenantId)
+        .select("name")
+        .single();
 
-      if (error) console.error("[stripe webhook] checkout.session.completed update error:", error);
-      else console.log(`[stripe webhook] tenant ${tenantId} → plan=${plan} active`);
+      if (error) {
+        console.error("[stripe webhook] checkout.session.completed update error:", error);
+      } else {
+        console.log(`[stripe webhook] tenant ${tenantId} → plan=${plan} active`);
+        try {
+          await notifySubscriptionActivated(tenantId, updatedTenant?.name ?? "Votre entreprise", plan);
+        } catch (notifError) {
+          console.error("[stripe webhook] notifySubscriptionActivated error:", notifError);
+        }
+      }
       break;
     }
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { hasActiveSubscription } from "@/lib/subscription";
 import EnrollButton from "./EnrollButton";
 import styles from "./formation.module.css";
 
@@ -14,6 +15,8 @@ const NIVEAU_LABEL: Record<string, string> = {
   avance: "Avancé",
 };
 
+const FREE_PREVIEW_LESSON_COUNT = 2;
+
 export default async function FormationDetailPage({ params }: Props) {
   const { formationId } = await params;
   const { userId: clerkUserId } = await auth();
@@ -23,11 +26,13 @@ export default async function FormationDetailPage({ params }: Props) {
     supabase.from("formations").select("id, title, description, niveau").eq("id", formationId).eq("is_published", true).single(),
     supabase.from("modules").select("id, title, order_index").eq("formation_id", formationId).order("order_index"),
     clerkUserId
-      ? supabase.from("users").select("id").eq("clerk_user_id", clerkUserId).single()
+      ? supabase.from("users").select("id, tenant_id").eq("clerk_user_id", clerkUserId).single()
       : { data: null },
   ]);
 
   if (!formation) notFound();
+
+  const tenantHasSubscription = dbUser?.tenant_id ? await hasActiveSubscription(dbUser.tenant_id) : false;
 
   // Vérifier si l'apprenant est inscrit à cette formation
   let isEnrolled = false;
@@ -147,6 +152,7 @@ export default async function FormationDetailPage({ params }: Props) {
             <div className={styles.lessons}>
               {lessonsByModule[mod.id]?.map((lesson) => {
                 const status = userProgress[lesson.id];
+                const isLocked = !tenantHasSubscription && allLeconIds.indexOf(lesson.id) >= FREE_PREVIEW_LESSON_COUNT;
                 return (
                   <Link
                     key={lesson.id}
@@ -162,7 +168,9 @@ export default async function FormationDetailPage({ params }: Props) {
                     )}
                     <span className={styles.lessonTitle}>{lesson.title}</span>
                     <span className={styles.lessonStatus}>
-                      {status === "completed" ? (
+                      {isLocked ? (
+                        <Lock size={13} className={styles.lockIcon} />
+                      ) : status === "completed" ? (
                         <CheckCircle size={15} className={styles.statusDone} />
                       ) : status === "in_progress" ? (
                         <Circle size={15} className={styles.statusInProgress} />

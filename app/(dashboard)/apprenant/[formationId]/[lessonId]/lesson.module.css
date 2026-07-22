@@ -18,6 +18,79 @@
 
 .back:hover { color: var(--text); }
 
+/* ── Locked wall (essai gratuit) ── */
+.lockedWall {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 48px 40px;
+  margin-top: 12px;
+}
+
+.lockedIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #1e2d4f;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.lockedTitle {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.lockedText {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 420px;
+  margin-bottom: 16px;
+}
+
+.lockedContact {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f07c48;
+  margin-bottom: 20px;
+}
+
+.lockedNotifyBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  background: #f07c48;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.lockedNotifyBtn:hover:not(:disabled) {
+  background: #e0693a;
+  transform: translateY(-1px);
+}
+
+.lockedNotifyBtn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .title {
   font-family: var(--font-barlow), sans-serif;
   font-size: 30px;
