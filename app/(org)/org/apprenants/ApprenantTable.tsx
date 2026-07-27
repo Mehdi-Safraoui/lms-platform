@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Users, Search } from "lucide-react";
+import { Users, Search, UserPlus } from "lucide-react";
 import styles from "./apprenants.module.css";
+import InviteApprenantModal from "./InviteApprenantModal";
 
 interface Apprenant {
   id: string;
@@ -51,6 +52,7 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
   const [selectedFormation, setSelectedFormation] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "not_started" | "in_progress" | "completed">("all");
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
   const currentFormation = useMemo(
     () => formations.find((f) => f.id === selectedFormation) ?? null,
@@ -81,11 +83,17 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
 
   return (
     <div className={styles.page}>
+      {inviteModalOpen && <InviteApprenantModal onClose={() => setInviteModalOpen(false)} />}
+
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Apprenants</h1>
           <p className={styles.subtitle}>{apprenants.length} apprenant{apprenants.length > 1 ? "s" : ""} inscrits</p>
         </div>
+        <button className={styles.btnInvite} onClick={() => setInviteModalOpen(true)}>
+          <UserPlus size={16} strokeWidth={2} />
+          Ajouter un apprenant
+        </button>
       </div>
 
       {/* Filters */}
