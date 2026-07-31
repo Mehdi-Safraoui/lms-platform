@@ -1,6 +1,6 @@
 .page {
   padding: 40px 48px;
-  max-width: 900px;
+  max-width: 1080px;
   margin: 0 auto;
 }
 
@@ -40,43 +40,55 @@
 }
 
 .grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 
 .card {
   display: flex;
-  align-items: center;
-  gap: 20px;
+  flex-direction: column;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px 24px;
-  transition: border-color 0.15s;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.card:hover {
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.08);
+  transform: translateY(-2px);
 }
 
 .cardEnabled {
   border-color: #bbf7d0;
-  background: #f0fdf4;
 }
 
 @media (prefers-color-scheme: dark) {
   .cardEnabled {
-    background: rgba(187, 247, 208, 0.05);
+    border-color: rgba(187, 247, 208, 0.35);
   }
 }
 
-.cardBody {
-  flex: 1;
-  min-width: 0;
+.cardIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: var(--coral-light, #fdf0ec);
+  color: var(--coral);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
 }
 
 .cardMeta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .badge {
@@ -102,27 +114,54 @@
 }
 
 .cardTitle {
-  font-size: 15px;
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text);
-  margin-bottom: 4px;
+  line-height: 1.3;
+  margin-bottom: 6px;
 }
 
 .cardDesc {
   font-size: 13px;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.cardStats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-top: 14px;
+  margin-top: auto;
+  border-top: 1px solid var(--border-soft);
+  margin-bottom: 16px;
+}
+
+.cardStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.cardStat svg { color: var(--coral); flex-shrink: 0; }
+
+.cardFooter {
+  display: flex;
 }
 
 .toggleBtn {
-  flex-shrink: 0;
-  height: 36px;
+  width: 100%;
+  height: 38px;
   padding: 0 18px;
-  border-radius: 8px;
+  border-radius: 9px;
   font-size: 13px;
   font-weight: 600;
   font-family: var(--font-jakarta), sans-serif;

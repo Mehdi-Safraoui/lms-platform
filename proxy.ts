@@ -28,7 +28,7 @@ export default clerkMiddleware(async (auth, req) => {
     // / → redirect immédiat si le rôle est connu (évite le flash blank page)
     // Si user pas encore en DB (sign-up race condition) → app/page.tsx gère le WaitForSync
     if (isRootRoute(req)) {
-      if (user?.role === "super_admin") return NextResponse.redirect(new URL("/admin/catalog", req.url));
+      if (user?.role === "super_admin") return NextResponse.redirect(new URL("/admin", req.url));
       if (user?.role === "admin_tenant" || user?.role === "tuteur") return NextResponse.redirect(new URL("/org", req.url));
       if (user?.role === "apprenant") return NextResponse.redirect(new URL("/apprenant", req.url));
       return; // user pas encore en DB → laisse app/page.tsx afficher WaitForSync
@@ -48,7 +48,7 @@ export default clerkMiddleware(async (auth, req) => {
 
     // /apprenant/* → apprenant uniquement
     if (isApprenantRoute(req) && user) {
-      if (user.role === "super_admin") return NextResponse.redirect(new URL("/admin/catalog", req.url));
+      if (user.role === "super_admin") return NextResponse.redirect(new URL("/admin", req.url));
       if (user.role === "admin_tenant" || user.role === "tuteur") return NextResponse.redirect(new URL("/org", req.url));
     }
   }

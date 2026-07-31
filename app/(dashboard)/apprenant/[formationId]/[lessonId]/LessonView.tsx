@@ -3,7 +3,18 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ChevronLeft, ChevronRight, CheckCircle, XCircle, Trophy, ClipboardList, Check } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle,
+  XCircle,
+  Trophy,
+  ClipboardList,
+  Check,
+  Clock,
+  PlayCircle,
+  FileText,
+} from "lucide-react";
 import { toast } from "sonner";
 import { getVideoEmbedUrl } from "@/lib/video";
 import styles from "./lesson.module.css";
@@ -30,6 +41,18 @@ interface Props {
   quizData: QuizData | null;
   prevLesson: AdjacentLesson | null;
   nextLesson: AdjacentLesson | null;
+  moduleTitle: string;
+  moduleNumber: number;
+  lessonIndexInModule: number;
+  lessonsInModule: number;
+  totalInFormation: number;
+  completedInFormation: number;
+}
+
+function estimateReadingMinutes(markdown: string | null): number {
+  if (!markdown) return 1;
+  const words = markdown.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
 }
 
 // ── Quiz Player ──────────────────────────────────────────
@@ -121,7 +144,9 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
                 }
                 return (
                   <button key={oi} className={optClass} onClick={() => select(qi, oi)} disabled={submitted}>
-                    <span className={styles.quizOptionDot} />
+                    <span className={`${styles.quizOptionDot} ${selected ? styles.quizOptionDotSelected : ""}`}>
+                      {selected && <span className={styles.quizOptionDotInner} />}
+                    </span>
                     <span>{o.text}</span>
                     {submitted && isCorrect && <CheckCircle size={15} className={styles.quizOptionIcon} />}
                     {submitted && selected && !isCorrect && <XCircle size={15} className={styles.quizOptionIcon} />}
@@ -166,8 +191,26 @@ function QuizIntro({ quiz, onStart }: { quiz: QuizData; onStart: () => void }) {
 }
 
 // ── Lesson View ──────────────────────────────────────────
-export default function LessonView({ lessonId, formationId, formationTitle, lessonTitle, contentType, contentMarkdown, videoUrl, quizData, prevLesson, nextLesson }: Props) {
+export default function LessonView({
+  lessonId,
+  formationId,
+  formationTitle,
+  lessonTitle,
+  contentType,
+  contentMarkdown,
+  videoUrl,
+  quizData,
+  prevLesson,
+  nextLesson,
+  moduleTitle,
+  moduleNumber,
+  lessonIndexInModule,
+  lessonsInModule,
+  totalInFormation,
+  completedInFormation,
+}: Props) {
   const embedUrl = videoUrl ? getVideoEmbedUrl(videoUrl) : null;
+  const progressPct = totalInFormation > 0 ? Math.round((completedInFormation / totalInFormation) * 100) : 0;
   const [quizStarted, setQuizStarted] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -219,86 +262,140 @@ export default function LessonView({ lessonId, formationId, formationTitle, less
 
   return (
     <div className={styles.page}>
-      <Link href={`/apprenant/${formationId}`} className={styles.back}>
-        <ChevronLeft size={15} />
-        {formationTitle}
-      </Link>
+      <nav className={styles.breadcrumb}>
+        <Link href="/apprenant">Mes formations</Link>
+        <ChevronRight size={13} />
+        <Link href={`/apprenant/${formationId}`}>{formationTitle}</Link>
+        <ChevronRight size={13} />
+        <span>{lessonTitle}</span>
+      </nav>
 
-      <h1 className={styles.title}>{lessonTitle}</h1>
-
-      {embedUrl && (
-        <div className={styles.videoWrapper}>
-          <iframe
-            src={embedUrl}
-            allowFullScreen
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            className={styles.videoIframe}
-          />
-        </div>
-      )}
-
-      {contentType === "markdown" && contentMarkdown && (
-        <div className={styles.markdownWrapper} data-color-mode="light">
-          <Markdown source={contentMarkdown} />
-        </div>
-      )}
-
-      {contentType === "video" && !embedUrl && videoUrl && (
-        <p className={styles.videoFallback}>
-          Vidéo non disponible.{" "}
-          <a href={videoUrl} target="_blank" rel="noopener noreferrer">Ouvrir le lien</a>
-        </p>
-      )}
-
-      {contentType === "quiz" && quizData && quizData.quiz_questions?.length > 0 && (
-        quizStarted
-          ? <QuizPlayer quiz={quizData} />
-          : <QuizIntro quiz={quizData} onStart={() => setQuizStarted(true)} />
-      )}
-
-      {contentType === "quiz" && (!quizData || !quizData.quiz_questions?.length) && (
-        <p className={styles.videoFallback}>Ce quiz n&apos;a pas encore été configuré.</p>
-      )}
-
-      {contentType !== "quiz" && (
-        <div className={styles.completeRow}>
-          <button
-            className={`${styles.completeBtn} ${completed ? styles.completeBtnDone : ""}`}
-            onClick={completeLesson}
-            disabled={completed || completing}
-          >
-            <Check size={15} />
-            {completed ? "Leçon terminée" : completing ? "Enregistrement…" : "Marquer comme terminé"}
-          </button>
-        </div>
-      )}
-
-      {(prevLesson || nextLesson) && (
-        <div className={styles.lessonNav}>
-          <div className={styles.lessonNavSlot}>
-            {prevLesson && (
-              <Link href={`/apprenant/${formationId}/${prevLesson.id}`} className={styles.lessonNavBtn}>
-                <ChevronLeft size={16} />
-                <span className={styles.lessonNavLabel}>
-                  <em>Précédent</em>
-                  <span>{prevLesson.title}</span>
-                </span>
-              </Link>
-            )}
+      <div className={styles.layout}>
+        <div className={styles.main}>
+          <div className={styles.eyebrow}>
+            MODULE {String(moduleNumber).padStart(2, "0")} · LEÇON {lessonIndexInModule}/{lessonsInModule}
           </div>
-          <div className={`${styles.lessonNavSlot} ${styles.lessonNavSlotRight}`}>
-            {nextLesson && (
-              <Link href={`/apprenant/${formationId}/${nextLesson.id}`} className={`${styles.lessonNavBtn} ${styles.lessonNavBtnNext}`}>
-                <span className={styles.lessonNavLabel}>
-                  <em>Suivant</em>
-                  <span>{nextLesson.title}</span>
-                </span>
-                <ChevronRight size={16} />
-              </Link>
+          <h1 className={styles.title}>{lessonTitle}</h1>
+
+          <div className={styles.metaRow}>
+            {contentType === "markdown" && (
+              <span className={styles.metaItem}>
+                <Clock size={14} />
+                {estimateReadingMinutes(contentMarkdown)} min de lecture
+              </span>
             )}
+            {contentType === "video" && (
+              <span className={styles.metaItem}>
+                <PlayCircle size={14} />
+                Format vidéo
+              </span>
+            )}
+            {contentType === "quiz" && (
+              <span className={styles.metaItem}>
+                <ClipboardList size={14} />
+                {quizData?.quiz_questions?.length ?? 0} questions
+              </span>
+            )}
+            <span className={styles.metaItem}>
+              <FileText size={14} />
+              {moduleTitle}
+            </span>
           </div>
+
+          {embedUrl && (
+            <div className={styles.videoWrapper}>
+              <iframe
+                src={embedUrl}
+                allowFullScreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                className={styles.videoIframe}
+              />
+            </div>
+          )}
+
+          {contentType === "markdown" && contentMarkdown && (
+            <div className={styles.markdownWrapper} data-color-mode="light">
+              <Markdown source={contentMarkdown} />
+            </div>
+          )}
+
+          {contentType === "video" && !embedUrl && videoUrl && (
+            <p className={styles.videoFallback}>
+              Vidéo non disponible.{" "}
+              <a href={videoUrl} target="_blank" rel="noopener noreferrer">Ouvrir le lien</a>
+            </p>
+          )}
+
+          {contentType === "quiz" && quizData && quizData.quiz_questions?.length > 0 && (
+            quizStarted
+              ? <QuizPlayer quiz={quizData} />
+              : <QuizIntro quiz={quizData} onStart={() => setQuizStarted(true)} />
+          )}
+
+          {contentType === "quiz" && (!quizData || !quizData.quiz_questions?.length) && (
+            <p className={styles.videoFallback}>Ce quiz n&apos;a pas encore été configuré.</p>
+          )}
+
+          {contentType !== "quiz" && (
+            <div className={styles.completeRow}>
+              <button
+                className={`${styles.completeBtn} ${completed ? styles.completeBtnDone : ""}`}
+                onClick={completeLesson}
+                disabled={completed || completing}
+              >
+                <Check size={15} />
+                {completed ? "Leçon terminée" : completing ? "Enregistrement…" : "Marquer comme terminé"}
+              </button>
+            </div>
+          )}
+
+          {(prevLesson || nextLesson) && (
+            <div className={styles.lessonNav}>
+              <div className={styles.lessonNavSlot}>
+                {prevLesson && (
+                  <Link href={`/apprenant/${formationId}/${prevLesson.id}`} className={styles.lessonNavBtn}>
+                    <ChevronLeft size={16} />
+                    <span className={styles.lessonNavLabel}>
+                      <em>Précédent</em>
+                      <span>{prevLesson.title}</span>
+                    </span>
+                  </Link>
+                )}
+              </div>
+              <div className={`${styles.lessonNavSlot} ${styles.lessonNavSlotRight}`}>
+                {nextLesson && (
+                  <Link href={`/apprenant/${formationId}/${nextLesson.id}`} className={`${styles.lessonNavBtn} ${styles.lessonNavBtnNext}`}>
+                    <span className={styles.lessonNavLabel}>
+                      <em>Suivant</em>
+                      <span>{nextLesson.title}</span>
+                    </span>
+                    <ChevronRight size={16} />
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+
+        <aside className={styles.sidebar}>
+          <div className={styles.sidebarCard}>
+            <span className={styles.sidebarLabel}>Progression du parcours</span>
+            <div className={styles.sidebarProgressValue}>{completedInFormation}/{totalInFormation}</div>
+            <div className={styles.progressBar}>
+              <div className={styles.progressFill} style={{ width: `${progressPct}%` }} />
+            </div>
+            <span className={styles.sidebarCaption}>{progressPct}% de la formation terminée</span>
+          </div>
+
+          <div className={styles.sidebarCard}>
+            <span className={styles.sidebarLabel}>Ce module</span>
+            <span className={styles.sidebarModuleTitle}>{moduleTitle}</span>
+            <span className={styles.sidebarCaption}>
+              Leçon {lessonIndexInModule} sur {lessonsInModule}
+            </span>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }

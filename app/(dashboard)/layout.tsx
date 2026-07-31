@@ -3,19 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { BookOpen, Building2, GraduationCap, Award } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, Award, LayoutDashboard } from "lucide-react";
 import { Toaster } from "sonner";
 import NotificationBell from "@/components/shared/NotificationBell";
 import styles from "./layout.module.css";
 
 const adminNavItems = [
-  { href: "/admin/catalog", label: "Catalogue IA", icon: BookOpen },
-  { href: "/admin/tenants", label: "Tenants", icon: Building2 },
+  { href: "/admin", label: "Vue globale", icon: LayoutDashboard, exact: true },
+  { href: "/admin/catalog", label: "Catalogue IA", icon: BookOpen, exact: false },
+  { href: "/admin/tenants", label: "Tenants", icon: Building2, exact: false },
 ];
 
 const apprenantNavItems = [
-  { href: "/apprenant", label: "Mes formations", icon: GraduationCap },
-  { href: "/apprenant/attestations", label: "Mes attestations", icon: Award },
+  { href: "/apprenant", label: "Mes formations", icon: GraduationCap, exact: true },
+  { href: "/apprenant/attestations", label: "Mes attestations", icon: Award, exact: false },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -42,16 +43,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Nav */}
         <nav className={styles.nav}>
           <span className={styles.navSection}>{sectionLabel}</span>
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`${styles.navItem} ${pathname === item.href || pathname.startsWith(item.href + "/") ? styles.active : ""}`}
-            >
-              <item.icon size={17} strokeWidth={1.75} />
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`${styles.navItem} ${isActive ? styles.active : ""}`}
+              >
+                <item.icon size={17} strokeWidth={1.75} />
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Bottom */}

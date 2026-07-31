@@ -1,0 +1,292 @@
+.page {
+  padding: 40px 48px 64px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--coral);
+  margin-bottom: 8px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--coral);
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.4px;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 32px;
+}
+
+.topRow {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+@media (max-width: 780px) {
+  .topRow { grid-template-columns: 1fr; }
+}
+
+/* ── Plan card (navy) ── */
+.planCard {
+  background: var(--navy);
+  color: #fff;
+  border-radius: 18px;
+  padding: 28px 30px;
+  position: relative;
+  overflow: hidden;
+}
+
+.planCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.planCardLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+
+.statusActive { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+.statusPastDue { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+.statusCanceled { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+
+.planName {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  margin-bottom: 8px;
+}
+
+.planPrice {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 20px;
+}
+
+.planDivider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin-bottom: 20px;
+}
+
+.planStats {
+  display: flex;
+  gap: 32px;
+}
+
+.planStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.planStatValue {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.planStatLabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Payment card ── */
+.paymentCard {
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.paymentLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.paymentInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.paymentInfo svg {
+  color: var(--navy);
+  flex-shrink: 0;
+}
+
+.paymentCardNumber {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.paymentCardExpiry {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.paymentEmpty {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.btnManage {
+  margin-top: auto;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btnManage:hover:not(:disabled) { background: var(--bg-alt); }
+.btnManage:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Invoices ── */
+.sectionTitle {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.empty {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.tableWrap {
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead tr {
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  padding: 12px 20px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: middle;
+}
+
+.table tr:last-child td { border-bottom: none; }
+
+.invoiceCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.invoiceCell svg { color: var(--text-muted); flex-shrink: 0; }
+
+.cellMuted { color: var(--text-muted); }
+
+.invoiceStatus {
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.invoiceStatusPaid {
+  background: #dcfce7;
+  color: #16a34a;
+  border-color: transparent;
+}
+
+.cellActions {
+  text-align: right;
+}
+
+.downloadBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.downloadBtn:hover { background: var(--bg-alt); color: var(--navy); }

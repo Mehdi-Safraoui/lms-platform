@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock } from "lucide-react";
+import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock, BookOpen, Layers, Clock } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { formatDuration } from "@/lib/utils";
 import EnrollButton from "./EnrollButton";
 import styles from "./formation.module.css";
 
@@ -23,7 +24,12 @@ export default async function FormationDetailPage({ params }: Props) {
   const supabase = createServiceRoleSupabaseClient();
 
   const [{ data: formation }, { data: modules }, { data: dbUser }] = await Promise.all([
-    supabase.from("formations").select("id, title, description, niveau").eq("id", formationId).eq("is_published", true).single(),
+    supabase
+      .from("formations")
+      .select("id, title, description, niveau, estimated_duration_minutes, attestation_threshold_pct")
+      .eq("id", formationId)
+      .eq("is_published", true)
+      .single(),
     supabase.from("modules").select("id, title, order_index").eq("formation_id", formationId).order("order_index"),
     clerkUserId
       ? supabase.from("users").select("id, tenant_id").eq("clerk_user_id", clerkUserId).single()
@@ -56,11 +62,26 @@ export default async function FormationDetailPage({ params }: Props) {
           <span>{formation.title}</span>
         </nav>
 
+        <div className={styles.eyebrow}>
+          <span className={styles.eyebrowDot} />
+          {formation.niveau ? NIVEAU_LABEL[formation.niveau] ?? formation.niveau : "Formation"}
+        </div>
+
         <h1 className={styles.title}>{formation.title}</h1>
         {formation.description && <p className={styles.desc}>{formation.description}</p>}
-        {formation.niveau && (
-          <span className={styles.badge}>{NIVEAU_LABEL[formation.niveau] ?? formation.niveau}</span>
-        )}
+
+        <div className={styles.metaRow}>
+          <span className={styles.metaItem}>
+            <Layers size={14} />
+            {modules?.length ?? 0} module{(modules?.length ?? 0) > 1 ? "s" : ""}
+          </span>
+          {formation.estimated_duration_minutes && (
+            <span className={styles.metaItem}>
+              <Clock size={14} />
+              {formatDuration(formation.estimated_duration_minutes)}
+            </span>
+          )}
+        </div>
 
         <div className={styles.enrollCta}>
           <div className={styles.enrollCtaText}>
@@ -74,8 +95,10 @@ export default async function FormationDetailPage({ params }: Props) {
           {(modules ?? []).map((mod, idx) => (
             <div key={mod.id} className={`${styles.module} ${styles.moduleLocked}`}>
               <div className={styles.moduleHeader}>
-                <span className={styles.moduleIndex}>Module {idx + 1}</span>
-                <h2 className={styles.moduleTitle}>{mod.title}</h2>
+                <span className={styles.moduleNumber}>{String(idx + 1).padStart(2, "0")}</span>
+                <div className={styles.moduleHeaderText}>
+                  <h2 className={styles.moduleTitle}>{mod.title}</h2>
+                </div>
                 <Lock size={14} className={styles.lockIcon} />
               </div>
             </div>
@@ -124,21 +147,44 @@ export default async function FormationDetailPage({ params }: Props) {
         <span>{formation.title}</span>
       </nav>
 
+      <div className={styles.eyebrow}>
+        <span className={styles.eyebrowDot} />
+        {formation.niveau ? NIVEAU_LABEL[formation.niveau] ?? formation.niveau : "Formation"}
+      </div>
+
       <h1 className={styles.title}>{formation.title}</h1>
       {formation.description && <p className={styles.desc}>{formation.description}</p>}
-      {formation.niveau && (
-        <span className={styles.badge}>{NIVEAU_LABEL[formation.niveau] ?? formation.niveau}</span>
-      )}
+
+      <div className={styles.metaRow}>
+        <span className={styles.metaItem}>
+          <Layers size={14} />
+          {modules?.length ?? 0} module{(modules?.length ?? 0) > 1 ? "s" : ""}
+        </span>
+        <span className={styles.metaItem}>
+          <BookOpen size={14} />
+          {totalLessons} leçon{totalLessons > 1 ? "s" : ""}
+        </span>
+        {formation.estimated_duration_minutes && (
+          <span className={styles.metaItem}>
+            <Clock size={14} />
+            {formatDuration(formation.estimated_duration_minutes)}
+          </span>
+        )}
+      </div>
 
       {totalLessons > 0 && (
-        <div className={styles.progressBlock}>
+        <div className={styles.progressCard}>
           <div className={styles.progressMeta}>
-            <span>{completedCount}/{totalLessons} leçons terminées</span>
+            <span className={styles.progressLabel}>Votre progression</span>
             <span className={styles.progressPct}>{completionRate}%</span>
           </div>
           <div className={styles.progressBar}>
             <div className={styles.progressFill} style={{ width: `${completionRate}%` }} />
           </div>
+          <span className={styles.progressCaption}>
+            {completedCount}/{totalLessons} leçons terminées · Attestation à {formation.attestation_threshold_pct}% de complétion
+            {completionRate >= formation.attestation_threshold_pct ? " ✓" : ""}
+          </span>
         </div>
       )}
 
@@ -146,11 +192,16 @@ export default async function FormationDetailPage({ params }: Props) {
         {(modules ?? []).map((mod, idx) => (
           <div key={mod.id} className={styles.module}>
             <div className={styles.moduleHeader}>
-              <span className={styles.moduleIndex}>Module {idx + 1}</span>
-              <h2 className={styles.moduleTitle}>{mod.title}</h2>
+              <span className={styles.moduleNumber}>{String(idx + 1).padStart(2, "0")}</span>
+              <div className={styles.moduleHeaderText}>
+                <h2 className={styles.moduleTitle}>{mod.title}</h2>
+                <span className={styles.moduleCaption}>
+                  {lessonsByModule[mod.id]?.length ?? 0} leçon{(lessonsByModule[mod.id]?.length ?? 0) > 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
             <div className={styles.lessons}>
-              {lessonsByModule[mod.id]?.map((lesson) => {
+              {lessonsByModule[mod.id]?.map((lesson, lessonIdx) => {
                 const status = userProgress[lesson.id];
                 const isLocked = !tenantHasSubscription && allLeconIds.indexOf(lesson.id) >= FREE_PREVIEW_LESSON_COUNT;
                 return (
@@ -159,14 +210,19 @@ export default async function FormationDetailPage({ params }: Props) {
                     href={`/apprenant/${formationId}/${lesson.id}`}
                     className={styles.lesson}
                   >
-                    {lesson.content_type === "video" ? (
-                      <Video size={14} className={styles.lessonIcon} />
-                    ) : lesson.content_type === "quiz" ? (
-                      <ClipboardList size={14} className={styles.lessonIcon} />
-                    ) : (
-                      <FileText size={14} className={styles.lessonIcon} />
-                    )}
-                    <span className={styles.lessonTitle}>{lesson.title}</span>
+                    <span className={styles.lessonIconWrap}>
+                      {lesson.content_type === "video" ? (
+                        <Video size={14} />
+                      ) : lesson.content_type === "quiz" ? (
+                        <ClipboardList size={14} />
+                      ) : (
+                        <FileText size={14} />
+                      )}
+                    </span>
+                    <span className={styles.lessonMeta}>
+                      <span className={styles.lessonIndex}>Leçon {lessonIdx + 1}</span>
+                      <span className={styles.lessonTitle}>{lesson.title}</span>
+                    </span>
                     <span className={styles.lessonStatus}>
                       {isLocked ? (
                         <Lock size={13} className={styles.lockIcon} />
@@ -174,7 +230,9 @@ export default async function FormationDetailPage({ params }: Props) {
                         <CheckCircle size={15} className={styles.statusDone} />
                       ) : status === "in_progress" ? (
                         <Circle size={15} className={styles.statusInProgress} />
-                      ) : null}
+                      ) : (
+                        <ChevronRight size={15} className={styles.lessonArrow} />
+                      )}
                     </span>
                   </Link>
                 );

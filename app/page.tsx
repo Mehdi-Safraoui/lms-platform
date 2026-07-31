@@ -15,7 +15,7 @@ export default async function Home() {
     .eq("clerk_user_id", clerkUserId)
     .single();
 
-  if (user?.role === "super_admin") redirect("/admin/catalog");
+  if (user?.role === "super_admin") redirect("/admin");
   if (user?.role === "admin_tenant" || user?.role === "tuteur") redirect("/org");
   if (user?.role === "apprenant") redirect("/apprenant");
 

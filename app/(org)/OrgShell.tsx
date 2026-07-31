@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { LayoutDashboard, Users, BookOpen } from "lucide-react";
+import { LayoutDashboard, Users, BookOpen, CreditCard } from "lucide-react";
 import styles from "./layout.module.css";
 import SubscriptionModal from "./SubscriptionModal";
 import NotificationBell from "@/components/shared/NotificationBell";
 
-const orgNavItems = [
+const baseNavItems = [
   { href: "/org", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
   { href: "/org/catalogue", label: "Catalogue", icon: BookOpen, exact: false },
   { href: "/org/apprenants", label: "Apprenants", icon: Users, exact: false },
+];
+
+const adminOnlyNavItems = [
+  { href: "/org/abonnement", label: "Abonnement", icon: CreditCard, exact: false },
 ];
 
 interface Props {
@@ -28,6 +32,7 @@ export default function OrgShell({ tenantName, userRole, hasSubscription, childr
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.primaryEmailAddress?.emailAddress
     : null;
   const roleLabel = userRole === "tuteur" ? "Tuteur" : "Administrateur";
+  const orgNavItems = userRole === "admin_tenant" ? [...baseNavItems, ...adminOnlyNavItems] : baseNavItems;
 
   return (
     <div className={styles.shell}>

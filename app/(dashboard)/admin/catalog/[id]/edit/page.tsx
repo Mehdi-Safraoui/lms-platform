@@ -15,7 +15,16 @@ import styles from "./editor.module.css";
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
 
 // ── Types ──────────────────────────────────────────────
-interface Formation { id: string; title: string; description: string | null; is_published: boolean; slug: string; niveau: "debutant" | "intermediaire" | "avance" | null; }
+interface Formation {
+  id: string;
+  title: string;
+  description: string | null;
+  is_published: boolean;
+  slug: string;
+  niveau: "debutant" | "intermediaire" | "avance" | null;
+  estimated_duration_minutes: number | null;
+  attestation_threshold_pct: number;
+}
 interface Module { id: string; formation_id: string; title: string; order_index: number; }
 interface Lesson { id: string; module_id: string; title: string; content_type: string; content_markdown: string | null; video_url: string | null; order_index: number; }
 type Selection =
@@ -396,6 +405,8 @@ function FormationPanel({ formation, onSave }: { formation: Formation; onSave: (
     description: formation.description ?? "",
     niveau: formation.niveau ?? "",
     is_published: formation.is_published,
+    estimated_duration_minutes: formation.estimated_duration_minutes?.toString() ?? "",
+    attestation_threshold_pct: formation.attestation_threshold_pct ?? 80,
   });
   const [saving, setSaving] = useState(false);
 
@@ -404,7 +415,11 @@ function FormationPanel({ formation, onSave }: { formation: Formation; onSave: (
     const res = await fetch(`/api/formations/${formation.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, niveau: form.niveau || null }),
+      body: JSON.stringify({
+        ...form,
+        niveau: form.niveau || null,
+        estimated_duration_minutes: form.estimated_duration_minutes ? Number(form.estimated_duration_minutes) : null,
+      }),
     });
     if (res.ok) {
       const json = await res.json();
@@ -451,6 +466,28 @@ function FormationPanel({ formation, onSave }: { formation: Formation; onSave: (
             <option value="intermediaire">Intermédiaire</option>
             <option value="avance">Avancé</option>
           </select>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Durée estimée (minutes)</label>
+          <input
+            className={styles.input}
+            type="number"
+            min={0}
+            placeholder="Ex : 240"
+            value={form.estimated_duration_minutes}
+            onChange={(e) => setForm((p) => ({ ...p, estimated_duration_minutes: e.target.value }))}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>Seuil de complétion pour l&apos;attestation (%)</label>
+          <input
+            className={styles.input}
+            type="number"
+            min={1}
+            max={100}
+            value={form.attestation_threshold_pct}
+            onChange={(e) => setForm((p) => ({ ...p, attestation_threshold_pct: Number(e.target.value) }))}
+          />
         </div>
         <label className={styles.checkboxRow}>
           <input
