@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { BookOpen, Star, CheckCircle, Flag, Flame, Target, Trophy, Lightbulb } from "lucide-react";
+import { Star, CheckCircle } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { computeBadges, detectAndPersistNewBadges } from "@/lib/badges";
+import { formationCover } from "@/lib/formationAccent";
 import BadgeUnlockToasts from "./BadgeUnlockToasts";
 import styles from "./apprenant.module.css";
 
@@ -32,13 +34,13 @@ export default async function ApprenantPage() {
     tenantFormationIds.length > 0
       ? supabase
           .from("formations")
-          .select("id, title, description, niveau")
+          .select("id, title, description, niveau, thumbnail_url")
           .eq("is_published", true)
           .in("id", tenantFormationIds)
           .order("created_at", { ascending: false })
-      : { data: [] as { id: string; title: string; description: string | null; niveau: string | null }[] },
+      : { data: [] as { id: string; title: string; description: string | null; niveau: string | null; thumbnail_url: string | null }[] },
     dbUser
-      ? supabase.from("user_tenant_formations").select("formation_id").eq("user_id", dbUser.id)
+      ? supabase.from("user_enrollments").select("formation_id").eq("user_id", dbUser.id)
       : { data: null },
   ]);
 
@@ -47,90 +49,8 @@ export default async function ApprenantPage() {
   const enrolledIds = new Set((userEnrollments ?? []).map((e) => e.formation_id));
 
   // ── Badges : calculés en direct depuis la progression réelle ──
-  const [{ data: progressRows }, { count: quizPassedCount }, { data: formationModules }] = await Promise.all([
-    dbUser
-      ? supabase.from("progress").select("lecon_id, status, updated_at").eq("user_id", dbUser.id)
-      : { data: [] as { lecon_id: string; status: string; updated_at: string }[] },
-    dbUser
-      ? supabase.from("quiz_results").select("*", { count: "exact", head: true }).eq("user_id", dbUser.id).eq("passed", true)
-      : { count: 0 },
-    tenantFormationIds.length > 0
-      ? supabase.from("modules").select("id, formation_id, lecons(id)").in("formation_id", tenantFormationIds)
-      : { data: [] as { id: string; formation_id: string; lecons: { id: string }[] }[] },
-  ]);
-
-  const completedLeconIds = new Set(
-    (progressRows ?? []).filter((p) => p.status === "completed").map((p) => p.lecon_id)
-  );
-  const activeDays = new Set((progressRows ?? []).map((p) => new Date(p.updated_at).toDateString()));
-
-  const lessonsByFormation: Record<string, string[]> = {};
-  (formationModules ?? []).forEach((m) => {
-    const ids = (m.lecons as { id: string }[] ?? []).map((l) => l.id);
-    lessonsByFormation[m.formation_id] = [...(lessonsByFormation[m.formation_id] ?? []), ...ids];
-  });
-  const hasCompletedFormation = Object.values(lessonsByFormation).some(
-    (ids) => ids.length > 0 && ids.every((id) => completedLeconIds.has(id))
-  );
-
-  const badges = [
-    {
-      id: "premier-pas",
-      label: "Premier pas",
-      description: "Terminer votre toute première leçon.",
-      icon: Flag,
-      earned: completedLeconIds.size >= 1,
-    },
-    {
-      id: "regulier",
-      label: "Apprenant régulier",
-      description: "Être actif sur au moins 3 jours différents.",
-      icon: Flame,
-      earned: activeDays.size >= 3,
-    },
-    {
-      id: "quiz",
-      label: "Quiz réussi",
-      description: "Valider au moins un quiz.",
-      icon: Target,
-      earned: (quizPassedCount ?? 0) >= 1,
-    },
-    {
-      id: "formation",
-      label: "Formation terminée",
-      description: "Terminer 100% des leçons d'une formation.",
-      icon: Trophy,
-      earned: hasCompletedFormation,
-    },
-    {
-      id: "assidu",
-      label: "Apprenant assidu",
-      description: "Terminer au moins 10 leçons au total.",
-      icon: Lightbulb,
-      earned: completedLeconIds.size >= 10,
-    },
-  ];
-
-  // ── Détection des nouveaux badges débloqués (pour la notif toast) ──
-  let newlyUnlocked: { id: string; label: string }[] = [];
-  if (dbUser) {
-    const earnedBadges = badges.filter((b) => b.earned);
-    const { data: existingBadgeRows } = await supabase
-      .from("user_badges")
-      .select("badge_id")
-      .eq("user_id", dbUser.id);
-    const alreadySeen = new Set((existingBadgeRows ?? []).map((r) => r.badge_id));
-    const toInsert = earnedBadges.filter((b) => !alreadySeen.has(b.id));
-
-    if (toInsert.length > 0) {
-      const { error: insertError } = await supabase
-        .from("user_badges")
-        .insert(toInsert.map((b) => ({ user_id: dbUser.id, badge_id: b.id })));
-      if (!insertError) {
-        newlyUnlocked = toInsert.map((b) => ({ id: b.id, label: b.label }));
-      }
-    }
-  }
+  const badges = dbUser ? await computeBadges(dbUser.id, tenantFormationIds) : [];
+  const newlyUnlocked = dbUser ? await detectAndPersistNewBadges(dbUser.id, badges) : [];
 
   return (
     <div className={styles.page}>
@@ -155,11 +75,17 @@ export default async function ApprenantPage() {
             <div className={styles.grid}>
               {formations.map((f) => {
                 const enrolled = enrolledIds.has(f.id);
+                const cover = formationCover(f.id);
                 return (
                   <Link key={f.id} href={`/apprenant/${f.id}`} className={`${styles.card} ${enrolled ? styles.cardEnrolled : ""}`}>
-                    <div className={styles.cardIcon}>
-                      <BookOpen size={20} />
-                    </div>
+                    {f.thumbnail_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={f.thumbnail_url} alt="" className={styles.cardCover} />
+                    ) : (
+                      <div className={styles.cardCoverGenerated} style={{ background: cover.gradient }}>
+                        <cover.icon size={34} color="#fff" strokeWidth={1.5} />
+                      </div>
+                    )}
                     <div className={styles.cardBody}>
                       <h2 className={styles.cardTitle}>{f.title}</h2>
                       {f.description && <p className={styles.cardDesc}>{f.description}</p>}

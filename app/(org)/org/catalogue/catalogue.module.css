@@ -54,6 +54,25 @@
   padding: 22px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  overflow: hidden;
+}
+
+.cardCover {
+  width: calc(100% + 44px);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin: -22px -22px 14px;
+  flex-shrink: 0;
+}
+
+.cardCoverGenerated {
+  width: calc(100% + 44px);
+  aspect-ratio: 16 / 9;
+  margin: -22px -22px 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .card:hover {

@@ -275,6 +275,16 @@
   gap: 6px;
 }
 
+.thumbnailPreview {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  margin-top: 4px;
+}
+
 .label {
   font-size: 13px;
   font-weight: 600;

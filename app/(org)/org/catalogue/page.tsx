@@ -4,6 +4,7 @@ import { BookOpen, Layers, Clock } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { formatDuration } from "@/lib/utils";
+import { formationCover } from "@/lib/formationAccent";
 import CatalogueToggle from "./CatalogueToggle";
 import styles from "./catalogue.module.css";
 
@@ -32,7 +33,7 @@ export default async function CataloguePage() {
   const [{ data: formations }, { data: tenant_formations }] = await Promise.all([
     supabase
       .from("formations")
-      .select("id, title, description, niveau, estimated_duration_minutes")
+      .select("id, title, description, niveau, estimated_duration_minutes, thumbnail_url")
       .eq("is_published", true)
       .is("tenant_id", null)
       .order("created_at", { ascending: false }),
@@ -76,11 +77,17 @@ export default async function CataloguePage() {
           {formations.map((f) => {
             const counts = countsByFormation[f.id] ?? { moduleCount: 0, lessonCount: 0 };
             const enabled = enrolledIds.has(f.id);
+            const cover = formationCover(f.id);
             return (
               <div key={f.id} className={`${styles.card} ${enabled ? styles.cardEnabled : ""}`}>
-                <div className={styles.cardIcon}>
-                  <BookOpen size={20} strokeWidth={1.75} />
-                </div>
+                {f.thumbnail_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={f.thumbnail_url} alt="" className={styles.cardCover} />
+                ) : (
+                  <div className={styles.cardCoverGenerated} style={{ background: cover.gradient }}>
+                    <cover.icon size={34} color="#fff" strokeWidth={1.5} />
+                  </div>
+                )}
                 <div className={styles.cardMeta}>
                   {f.niveau && (
                     <span className={styles.badge}>{NIVEAU_LABEL[f.niveau] ?? f.niveau}</span>

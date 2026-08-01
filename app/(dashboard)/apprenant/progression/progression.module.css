@@ -1,0 +1,236 @@
+.page {
+  padding: 40px 48px 64px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  color: var(--coral);
+  margin-bottom: 12px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--coral);
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.4px;
+  margin-bottom: 32px;
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+@media (max-width: 800px) {
+  .statsRow { grid-template-columns: repeat(2, 1fr); }
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.statIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.statIconNavy { background: #eff0ff; color: var(--navy); }
+.statIconCoral { background: var(--coral-light, #fdf0ec); color: var(--coral); }
+.statIconGreen { background: #f0fdf4; color: #16a34a; }
+
+.statBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.statValue {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.statLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.section {
+  margin-bottom: 40px;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.formationList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.formationRow {
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.formationRowHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.formationTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.formationPct {
+  font-family: var(--font-barlow), sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.progressBar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--coral);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.formationCaption {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.badgesGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.badgeCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.badgeCardEarned {
+  border-color: #fde3d5;
+}
+
+.badgeIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-alt);
+  color: var(--text-light);
+  border: 1.5px dashed var(--border);
+  flex-shrink: 0;
+}
+
+.badgeIconEarned {
+  background: linear-gradient(135deg, var(--coral) 0%, #f0784f 100%);
+  color: #fff;
+  border: 1.5px solid transparent;
+  box-shadow: 0 3px 10px rgba(232, 96, 58, 0.35);
+}
+
+.badgeCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.badgeCardLabel {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.badgeCardDesc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.badgeStatus {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-light);
+  flex-shrink: 0;
+}
+
+.badgeStatusEarned {
+  color: var(--coral);
+}

@@ -231,7 +231,7 @@
 
 .card {
   display: flex;
-  gap: 16px;
+  flex-direction: column;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -239,12 +239,31 @@
   text-decoration: none;
   color: inherit;
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.15s;
+  overflow: hidden;
 }
 
 .card:hover {
   box-shadow: var(--shadow-md);
   border-color: var(--navy);
   transform: translateY(-1px);
+}
+
+.cardCover {
+  width: calc(100% + 40px);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin: -20px -20px 14px;
+  flex-shrink: 0;
+}
+
+.cardCoverGenerated {
+  width: calc(100% + 40px);
+  aspect-ratio: 16 / 9;
+  margin: -20px -20px 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .cardIcon {
@@ -257,6 +276,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-bottom: 14px;
 }
 
 .cardBody {

@@ -24,6 +24,7 @@ interface Formation {
   niveau: "debutant" | "intermediaire" | "avance" | null;
   estimated_duration_minutes: number | null;
   attestation_threshold_pct: number;
+  thumbnail_url: string | null;
 }
 interface Module { id: string; formation_id: string; title: string; order_index: number; }
 interface Lesson { id: string; module_id: string; title: string; content_type: string; content_markdown: string | null; video_url: string | null; order_index: number; }
@@ -407,6 +408,7 @@ function FormationPanel({ formation, onSave }: { formation: Formation; onSave: (
     is_published: formation.is_published,
     estimated_duration_minutes: formation.estimated_duration_minutes?.toString() ?? "",
     attestation_threshold_pct: formation.attestation_threshold_pct ?? 80,
+    thumbnail_url: formation.thumbnail_url ?? "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -419,6 +421,7 @@ function FormationPanel({ formation, onSave }: { formation: Formation; onSave: (
         ...form,
         niveau: form.niveau || null,
         estimated_duration_minutes: form.estimated_duration_minutes ? Number(form.estimated_duration_minutes) : null,
+        thumbnail_url: form.thumbnail_url || null,
       }),
     });
     if (res.ok) {
@@ -477,6 +480,20 @@ function FormationPanel({ formation, onSave }: { formation: Formation; onSave: (
             value={form.estimated_duration_minutes}
             onChange={(e) => setForm((p) => ({ ...p, estimated_duration_minutes: e.target.value }))}
           />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label}>URL de la cover (image)</label>
+          <input
+            className={styles.input}
+            type="url"
+            placeholder="https://…"
+            value={form.thumbnail_url}
+            onChange={(e) => setForm((p) => ({ ...p, thumbnail_url: e.target.value }))}
+          />
+          {form.thumbnail_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={form.thumbnail_url} alt="" className={styles.thumbnailPreview} />
+          )}
         </div>
         <div className={styles.field}>
           <label className={styles.label}>Seuil de complétion pour l&apos;attestation (%)</label>

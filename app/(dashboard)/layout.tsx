@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { BookOpen, Building2, GraduationCap, Award, LayoutDashboard } from "lucide-react";
+import { BookOpen, Building2, GraduationCap, TrendingUp, LayoutDashboard } from "lucide-react";
 import { Toaster } from "sonner";
 import NotificationBell from "@/components/shared/NotificationBell";
 import styles from "./layout.module.css";
@@ -16,7 +16,7 @@ const adminNavItems = [
 
 const apprenantNavItems = [
   { href: "/apprenant", label: "Mes formations", icon: GraduationCap, exact: true },
-  { href: "/apprenant/attestations", label: "Mes attestations", icon: Award, exact: false },
+  { href: "/apprenant/progression", label: "Ma progression", icon: TrendingUp, exact: false },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
