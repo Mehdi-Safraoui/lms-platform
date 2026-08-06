@@ -10,6 +10,7 @@ Deux pièges à connaître :
 
 - **`NEXT_PUBLIC_APP_URL`** doit pointer vers le vrai domaine de prod (`https://lms-platform-ten-gamma.vercel.app`), pas `localhost`. Elle sert aux `success_url`/`cancel_url` de Stripe Checkout.
 - **`STRIPE_WEBHOOK_SECRET`** et **`CLERK_WEBHOOK_SIGNING_SECRET`** de prod sont **différents** des secrets utilisés en local (voir étape 3). Ne jamais copier une valeur locale vers Vercel ou inversement.
+- **`OPENAI_API_KEY`** / **`OPENAI_MODEL`** (`gpt-5.6-luna`) — nécessaires pour la génération de formation par IA (`/admin/catalog/new`, `POST /api/formations/generate`). Sans elles, cette fonctionnalité échoue mais le reste de l'app n'est pas affecté.
 
 ## 2. Migrations Supabase
 
@@ -52,6 +53,9 @@ Push sur la branche connectée à Vercel (déploiement automatique), ou `vercel 
 - [ ] Dashboard Stripe → Webhooks → endpoint prod → onglet Événements : le dernier `checkout.session.completed` est en `200`
 - [ ] La table `tenants` (Supabase) reflète bien `subscription_status = active` après le test
 - [ ] La cloche de notifications reçoit bien les notifs `subscription_activated`
+- [ ] Génération de formation par IA (`/admin/catalog/new` → upload PDF/Word) fonctionne en prod — **non testé sur Vercel à ce jour**, seulement en local. Deux points de vigilance connus, jamais vérifiés en conditions réelles :
+  - Vercel limite par défaut le body des Serverless Functions Node.js à ~4,5 Mo ; la limite applicative est fixée à 4 Mo (`MAX_FILE_SIZE_BYTES` dans `app/api/formations/generate/route.ts`) mais n'a jamais été testée contre la vraie limite de la plateforme.
+  - `pdf-parse`/`pdfjs-dist` sont déclarés en `serverExternalPackages` pour contourner un souci de bundling Turbopack (voir ARCHITECTURE.md) — le comportement en environnement Serverless Vercel (par opposition à `next dev` en local) n'a pas été vérifié.
 
 ## Développement local
 

@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getVideoEmbedUrl } from "@/lib/video";
+import BlockRenderer from "@/components/lessons/BlockRenderer";
+import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import styles from "./lesson.module.css";
 
 const Markdown = dynamic(
@@ -37,6 +39,7 @@ interface Props {
   lessonTitle: string;
   contentType: string;
   contentMarkdown: string | null;
+  contentBlocks: ContentBlock[] | null;
   videoUrl: string | null;
   quizData: QuizData | null;
   prevLesson: AdjacentLesson | null;
@@ -52,6 +55,30 @@ interface Props {
 function estimateReadingMinutes(markdown: string | null): number {
   if (!markdown) return 1;
   const words = markdown.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
+}
+
+function estimateBlocksReadingMinutes(blocks: ContentBlock[] | null): number {
+  if (!blocks) return 1;
+  const words = blocks.reduce((count, block) => {
+    switch (block.type) {
+      case "heading":
+        return count + block.text.split(/\s+/).filter(Boolean).length;
+      case "paragraph":
+        return count + block.text.split(/\s+/).filter(Boolean).length;
+      case "list":
+        return count + block.items.join(" ").split(/\s+/).filter(Boolean).length;
+      case "callout":
+      case "highlight":
+        return count + `${block.title} ${block.text}`.split(/\s+/).filter(Boolean).length;
+      case "comparison":
+        return count + block.columns.flatMap((c) => c.items).join(" ").split(/\s+/).filter(Boolean).length;
+      case "feature_grid":
+        return count + block.items.map((it) => `${it.title} ${it.description}`).join(" ").split(/\s+/).filter(Boolean).length;
+      default:
+        return count;
+    }
+  }, 0);
   return Math.max(1, Math.round(words / 200));
 }
 
@@ -198,6 +225,7 @@ export default function LessonView({
   lessonTitle,
   contentType,
   contentMarkdown,
+  contentBlocks,
   videoUrl,
   quizData,
   prevLesson,
@@ -284,6 +312,12 @@ export default function LessonView({
                 {estimateReadingMinutes(contentMarkdown)} min de lecture
               </span>
             )}
+            {contentType === "rich" && (
+              <span className={styles.metaItem}>
+                <Clock size={14} />
+                {estimateBlocksReadingMinutes(contentBlocks)} min de lecture
+              </span>
+            )}
             {contentType === "video" && (
               <span className={styles.metaItem}>
                 <PlayCircle size={14} />
@@ -317,6 +351,10 @@ export default function LessonView({
             <div className={styles.markdownWrapper} data-color-mode="light">
               <Markdown source={contentMarkdown} />
             </div>
+          )}
+
+          {contentType === "rich" && contentBlocks && contentBlocks.length > 0 && (
+            <BlockRenderer blocks={contentBlocks} />
           )}
 
           {contentType === "video" && !embedUrl && videoUrl && (

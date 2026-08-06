@@ -8,6 +8,7 @@ Plateforme LMS multi-tenant : Ahead (super-admin) fournit un catalogue de format
 - **Clerk** — authentification + gestion des Organizations (= tenants)
 - **Supabase** (Postgres) — base de données, avec Row Level Security
 - **Stripe** — abonnements SaaS (Checkout + Webhooks)
+- **OpenAI API** (`gpt-5.6-luna`) — génération de formation par IA (super-admin, V1)
 
 ## Schéma général
 
@@ -100,3 +101,26 @@ Deux déclencheurs (`lib/notifications.ts`) :
 - Formations créées par Ahead (`tenant_id IS NULL`, catalogue transverse) via `/admin/catalog`
 - Un `admin_tenant` active des formations pour son entreprise via `/org/catalogue` → table `tenant_formations`
 - Les apprenants ne voient que les formations activées par leur tenant (`app/(dashboard)/apprenant/page.tsx`)
+- Cover de formation : `formations.thumbnail_url` si renseigné, sinon dégradé + icône générés automatiquement par hash déterministe de l'id (`lib/formationAccent.ts`) — même formation = même rendu à chaque affichage
+
+## Suivi de progression & gamification
+
+- `/apprenant/progression` — vue d'ensemble apprenant : complétion globale, progression par formation, badges
+- Badges calculés en direct depuis `progress`/`quiz_results` (pas de moteur de règles) : `lib/badges.ts` (`computeBadges`, `detectAndPersistNewBadges`)
+- Table `user_badges` sert uniquement à détecter un déblocage "nouveau" pour déclencher un toast (`BadgeUnlockToasts.tsx`), pas de source de vérité pour l'état des badges
+- Points crédités via `total_points` sur `users`, niveau = `floor(points / 500) + 1`
+
+## Génération de formation par IA (Super-admin uniquement, V1)
+
+Réservée au `super_admin` en V1 — les `admin_tenant` n'y ont pas accès (prévu en V2 avec leurs propres documents).
+
+Flow : `/admin/catalog/new` propose un choix Manuel / IA. En mode IA, `POST /api/formations/generate` reçoit un PDF ou `.docx` et exécute :
+
+1. **Extraction de texte** (`lib/documentExtraction.ts`) — `pdf-parse` pour PDF, `mammoth` pour `.docx`. Document tronqué à 60 000 caractères si trop volumineux (pas de découpage/résumé progressif pour l'instant).
+2. **Génération structurée** (`lib/ai/generateFormation.ts`) — appel à l'API Responses d'OpenAI avec sortie JSON strict contrainte par un schéma Zod (`lib/ai/contentBlocks.ts`). Le contenu de chaque leçon est une liste de blocs typés (`heading`, `paragraph`, `list`, `callout`, `comparison`, `feature_grid`, `highlight`). Règle métier forcée par validation : exactement une leçon `quiz` par module, en dernière position — retry automatique avec message de correction si la sortie du modèle est invalide.
+3. **Sauvegarde** (`lib/ai/saveGeneratedFormation.ts`) — écrit dans les tables existantes (`formations`, `modules`, `lecons`, `quizzes`, `quiz_questions`). La formation est créée en **brouillon** (`is_published: false`) : le super-admin doit relire et publier explicitement depuis l'éditeur.
+4. **Rendu** — une leçon avec `content_type = 'rich'` stocke ses blocs dans `lecons.content_blocks` (jsonb) et est affichée par `components/lessons/BlockRenderer.tsx` côté apprenant.
+
+Point technique notable : `pdf-parse`/`pdfjs-dist` résout un chemin de worker relatif au runtime, incompatible avec le bundling Turbopack des routes API. Ces packages sont déclarés dans `serverExternalPackages` (`next.config.ts`) pour être chargés normalement depuis `node_modules` plutôt que bundlés.
+
+Limite connue : l'éditeur manuel actuel ne permet pas de modifier le contenu (blocs) d'une leçon générée par IA — seulement ses métadonnées (titre, publication). Un éditeur de blocs dédié serait nécessaire pour ça.

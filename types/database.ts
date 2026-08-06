@@ -4,7 +4,7 @@ export type SubscriptionPlan = "decouverte" | "creation" | "entreprise";
 
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled" | "unpaid";
 
-export type LessonContentType = "markdown" | "video" | "quiz";
+export type LessonContentType = "markdown" | "video" | "quiz" | "rich";
 
 export type MediaType = "video" | "image" | "document" | "audio";
 
@@ -81,6 +81,7 @@ export interface Lesson {
   title: string;
   content_type: LessonContentType;
   content_markdown: string | null;
+  content_blocks: unknown | null; // ContentBlock[] côté génération IA — voir lib/ai/contentBlocks.ts
   video_url: string | null;
   order_index: number;
   duration_minutes: number | null;

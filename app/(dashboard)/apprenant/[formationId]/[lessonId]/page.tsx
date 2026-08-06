@@ -19,7 +19,7 @@ export default async function ApprenantLessonPage({ params }: Props) {
 
   const [{ data: formation }, { data: lecon }, { data: allModules }, { data: dbUser }] = await Promise.all([
     supabase.from("formations").select("id, title, is_published").eq("id", formationId).single(),
-    supabase.from("lecons").select("id, title, content_type, content_markdown, video_url").eq("id", lessonId).single(),
+    supabase.from("lecons").select("id, title, content_type, content_markdown, content_blocks, video_url").eq("id", lessonId).single(),
     supabase.from("modules").select("id, title, order_index, lecons(id, title, order_index)").eq("formation_id", formationId).order("order_index"),
     clerkUserId
       ? supabase.from("users").select("id, tenant_id").eq("clerk_user_id", clerkUserId).single()
@@ -109,6 +109,7 @@ export default async function ApprenantLessonPage({ params }: Props) {
       lessonTitle={lecon.title}
       contentType={lecon.content_type}
       contentMarkdown={lecon.content_markdown}
+      contentBlocks={lecon.content_blocks}
       videoUrl={lecon.video_url}
       quizData={quizData}
       prevLesson={prevLesson}
