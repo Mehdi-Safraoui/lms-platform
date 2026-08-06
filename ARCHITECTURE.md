@@ -116,11 +116,11 @@ Réservée au `super_admin` en V1 — les `admin_tenant` n'y ont pas accès (pr�
 
 Flow : `/admin/catalog/new` propose un choix Manuel / IA. En mode IA, `POST /api/formations/generate` reçoit un PDF ou `.docx` et exécute :
 
-1. **Extraction de texte** (`lib/documentExtraction.ts`) — `pdf-parse` pour PDF, `mammoth` pour `.docx`. Document tronqué à 60 000 caractères si trop volumineux (pas de découpage/résumé progressif pour l'instant).
+1. **Extraction de texte** (`lib/documentExtraction.ts`) — `unpdf` pour PDF, `mammoth` pour `.docx`. Document tronqué à 60 000 caractères si trop volumineux (pas de découpage/résumé progressif pour l'instant).
 2. **Génération structurée** (`lib/ai/generateFormation.ts`) — appel à l'API Responses d'OpenAI avec sortie JSON strict contrainte par un schéma Zod (`lib/ai/contentBlocks.ts`). Le contenu de chaque leçon est une liste de blocs typés (`heading`, `paragraph`, `list`, `callout`, `comparison`, `feature_grid`, `highlight`). Règle métier forcée par validation : exactement une leçon `quiz` par module, en dernière position — retry automatique avec message de correction si la sortie du modèle est invalide.
 3. **Sauvegarde** (`lib/ai/saveGeneratedFormation.ts`) — écrit dans les tables existantes (`formations`, `modules`, `lecons`, `quizzes`, `quiz_questions`). La formation est créée en **brouillon** (`is_published: false`) : le super-admin doit relire et publier explicitement depuis l'éditeur.
 4. **Rendu** — une leçon avec `content_type = 'rich'` stocke ses blocs dans `lecons.content_blocks` (jsonb) et est affichée par `components/lessons/BlockRenderer.tsx` côté apprenant.
 
-Point technique notable : `pdf-parse`/`pdfjs-dist` résout un chemin de worker relatif au runtime, incompatible avec le bundling Turbopack des routes API. Ces packages sont déclarés dans `serverExternalPackages` (`next.config.ts`) pour être chargés normalement depuis `node_modules` plutôt que bundlés.
+Point technique notable : `pdf-parse` (basé sur `pdfjs-dist`) a été abandonné après deux échecs en environnement Vercel Serverless — d'abord un chemin de worker relatif non résolu par le bundling Turbopack, puis un `ReferenceError: DOMMatrix is not defined` (pdfjs-dist attend des globals navigateur même pour de la simple extraction de texte). Remplacé par **`unpdf`**, qui embarque une build de PDF.js spécifiquement dépourvue de ces dépendances navigateur et sans worker externe — fonctionne nativement en Serverless, aucune configuration `serverExternalPackages` nécessaire.
 
 Limite connue : l'éditeur manuel actuel ne permet pas de modifier le contenu (blocs) d'une leçon générée par IA — seulement ses métadonnées (titre, publication). Un éditeur de blocs dédié serait nécessaire pour ça.

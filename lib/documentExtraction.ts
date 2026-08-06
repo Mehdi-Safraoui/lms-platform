@@ -1,4 +1,4 @@
-import { PDFParse } from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
 import mammoth from "mammoth";
 
 export type SupportedDocumentType = "pdf" | "docx";
@@ -11,15 +11,13 @@ export function detectDocumentType(filename: string): SupportedDocumentType | nu
 }
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: buffer });
-  try {
-    // pageJoiner: "" — évite les footers "-- page X of Y --" insérés par défaut,
-    // du bruit inutile dans le texte envoyé au LLM.
-    const result = await parser.getText({ pageJoiner: "" });
-    return result.text;
-  } finally {
-    await parser.destroy();
-  }
+  // unpdf embarque une build de PDF.js dépourvue de toute référence navigateur
+  // (DOMMatrix, canvas...) et sans fichier worker externe à résoudre — contrairement
+  // à pdf-parse/pdfjs-dist, elle fonctionne telle quelle en environnement Serverless
+  // (Vercel). Voir ARCHITECTURE.md.
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return text;
 }
 
 async function extractTextFromDocx(buffer: Buffer): Promise<string> {

@@ -53,9 +53,7 @@ Push sur la branche connectée à Vercel (déploiement automatique), ou `vercel 
 - [ ] Dashboard Stripe → Webhooks → endpoint prod → onglet Événements : le dernier `checkout.session.completed` est en `200`
 - [ ] La table `tenants` (Supabase) reflète bien `subscription_status = active` après le test
 - [ ] La cloche de notifications reçoit bien les notifs `subscription_activated`
-- [ ] Génération de formation par IA (`/admin/catalog/new` → upload PDF/Word) fonctionne en prod — **non testé sur Vercel à ce jour**, seulement en local. Deux points de vigilance connus, jamais vérifiés en conditions réelles :
-  - Vercel limite par défaut le body des Serverless Functions Node.js à ~4,5 Mo ; la limite applicative est fixée à 4 Mo (`MAX_FILE_SIZE_BYTES` dans `app/api/formations/generate/route.ts`) mais n'a jamais été testée contre la vraie limite de la plateforme.
-  - `pdf-parse`/`pdfjs-dist` sont déclarés en `serverExternalPackages` pour contourner un souci de bundling Turbopack (voir ARCHITECTURE.md) — le comportement en environnement Serverless Vercel (par opposition à `next dev` en local) n'a pas été vérifié.
+- [ ] Génération de formation par IA (`/admin/catalog/new` → upload PDF/Word) fonctionne en prod — testée en Serverless Vercel avec `unpdf` (voir ARCHITECTURE.md, section IA) après deux échecs successifs avec `pdf-parse`. Point de vigilance restant, jamais vérifié en conditions réelles : Vercel limite par défaut le body des Serverless Functions Node.js à ~4,5 Mo ; la limite applicative est fixée à 4 Mo (`MAX_FILE_SIZE_BYTES` dans `app/api/formations/generate/route.ts`) mais n'a jamais été testée contre la vraie limite de la plateforme avec un gros fichier.
 
 ## Développement local
 
