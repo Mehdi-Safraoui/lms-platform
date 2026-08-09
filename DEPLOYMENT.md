@@ -6,11 +6,12 @@ Déploiement cible : **Vercel** (déploiement actuel : `lms-platform-ten-gamma.v
 
 Voir [.env.example](.env.example) pour la liste complète et leur origine. Dans Vercel → Settings → Environment Variables, renseigner toutes les variables pour **Production** (et **Preview** si les previews doivent fonctionner).
 
-Deux pièges à connaître :
+Pièges à connaître :
 
 - **`NEXT_PUBLIC_APP_URL`** doit pointer vers le vrai domaine de prod (`https://lms-platform-ten-gamma.vercel.app`), pas `localhost`. Elle sert aux `success_url`/`cancel_url` de Stripe Checkout.
 - **`STRIPE_WEBHOOK_SECRET`** et **`CLERK_WEBHOOK_SIGNING_SECRET`** de prod sont **différents** des secrets utilisés en local (voir étape 3). Ne jamais copier une valeur locale vers Vercel ou inversement.
 - **`OPENAI_API_KEY`** / **`OPENAI_MODEL`** (`gpt-5.6-luna`) — nécessaires pour la génération de formation par IA (`/admin/catalog/new`, `POST /api/formations/generate`). Sans elles, cette fonctionnalité échoue mais le reste de l'app n'est pas affecté.
+- **`NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL`** doit valoir `/create-organization` (pas `/invite-members`, une ancienne valeur qui menait à une impasse — voir ARCHITECTURE.md, onboarding chemin B). Si cette variable n'est pas à jour sur Vercel, l'auto-inscription d'un admin_tenant reste bloquée indéfiniment sur `WaitForSync`.
 
 ## 2. Migrations Supabase
 

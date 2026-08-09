@@ -90,11 +90,22 @@ Deux déclencheurs (`lib/notifications.ts`) :
 
 ## Onboarding d'une nouvelle entreprise cliente
 
+Deux chemins possibles :
+
+**A. Invitation par le super-admin**
 1. Le super-admin crée l'entreprise depuis `/admin/tenants` (`POST /api/admin/tenants`)
 2. Le backend Clerk crée l'Organization **sans** ajouter le super-admin comme membre (`createdBy` volontairement omis, pour ne pas corrompre son propre rôle via le webhook de sync)
 3. Une invitation Clerk (`role: org:admin`) est envoyée par email à l'administrateur de l'entreprise
 4. Le webhook Clerk crée automatiquement la ligne `tenants` (`organization.created`)
 5. Quand l'admin accepte l'invitation, le webhook crée sa ligne `users` (`organizationMembership.created`, rôle `admin_tenant`)
+
+**B. Auto-inscription de l'admin_tenant**
+1. `/sign-up` (Clerk `<SignUp/>`) → redirection forcée vers `/create-organization` (`NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL`)
+2. `/create-organization` (Clerk `<CreateOrganization/>`) crée l'Organization ; son créateur en devient automatiquement `org:admin`. L'écran d'invitation intégré de Clerk s'affiche ensuite automatiquement (email + rôle + "passer cette étape") — pas de page custom, juste `afterCreateOrganizationUrl="/"`
+3. Le webhook Clerk crée `tenants` (`organization.created`) et `users` (`organizationMembership.created`, rôle `admin_tenant`) de la même façon qu'au chemin A
+4. Retour sur `/` → `WaitForSync` attend la synchro webhook puis route vers `/org`
+
+**Point important** : un `<SignUp/>` seul, sans passer par `/create-organization`, ne déclenche aucun webhook (aucune Organization créée/rejointe) — l'utilisateur reste bloqué sans ligne `users`. C'est pour ça que la redirection forcée post-signup est indispensable, et que `/sign-up` ne doit jamais être une impasse accessible sans ce second écran.
 
 ## Catalogue de formations
 
