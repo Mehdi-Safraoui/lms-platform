@@ -174,10 +174,32 @@
 
 .cardFooter {
   display: flex;
+  gap: 8px;
 }
 
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-jakarta), sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.viewBtn:hover { background: var(--bg-alt); }
+
 .toggleBtn {
-  width: 100%;
+  flex: 1;
   height: 38px;
   padding: 0 18px;
   border-radius: 9px;

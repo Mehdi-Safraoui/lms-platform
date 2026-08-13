@@ -10,6 +10,8 @@ import {
   Trash2, Plus, FileText, Layers, Save, X, Eye, CheckCircle, Circle,
 } from "lucide-react";
 import { getVideoEmbedUrl } from "@/lib/video";
+import BlockEditor from "@/components/lessons/BlockEditor";
+import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import styles from "./editor.module.css";
 
 const MDEditor = dynamic(() => import("@uiw/react-md-editor"), { ssr: false });
@@ -27,7 +29,7 @@ interface Formation {
   thumbnail_url: string | null;
 }
 interface Module { id: string; formation_id: string; title: string; order_index: number; }
-interface Lesson { id: string; module_id: string; title: string; content_type: string; content_markdown: string | null; video_url: string | null; order_index: number; }
+interface Lesson { id: string; module_id: string; title: string; content_type: string; content_markdown: string | null; content_blocks: ContentBlock[] | null; video_url: string | null; order_index: number; }
 type Selection =
   | { type: "formation" }
   | { type: "module"; id: string }
@@ -368,8 +370,10 @@ export default function FormationEditorPage() {
                   <ModulePanel
                     key={selected.id}
                     module={modules.find((m) => m.id === selected.id)!}
+                    lessons={lessons[selected.id] ?? []}
                     formationId={id}
                     onSave={(updated) => setModules((prev) => prev.map((m) => m.id === updated.id ? updated : m))}
+                    onSelectLesson={(lessonId) => setSelected({ type: "lesson", id: lessonId, moduleId: selected.id })}
                   />
                 )}
                 {selected.type === "lesson" && (() => {
@@ -525,8 +529,20 @@ function FormationPanel({ formation, onSave }: { formation: Formation; onSave: (
   );
 }
 
+const CONTENT_TYPE_LABEL: Record<string, string> = {
+  markdown: "Markdown",
+  video: "Vidéo",
+  quiz: "Quiz",
+  rich: "Contenu riche (IA)",
+};
+
 // ── Module panel ───────────────────────────────────────
-function ModulePanel({ module, formationId, onSave }: { module: Module; formationId: string; onSave: (m: Module) => void }) {
+function ModulePanel({
+  module, lessons, formationId, onSave, onSelectLesson,
+}: {
+  module: Module; lessons: Lesson[]; formationId: string;
+  onSave: (m: Module) => void; onSelectLesson: (lessonId: string) => void;
+}) {
   const [title, setTitle] = useState(module.title);
   const [saving, setSaving] = useState(false);
 
@@ -566,6 +582,51 @@ function ModulePanel({ module, formationId, onSave }: { module: Module; formatio
           </button>
         </div>
       </div>
+
+      <h2 className={styles.panelTitle} style={{ marginTop: 28 }}>
+        Leçons de ce module ({lessons.length})
+      </h2>
+      {lessons.length === 0 ? (
+        <p className={styles.hint}>Aucune leçon pour l&apos;instant.</p>
+      ) : (
+        <div className={styles.formCard} style={{ gap: 8 }}>
+          {lessons.map((lesson, i) => {
+            const contentInfo =
+              lesson.content_type === "rich"
+                ? `${lesson.content_blocks?.length ?? 0} bloc${(lesson.content_blocks?.length ?? 0) > 1 ? "s" : ""}`
+                : lesson.content_type === "markdown"
+                ? `${(lesson.content_markdown ?? "").trim().split(/\s+/).filter(Boolean).length} mots`
+                : lesson.content_type === "video"
+                ? lesson.video_url ? "Vidéo renseignée" : "Vidéo manquante"
+                : "Quiz";
+            return (
+              <button
+                key={lesson.id}
+                type="button"
+                onClick={() => onSelectLesson(lesson.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, width: "100%",
+                  padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border-soft)",
+                  background: "var(--bg-alt)", cursor: "pointer", textAlign: "left", font: "inherit",
+                }}
+              >
+                <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600, flexShrink: 0 }}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500, color: "var(--text)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {lesson.title}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--navy)", background: "#eff0ff", borderRadius: 999, padding: "2px 8px", flexShrink: 0 }}>
+                  {CONTENT_TYPE_LABEL[lesson.content_type] ?? lesson.content_type}
+                </span>
+                <span style={{ fontSize: 11, color: "var(--text-muted)", flexShrink: 0, whiteSpace: "nowrap" }}>
+                  {contentInfo}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }
@@ -760,6 +821,7 @@ function LessonPanel({ lesson, formationId, onSave }: { lesson: Lesson; formatio
     title: lesson.title,
     content_type: lesson.content_type,
     content_markdown: lesson.content_markdown ?? "",
+    content_blocks: lesson.content_blocks ?? ([] as ContentBlock[]),
     video_url: lesson.video_url ?? "",
   });
   const [saving, setSaving] = useState(false);
@@ -774,6 +836,7 @@ function LessonPanel({ lesson, formationId, onSave }: { lesson: Lesson; formatio
       body: JSON.stringify({
         ...form,
         video_url: form.video_url.trim() || null,
+        content_blocks: form.content_type === "rich" ? form.content_blocks : null,
       }),
     });
     if (res.ok) {
@@ -808,8 +871,21 @@ function LessonPanel({ lesson, formationId, onSave }: { lesson: Lesson; formatio
             <option value="markdown">Markdown</option>
             <option value="video">Vidéo</option>
             <option value="quiz">Quiz</option>
+            <option value="rich">Contenu riche (généré par IA)</option>
           </select>
         </div>
+        {form.content_type === "rich" && (
+          <div className={styles.field}>
+            <label className={styles.label}>Contenu ({form.content_blocks.length} bloc{form.content_blocks.length > 1 ? "s" : ""})</label>
+            {form.content_blocks.length === 0 ? (
+              <p className={styles.hint}>Aucun bloc pour l&apos;instant — ajoutez-en un ci-dessous.</p>
+            ) : null}
+            <BlockEditor
+              blocks={form.content_blocks}
+              onChange={(content_blocks) => setForm((p) => ({ ...p, content_blocks }))}
+            />
+          </div>
+        )}
         {form.content_type === "markdown" && (
           <div className={styles.field}>
             <label className={styles.label}>Contenu</label>

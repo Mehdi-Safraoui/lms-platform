@@ -28,7 +28,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { leconId } = await params;
   const body = await req.json();
-  const { title, content_type, content_markdown, video_url, order_index, duration_minutes, is_preview } = body;
+  const { title, content_type, content_markdown, content_blocks, video_url, order_index, duration_minutes, is_preview } = body;
 
   const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase
@@ -37,6 +37,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ...(title !== undefined && { title }),
       ...(content_type !== undefined && { content_type }),
       ...(content_markdown !== undefined && { content_markdown }),
+      ...(content_blocks !== undefined && { content_blocks }),
       ...(video_url !== undefined && { video_url }),
       ...(order_index !== undefined && { order_index }),
       ...(duration_minutes !== undefined && { duration_minutes }),

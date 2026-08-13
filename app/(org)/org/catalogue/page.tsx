@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
-import { BookOpen, Layers, Clock } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Layers, Clock, Eye } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { formatDuration } from "@/lib/utils";
@@ -115,6 +116,10 @@ export default async function CataloguePage() {
                 </div>
 
                 <div className={styles.cardFooter}>
+                  <Link href={`/org/catalogue/${f.id}`} className={styles.viewBtn}>
+                    <Eye size={14} />
+                    Voir le contenu
+                  </Link>
                   <CatalogueToggle formationId={f.id} enabled={enabled} />
                 </div>
               </div>
