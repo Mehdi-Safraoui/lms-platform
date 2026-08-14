@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { LayoutDashboard, Users, BookOpen, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users, BookOpen, CreditCard, Sparkles } from "lucide-react";
 import styles from "./layout.module.css";
 import SubscriptionModal from "./SubscriptionModal";
 import NotificationBell from "@/components/shared/NotificationBell";
@@ -15,6 +15,7 @@ const baseNavItems = [
 ];
 
 const adminOnlyNavItems = [
+  { href: "/org/formations/new", label: "Générer une formation", icon: Sparkles, exact: false },
   { href: "/org/abonnement", label: "Abonnement", icon: CreditCard, exact: false },
 ];
 
