@@ -64,10 +64,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // redirectUrl obligatoire : sans lui, l'invité atterrit sur les pages hébergées
+    // par défaut de Clerk (accounts.dev/default-redirect) au lieu du formulaire
+    // /sign-up de l'app — même correctif que app/api/org/apprenants/invite/route.ts.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
     await client.organizations.createOrganizationInvitation({
       organizationId: organization.id,
       emailAddress: adminEmail.trim(),
       role: "org:admin",
+      redirectUrl: `${appUrl}/sign-up`,
     });
   } catch (err) {
     console.error("[admin/tenants] createOrganizationInvitation error:", err);

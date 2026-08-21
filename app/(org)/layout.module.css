@@ -74,6 +74,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  object-fit: cover; /* sans effet sur le fallback (div), utile quand c'est un <img> */
 }
 
 .tenantInfo {

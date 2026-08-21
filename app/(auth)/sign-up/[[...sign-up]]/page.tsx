@@ -1,21 +1,23 @@
 import { SignUp } from "@clerk/nextjs";
+import AcceptInvitationFlow from "./AcceptInvitationFlow";
+import styles from "./acceptInvitation.module.css";
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export default async function SignUpPage({ searchParams }: Props) {
   const params = await searchParams;
 
-  // Un apprenant invité arrive ici via un lien d'invitation Clerk (ticket, voir
-  // app/api/org/apprenants/invite/route.ts) : il rejoint une Organization existante,
-  // il ne doit donc PAS suivre NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL
-  // (=/create-organization, réservé à l'auto-inscription d'un nouvel admin_tenant —
-  // voir ARCHITECTURE.md, chemin B). forceRedirectUrl="/" prend le pas sur cette
-  // variable d'env pour ce rendu précis et laisse WaitForSync router selon le rôle.
+  // Un apprenant (ou un admin) invité arrive ici via un lien d'invitation
+  // Clerk (ticket, voir app/api/org/apprenants/invite/route.ts et
+  // app/api/admin/tenants/route.ts) : il rejoint une Organization existante.
+  // Le composant prébuilt <SignUp/> ne gère pas correctement ce cas — voir
+  // le commentaire détaillé dans AcceptInvitationFlow.tsx — donc on bascule
+  // sur un flux personnalisé dès qu'un ticket est présent dans l'URL.
   const isInvitationTicket = typeof params.__clerk_ticket === "string";
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", paddingTop: "4rem" }}>
-      {isInvitationTicket ? <SignUp forceRedirectUrl="/" /> : <SignUp />}
+    <div className={styles.wrap}>
+      {isInvitationTicket ? <AcceptInvitationFlow /> : <SignUp />}
     </div>
   );
 }

@@ -21,12 +21,13 @@ const adminOnlyNavItems = [
 
 interface Props {
   tenantName: string;
+  tenantLogoUrl?: string | null;
   userRole: string;
   hasSubscription: boolean;
   children: React.ReactNode;
 }
 
-export default function OrgShell({ tenantName, userRole, hasSubscription, children }: Props) {
+export default function OrgShell({ tenantName, tenantLogoUrl, userRole, hasSubscription, children }: Props) {
   const pathname = usePathname();
   const { user } = useUser();
   const displayName = user
@@ -51,7 +52,12 @@ export default function OrgShell({ tenantName, userRole, hasSubscription, childr
 
         {/* Tenant identity */}
         <div className={styles.tenantBlock}>
-          <div className={styles.tenantAvatar}>{tenantName.charAt(0).toUpperCase()}</div>
+          {tenantLogoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- logo hébergé par Clerk, pas un asset local
+            <img src={tenantLogoUrl} alt="" className={styles.tenantAvatar} />
+          ) : (
+            <div className={styles.tenantAvatar}>{tenantName.charAt(0).toUpperCase()}</div>
+          )}
           <div className={styles.tenantInfo}>
             <span className={styles.tenantName}>{tenantName}</span>
             <span className={styles.tenantRole}>{roleLabel}</span>
