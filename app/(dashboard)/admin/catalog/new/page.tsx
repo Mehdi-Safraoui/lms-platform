@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, PenLine, Sparkles, UploadCloud, FileText, X } from "lucide-react";
+import VideoStep from "@/components/lessons/VideoStep";
 import styles from "./new.module.css";
 
 type Mode = "choice" | "manual" | "ai";
@@ -159,6 +160,9 @@ function AiGenerateForm({ onBack }: { onBack: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Une fois la formation générée, on propose une vidéo d'accompagnement avant de
+  // rediriger vers l'éditeur — voir components/lessons/VideoStep.tsx.
+  const [generated, setGenerated] = useState<{ id: string; title: string } | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
@@ -181,11 +185,21 @@ function AiGenerateForm({ onBack }: { onBack: () => void }) {
         setGenerating(false);
         return;
       }
-      router.push(`/admin/catalog/${json.data.id}/edit`);
+      setGenerated({ id: json.data.id, title: json.data.title });
     } catch {
       setError("Erreur réseau — réessayez.");
       setGenerating(false);
     }
+  }
+
+  if (generated) {
+    return (
+      <VideoStep
+        formationId={generated.id}
+        suggestedQuery={generated.title}
+        onDone={() => router.push(`/admin/catalog/${generated.id}/edit`)}
+      />
+    );
   }
 
   return (

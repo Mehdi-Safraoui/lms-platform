@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import dynamic from "next/dynamic";
 import {
   Sparkles, Wand2, Share2, ShieldCheck, PenTool, BarChart3,
   BookOpen, Brain, Rocket, Target, Lightbulb, Users,
   Search, Monitor, CheckCircle2, AlertTriangle, Info, Star,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import styles from "./blocks.module.css";
@@ -38,12 +40,46 @@ const CALLOUT_ICONS = {
   tip: Lightbulb,
   warning: AlertTriangle,
   success: CheckCircle2,
+  objective: Target,
+  example: BookOpen,
 };
 
 function InlineMarkdown({ text }: { text: string }) {
   return (
     <div className={styles.inlineMarkdown} data-color-mode="light">
       <Markdown source={text} />
+    </div>
+  );
+}
+
+function ExerciseBlockView({ prompt, answer }: { prompt: string; answer: string }) {
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <div className={styles.exercise}>
+      <span className={styles.exerciseIcon}>
+        <PenTool size={18} />
+      </span>
+      <div className={styles.exerciseBody}>
+        <strong>Exercice</strong>
+        <div className={styles.exercisePrompt}>
+          <InlineMarkdown text={prompt} />
+        </div>
+        <button
+          type="button"
+          className={styles.exerciseToggle}
+          onClick={() => setRevealed((r) => !r)}
+          aria-expanded={revealed}
+        >
+          {revealed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {revealed ? "Masquer la correction" : "Voir la correction"}
+        </button>
+        {revealed && (
+          <div className={styles.exerciseAnswer}>
+            <InlineMarkdown text={answer} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -150,6 +186,9 @@ export default function BlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
                 </div>
               </div>
             );
+
+          case "exercise":
+            return <ExerciseBlockView key={i} prompt={block.prompt} answer={block.answer} />;
 
           default:
             return null;

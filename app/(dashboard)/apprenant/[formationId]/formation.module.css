@@ -188,6 +188,24 @@
   color: var(--text-muted);
 }
 
+.videoWrap {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%; /* ratio 16:9 */
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  margin-bottom: 8px;
+}
+
+.videoFrame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
 .progressCard {
   background: var(--card);
   border: 1px solid var(--border-soft);

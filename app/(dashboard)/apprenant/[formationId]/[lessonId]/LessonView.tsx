@@ -75,6 +75,8 @@ function estimateBlocksReadingMinutes(blocks: ContentBlock[] | null): number {
         return count + block.columns.flatMap((c) => c.items).join(" ").split(/\s+/).filter(Boolean).length;
       case "feature_grid":
         return count + block.items.map((it) => `${it.title} ${it.description}`).join(" ").split(/\s+/).filter(Boolean).length;
+      case "exercise":
+        return count + `${block.prompt} ${block.answer}`.split(/\s+/).filter(Boolean).length;
       default:
         return count;
     }

@@ -21,10 +21,11 @@ const BLOCK_TYPE_LABELS: Record<ContentBlock["type"], string> = {
   heading: "Titre de section",
   paragraph: "Paragraphe",
   list: "Liste",
-  callout: "Encadré (info/astuce/attention/succès)",
+  callout: "Encadré (info/astuce/attention/succès/objectif/exemple)",
   comparison: "Comparaison",
   feature_grid: "Grille de fonctionnalités",
   highlight: "Mise en avant",
+  exercise: "Exercice (consigne + correction)",
 };
 
 function defaultBlockFor(type: ContentBlock["type"]): ContentBlock {
@@ -48,6 +49,7 @@ function defaultBlockFor(type: ContentBlock["type"]): ContentBlock {
       ],
     };
     case "highlight": return { type: "highlight", title: "À retenir", text: "" };
+    case "exercise": return { type: "exercise", prompt: "", answer: "" };
   }
 }
 
@@ -146,6 +148,8 @@ export default function BlockEditor({ blocks, onChange }: Props) {
                   <option value="tip">Astuce</option>
                   <option value="warning">Attention</option>
                   <option value="success">Succès</option>
+                  <option value="objective">Objectif</option>
+                  <option value="example">Exemple</option>
                 </select>
                 <input
                   className={editorStyles.input}
@@ -176,6 +180,25 @@ export default function BlockEditor({ blocks, onChange }: Props) {
                 rows={2}
                 value={block.text}
                 onChange={(e) => update(i, { ...block, text: e.target.value })}
+              />
+            </>
+          )}
+
+          {block.type === "exercise" && (
+            <>
+              <textarea
+                className={editorStyles.textarea}
+                rows={2}
+                placeholder="Consigne de l'exercice"
+                value={block.prompt}
+                onChange={(e) => update(i, { ...block, prompt: e.target.value })}
+              />
+              <textarea
+                className={editorStyles.textarea}
+                rows={2}
+                placeholder="Correction / piste de solution"
+                value={block.answer}
+                onChange={(e) => update(i, { ...block, answer: e.target.value })}
               />
             </>
           )}

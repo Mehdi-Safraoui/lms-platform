@@ -18,6 +18,14 @@ const NIVEAU_LABEL: Record<string, string> = {
 
 const FREE_PREVIEW_LESSON_COUNT = 2;
 
+interface FormationVideo {
+  videoId: string;
+  title: string;
+  channelTitle: string;
+  thumbnailUrl: string;
+  url: string;
+}
+
 export default async function FormationDetailPage({ params }: Props) {
   const { formationId } = await params;
   const { userId: clerkUserId } = await auth();
@@ -26,7 +34,7 @@ export default async function FormationDetailPage({ params }: Props) {
   const [{ data: formation }, { data: modules }, { data: dbUser }] = await Promise.all([
     supabase
       .from("formations")
-      .select("id, title, description, niveau, estimated_duration_minutes, attestation_threshold_pct")
+      .select("id, title, description, niveau, estimated_duration_minutes, attestation_threshold_pct, videos")
       .eq("id", formationId)
       .eq("is_published", true)
       .single(),
@@ -171,6 +179,18 @@ export default async function FormationDetailPage({ params }: Props) {
           </span>
         )}
       </div>
+
+      {((formation.videos as FormationVideo[] | null) ?? []).map((video) => (
+        <div key={video.videoId} className={styles.videoWrap}>
+          <iframe
+            className={styles.videoFrame}
+            src={`https://www.youtube.com/embed/${video.videoId}`}
+            title={video.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      ))}
 
       {totalLessons > 0 && (
         <div className={styles.progressCard}>

@@ -1,19 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useOrganization } from "@clerk/nextjs";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import styles from "./apprenants.module.css";
 
 export default function InviteApprenantModal({ onClose }: { onClose: () => void }) {
-  const { organization } = useOrganization();
   const [emails, setEmails] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!organization) return;
 
     const emailAddresses = emails
       .split(/[,\n]/)
@@ -27,7 +24,18 @@ export default function InviteApprenantModal({ onClose }: { onClose: () => void 
 
     setSubmitting(true);
     try {
-      await organization.inviteMembers({ emailAddresses, role: "org:member" });
+      // Passe par l'API backend Clerk côté serveur (pas organization.inviteMembers()
+      // côté client) : c'est la seule façon de spécifier un redirectUrl, nécessaire
+      // pour que l'apprenant invité revienne dans l'app plutôt que sur les pages
+      // hébergées par défaut de Clerk. Voir app/api/org/apprenants/invite/route.ts.
+      const res = await fetch("/api/org/apprenants/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: emailAddresses }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erreur lors de l'envoi des invitations.");
+
       toast.success(
         emailAddresses.length > 1 ? "Invitations envoyées." : "Invitation envoyée.",
         { description: emailAddresses.join(", ") }

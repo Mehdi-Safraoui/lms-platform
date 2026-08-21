@@ -38,6 +38,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     niveau,
     estimated_duration_minutes,
     attestation_threshold_pct,
+    videos,
   } = body;
 
   const supabase = createServiceRoleSupabaseClient();
@@ -53,6 +54,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ...(niveau !== undefined && { niveau }),
       ...(estimated_duration_minutes !== undefined && { estimated_duration_minutes }),
       ...(attestation_threshold_pct !== undefined && { attestation_threshold_pct }),
+      ...(videos !== undefined && { videos }),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

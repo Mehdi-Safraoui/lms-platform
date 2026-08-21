@@ -11,36 +11,43 @@ export const ICON_KEYS = [
   "search", "monitor", "check", "warning",
 ] as const;
 
+// .min(1) sur tous les champs texte obligatoires ci-dessous : sans ça, un titre ou
+// un texte vide ("") passe la validation Zod sans broncher (une chaîne vide reste
+// un `string` valide). Trouvé en testant un document source trop court : le modèle
+// avait produit des leçons avec des titres vides, silencieusement acceptées. Avec
+// .min(1), ce cas déclenche la tentative de correction automatique comme n'importe
+// quelle autre sortie invalide.
+
 const headingBlock = z.object({
   type: z.literal("heading"),
   level: z.union([z.literal(2), z.literal(3)]),
-  text: z.string(),
+  text: z.string().min(1),
 });
 
 const paragraphBlock = z.object({
   type: z.literal("paragraph"),
   // Peut contenir du markdown inline simple : **gras**, *italique*, [texte](url).
-  text: z.string(),
+  text: z.string().min(1),
 });
 
 const listBlock = z.object({
   type: z.literal("list"),
   ordered: z.boolean(),
-  items: z.array(z.string()).min(2).max(10),
+  items: z.array(z.string().min(1)).min(2).max(10),
 });
 
 const calloutBlock = z.object({
   type: z.literal("callout"),
-  variant: z.enum(["info", "tip", "warning", "success"]),
-  title: z.string(),
-  text: z.string(),
+  variant: z.enum(["info", "tip", "warning", "success", "objective", "example"]),
+  title: z.string().min(1),
+  text: z.string().min(1),
 });
 
 const comparisonColumn = z.object({
-  label: z.string(),
+  label: z.string().min(1),
   // "primary" = colonne mise en avant visuellement (ex: la recommandation).
   emphasis: z.enum(["neutral", "primary"]),
-  items: z.array(z.string()).min(1).max(8),
+  items: z.array(z.string().min(1)).min(1).max(8),
 });
 
 const comparisonBlock = z.object({
@@ -51,8 +58,8 @@ const comparisonBlock = z.object({
 
 const featureItem = z.object({
   icon: z.enum(ICON_KEYS),
-  title: z.string(),
-  description: z.string(),
+  title: z.string().min(1),
+  description: z.string().min(1),
 });
 
 const featureGridBlock = z.object({
@@ -62,8 +69,17 @@ const featureGridBlock = z.object({
 
 const highlightBlock = z.object({
   type: z.literal("highlight"),
-  title: z.string(),
-  text: z.string(),
+  title: z.string().min(1),
+  text: z.string().min(1),
+});
+
+const exerciseBlock = z.object({
+  type: z.literal("exercise"),
+  // Les deux champs sont obligatoires (pas de .nullable()/.optional()) : impossible
+  // pour le LLM de produire une consigne sans sa correction — si l'un des deux
+  // manque, la validation Zod échoue et déclenche la tentative de correction.
+  prompt: z.string().min(1),
+  answer: z.string().min(1),
 });
 
 export const contentBlockSchema = z.discriminatedUnion("type", [
@@ -74,18 +90,19 @@ export const contentBlockSchema = z.discriminatedUnion("type", [
   comparisonBlock,
   featureGridBlock,
   highlightBlock,
+  exerciseBlock,
 ]);
 
 export type ContentBlock = z.infer<typeof contentBlockSchema>;
 
 const quizQuestionSchema = z.object({
-  question: z.string(),
-  options: z.array(z.string()).min(2).max(6),
+  question: z.string().min(1),
+  options: z.array(z.string().min(1)).min(2).max(6),
   correctIndex: z.number().int().min(0),
 });
 
 const lessonSchema = z.object({
-  title: z.string(),
+  title: z.string().min(1),
   contentType: z.enum(["lesson", "quiz"]),
   // Présent seulement si contentType === "lesson".
   blocks: z.array(contentBlockSchema).nullable(),
@@ -97,7 +114,7 @@ export type GeneratedLesson = z.infer<typeof lessonSchema>;
 
 const moduleSchema = z
   .object({
-    title: z.string(),
+    title: z.string().min(1),
     lessons: z.array(lessonSchema).min(2).max(8),
   })
   .superRefine((mod, ctx) => {
@@ -125,8 +142,8 @@ const moduleSchema = z
   });
 
 export const generatedFormationSchema = z.object({
-  title: z.string(),
-  description: z.string(),
+  title: z.string().min(1),
+  description: z.string().min(1),
   niveau: z.enum(["debutant", "intermediaire", "avance"]),
   estimatedDurationMinutes: z.number().int().positive(),
   modules: z.array(moduleSchema).min(2).max(10),

@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     const slug = await uniqueSlug(generated.title);
     const formationId = await saveGeneratedFormation(generated, guard.userId, slug);
 
-    return NextResponse.json({ data: { id: formationId } }, { status: 201 });
+    return NextResponse.json({ data: { id: formationId, title: generated.title } }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/formations/generate]", err);
     const message = err instanceof Error ? err.message : "Erreur inconnue lors de la génération.";
