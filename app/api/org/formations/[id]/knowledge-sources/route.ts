@@ -3,6 +3,8 @@ import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { canCreateFormationByAi } from "@/lib/subscription";
 import { detectKnowledgeSourceFormat } from "@/lib/documentExtraction";
+import { processKnowledgeSource } from "@/lib/processKnowledgeSource";
+import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,9 +16,22 @@ const MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024;
 type Params = { params: Promise<{ id: string }> };
 type SupabaseClient = ReturnType<typeof createServiceRoleSupabaseClient>;
 
-async function assertOwnFormation(supabase: SupabaseClient, formationId: string, tenantId: string): Promise<boolean> {
-  const { data } = await supabase.from("formations").select("id, tenant_id").eq("id", formationId).single();
-  return !!data && data.tenant_id === tenantId;
+/**
+ * Traite la source (extraction + chunking + embeddings) avant de répondre, puis
+ * relit la ligne pour renvoyer son statut final au client — sans ça, la réponse
+ * refléterait toujours "en_attente" et le badge de statut resterait figé côté UI
+ * tant que la page n'est pas rechargée. processKnowledgeSource gère déjà ses
+ * propres statuts d'erreur en base ; si elle échoue, l'upload reste un succès
+ * (la source existe, seule l'indexation a échoué — visible via le badge "erreur").
+ */
+async function ingestAndReturn(supabase: SupabaseClient, knowledgeSourceId: string) {
+  try {
+    await processKnowledgeSource(knowledgeSourceId);
+  } catch {
+    // Déjà tracé dans knowledge_sources.error_message par processKnowledgeSource.
+  }
+  const { data } = await supabase.from("knowledge_sources").select("*").eq("id", knowledgeSourceId).single();
+  return data;
 }
 
 // GET /api/org/formations/[id]/knowledge-sources — liste les sources déjà uploadées
@@ -70,8 +85,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   const url = formData.get("url");
   const file = formData.get("file");
 
-  // Cas URL web : pas de fichier à stocker, juste l'URL — l'extraction
-  // (scraping) est prévue dans une carte suivante, pas encore construite.
+  // Cas URL web : pas de fichier à stocker, juste l'URL — extraite par scraping
+  // dans processKnowledgeSource (extractTextFromUrl, lib/documentExtraction.ts).
   if (typeof url === "string" && url.trim()) {
     const { data, error } = await supabase
       .from("knowledge_sources")
@@ -86,7 +101,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       .select()
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ data }, { status: 201 });
+    return NextResponse.json({ data: await ingestAndReturn(supabase, data.id) }, { status: 201 });
   }
 
   if (!(file instanceof File)) {
@@ -142,5 +157,5 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ data }, { status: 201 });
+  return NextResponse.json({ data: await ingestAndReturn(supabase, data.id) }, { status: 201 });
 }

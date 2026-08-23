@@ -38,7 +38,7 @@ export default async function AbonnementPage() {
 
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("subscription_plan, subscription_status, stripe_customer_id, stripe_subscription_id")
+    .select("subscription_plan, subscription_status, stripe_customer_id, stripe_subscription_id, cancel_at_period_end")
     .eq("id", currentUser.tenant_id)
     .single();
 
@@ -50,7 +50,12 @@ export default async function AbonnementPage() {
 
   const planKey = tenant?.subscription_plan as PlanKey | null;
   const plan = planKey && PLANS[planKey] ? PLANS[planKey] : null;
-  const status = tenant?.subscription_status ? STATUS_LABEL[tenant.subscription_status] : null;
+  const cancelScheduled = tenant?.subscription_status === "active" && tenant?.cancel_at_period_end;
+  const status = cancelScheduled
+    ? { label: "Annulation prévue", className: "statusPastDue" }
+    : tenant?.subscription_status
+      ? STATUS_LABEL[tenant.subscription_status]
+      : null;
 
   let renewalDate: Date | null = null;
   let card: { brand: string; last4: string; expMonth: number; expYear: number } | null = null;
@@ -72,8 +77,8 @@ export default async function AbonnementPage() {
 
     if (tenant?.stripe_customer_id) {
       const invoiceList = await stripe.invoices.list({ customer: tenant.stripe_customer_id, limit: 5 });
-      invoices = invoiceList.data.map((inv) => ({
-        id: inv.id ?? inv.number ?? Math.random().toString(),
+      invoices = invoiceList.data.map((inv, idx) => ({
+        id: inv.id ?? inv.number ?? `invoice-${idx}`,
         number: inv.number,
         created: inv.created,
         amountPaid: inv.amount_paid,
@@ -105,7 +110,15 @@ export default async function AbonnementPage() {
           {plan && (
             <p className={styles.planPrice}>
               {plan.price} {plan.period}
-              {renewalDate && ` · renouvellement le ${renewalDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`}
+              {renewalDate &&
+                (cancelScheduled
+                  ? ` · accès jusqu'au ${renewalDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}, non renouvelé`
+                  : ` · renouvellement le ${renewalDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`)}
+            </p>
+          )}
+          {cancelScheduled && (
+            <p className={styles.cancelNotice}>
+              Abonnement annulé — vous conservez l&apos;accès jusqu&apos;à la fin de la période déjà payée.
             </p>
           )}
           <div className={styles.planDivider} />

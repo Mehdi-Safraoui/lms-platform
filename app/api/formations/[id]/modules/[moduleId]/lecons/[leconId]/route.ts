@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { embedAndInsertLessonChunks } from "@/lib/chunkLesson";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
-  const { leconId } = await params;
+  const { id: formationId, leconId } = await params;
   const body = await req.json();
   const { title, content_type, content_markdown, content_blocks, video_url, order_index, duration_minutes, is_preview } = body;
 
@@ -51,6 +52,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: error.code === "PGRST116" ? 404 : 500 });
   }
+
+  // Ré-indexation RAG best-effort si le contenu ou son type a changé — garde
+  // les chunks de l'agent conversationnel synchronisés avec ce que l'apprenant
+  // voit réellement (voir lib/chunkLesson.ts, qui vide toujours les anciens
+  // chunks d'abord, y compris quand la leçon n'est plus de type "rich").
+  if (content_blocks !== undefined || content_type !== undefined) {
+    try {
+      const blocks = data.content_type === "rich" ? data.content_blocks : null;
+      await embedAndInsertLessonChunks(leconId, formationId, null, blocks);
+    } catch (err) {
+      console.error(`[lecons PUT] Indexation RAG échouée pour la leçon ${leconId}:`, err);
+    }
+  }
+
   return NextResponse.json({ data });
 }
 

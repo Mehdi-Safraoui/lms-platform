@@ -1,0 +1,319 @@
+.page {
+  padding: 40px 48px 80px;
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  margin-bottom: 24px;
+  transition: color 0.15s;
+}
+.back:hover { color: var(--text); }
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.1px;
+  color: var(--coral);
+  margin-bottom: 8px;
+}
+
+.title {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.4px;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 32px;
+  max-width: 560px;
+}
+
+/* ── État vide ── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 56px 24px;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+}
+
+.emptyIcon { color: var(--coral); }
+
+.emptyText {
+  font-size: 14px;
+  color: var(--text-muted);
+  max-width: 380px;
+  line-height: 1.6;
+}
+
+/* ── Boutons communs ── */
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 10px;
+  border: none;
+  background: var(--coral);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.primaryBtn:hover:not(:disabled) { opacity: 0.9; }
+.primaryBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 15px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.secondaryBtn:hover:not(:disabled) { border-color: var(--navy); }
+.secondaryBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+/* ── Module ── */
+.moduleCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.moduleHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.moduleBadge {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--coral);
+  background: #fdf0ec;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.moduleTitleInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  padding: 4px 2px;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+.moduleTitleInput:focus { border-color: var(--border); }
+
+.moduleActions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.iconBtn,
+.iconBtnDanger {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.iconBtn:hover:not(:disabled) { border-color: var(--navy); color: var(--text); }
+.iconBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+.iconBtnDanger:hover { border-color: #dc2626; color: #dc2626; }
+
+/* ── Leçons ── */
+.lessonsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lessonRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--bg-alt);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.lessonTypeIcon {
+  flex-shrink: 0;
+  margin-top: 9px;
+  color: var(--text-muted);
+}
+
+.lessonFields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lessonTitleInput {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 2px;
+}
+
+.lessonDescInput {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  padding: 2px;
+  resize: none;
+  font-family: var(--font-jakarta), sans-serif;
+  line-height: 1.4;
+}
+
+.typeToggle {
+  flex-shrink: 0;
+  margin-top: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.typeToggle:hover { border-color: var(--navy); }
+
+.lessonActions {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.addLessonBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+.addLessonBtn:hover { color: var(--navy); }
+
+.validateBtn {
+  display: block;
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  border: none;
+  background: var(--coral);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.15s;
+}
+.validateBtn:hover:not(:disabled) { opacity: 0.9; }
+.validateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Validée ── */
+.validatedCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 48px 24px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 16px;
+}
+
+.validatedIcon { color: #16a34a; }
+
+.validatedTitle {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.validatedSubtitle {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  max-width: 420px;
+  line-height: 1.6;
+}

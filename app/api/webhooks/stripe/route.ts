@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
           subscription_plan: plan,
           subscription_status: "active",
           stripe_subscription_id: subscriptionId,
+          cancel_at_period_end: false,
         })
         .eq("id", tenantId)
         .select("name")
@@ -79,6 +80,36 @@ export async function POST(req: NextRequest) {
       break;
     }
 
+    case "customer.subscription.updated": {
+      // Le Customer Portal est configuré en mode "at_period_end" (vérifié via
+      // stripe.billingPortal.configurations.list()) : annuler ne supprime pas
+      // l'abonnement tout de suite, ça programme juste cancel_at_period_end
+      // pour la fin de la période payée — status reste "active" jusque-là, et
+      // seul cet event (jamais customer.subscription.deleted, qui n'arrive
+      // qu'à l'échéance réelle) permet de le savoir avant. Sans ce handler,
+      // rien ne distingue "actif, se renouvelle normalement" de "actif, mais
+      // ne se renouvellera pas" tant que la période n'est pas terminée.
+      const subscription = event.data.object;
+      const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
+
+      if (!customerId) break;
+
+      const { error } = await supabase
+        .from("tenants")
+        .update({
+          subscription_status: subscription.status,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+        })
+        .eq("stripe_customer_id", customerId);
+
+      if (error) console.error("[stripe webhook] subscription.updated update error:", error);
+      else
+        console.log(
+          `[stripe webhook] customer ${customerId} → status=${subscription.status} cancel_at_period_end=${subscription.cancel_at_period_end}`
+        );
+      break;
+    }
+
     case "customer.subscription.deleted": {
       const subscription = event.data.object;
       const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
@@ -91,6 +122,7 @@ export async function POST(req: NextRequest) {
           subscription_status: "canceled",
           subscription_plan: null,
           stripe_subscription_id: null,
+          cancel_at_period_end: false,
         })
         .eq("stripe_customer_id", customerId);
 

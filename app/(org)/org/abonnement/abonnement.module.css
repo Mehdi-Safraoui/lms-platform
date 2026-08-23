@@ -102,6 +102,17 @@
   margin-bottom: 20px;
 }
 
+.cancelNotice {
+  font-size: 12px;
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 0 0 20px;
+  line-height: 1.4;
+}
+
 .planDivider {
   height: 1px;
   background: rgba(255, 255, 255, 0.12);

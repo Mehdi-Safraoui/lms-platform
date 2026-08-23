@@ -4,6 +4,7 @@ import { generateEmbedding } from "@/lib/embeddings";
 export interface ChunkSearchResult {
   id: string;
   content: string;
+  lessonId: string | null;
   metadata: {
     position: number;
     char_start: number;
@@ -14,14 +15,17 @@ export interface ChunkSearchResult {
 }
 
 /**
- * Recherche les chunks les plus pertinents pour une question, strictement isolés
- * par tenant ET par formation (voir fonction SQL match_chunks — un chunk d'un autre
- * tenant ou d'une autre formation ne peut jamais remonter, peu importe sa proximité
- * vectorielle avec la question).
+ * Recherche les chunks les plus pertinents pour une question, isolés par
+ * formation (voir fonction SQL match_chunks — un chunk d'une autre formation
+ * ne peut jamais remonter, peu importe sa proximité vectorielle). L'isolation
+ * par tenant n'est pas refaite ici : elle est déjà garantie en amont par la
+ * vérification d'accès à cette formation précise (tenant propriétaire OU
+ * abonnement via tenant_formations pour une formation du catalogue global —
+ * voir app/api/agent/[formationId]/route.ts), avant même l'appel à cette
+ * fonction.
  */
 export async function searchChunks(
   query: string,
-  tenantId: string,
   formationId: string,
   topK: number = 5
 ): Promise<ChunkSearchResult[]> {
@@ -30,7 +34,6 @@ export async function searchChunks(
   const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase.rpc("match_chunks", {
     query_embedding: queryEmbedding,
-    match_tenant_id: tenantId,
     match_formation_id: formationId,
     match_count: topK,
   });
@@ -39,5 +42,13 @@ export async function searchChunks(
     throw new Error(`Échec de la recherche vectorielle : ${error.message}`);
   }
 
-  return (data ?? []) as ChunkSearchResult[];
+  return ((data ?? []) as { id: string; content: string; lesson_id: string | null; metadata: ChunkSearchResult["metadata"]; similarity: number }[]).map(
+    (row) => ({
+      id: row.id,
+      content: row.content,
+      lessonId: row.lesson_id,
+      metadata: row.metadata,
+      similarity: row.similarity,
+    })
+  );
 }

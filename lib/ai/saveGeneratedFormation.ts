@@ -1,4 +1,5 @@
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { embedAndInsertLessonChunks } from "@/lib/chunkLesson";
 import type { GeneratedFormation } from "./contentBlocks";
 
 /**
@@ -58,6 +59,19 @@ export async function saveGeneratedFormation(
         .single();
       if (leconError || !leconRow) {
         throw new Error(`Échec de création de la leçon "${lesson.title}" : ${leconError?.message}`);
+      }
+
+      // Indexation RAG (recherche de l'agent conversationnel) — best-effort :
+      // une erreur d'embedding ne doit pas faire échouer la sauvegarde de la
+      // formation elle-même. tenant_id = null car cette fonction ne sert
+      // aujourd'hui que le catalogue global (V1, super_admin) ; à revoir si
+      // V2 (admin_tenant) la réutilise un jour pour ses propres formations.
+      if (lesson.contentType === "lesson" && lesson.blocks) {
+        try {
+          await embedAndInsertLessonChunks(leconRow.id, formation.id, null, lesson.blocks);
+        } catch (err) {
+          console.error(`[saveGeneratedFormation] Indexation RAG échouée pour "${lesson.title}":`, err);
+        }
       }
 
       if (lesson.contentType === "quiz" && lesson.quiz) {

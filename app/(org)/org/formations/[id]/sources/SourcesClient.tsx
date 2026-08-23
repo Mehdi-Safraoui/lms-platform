@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   UploadCloud, FileText, Link as LinkIcon,
-  Clock, Loader2, CheckCircle2, AlertTriangle,
+  Clock, Loader2, CheckCircle2, AlertTriangle, ArrowRight,
 } from "lucide-react";
 import styles from "./sources.module.css";
 
@@ -32,6 +33,7 @@ const STATUS_LABEL: Record<KnowledgeSource["ingestion_status"], string> = {
 };
 
 export default function SourcesClient({ formationId }: { formationId: string }) {
+  const router = useRouter();
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -90,6 +92,9 @@ export default function SourcesClient({ formationId }: { formationId: string }) 
   }
 
   if (loading) return <div className={styles.loading}>Chargement…</div>;
+
+  const readyCount = sources.filter((s) => s.ingestion_status === "terminee").length;
+  const canContinue = readyCount > 0 && !uploading;
 
   return (
     <>
@@ -159,6 +164,23 @@ export default function SourcesClient({ formationId }: { formationId: string }) 
             ))}
           </div>
         )}
+      </div>
+
+      <div className={styles.continueRow}>
+        {!canContinue && (
+          <p className={styles.continueHint}>
+            Ajoutez au moins un document traité avec succès pour continuer.
+          </p>
+        )}
+        <button
+          type="button"
+          className={styles.continueBtn}
+          disabled={!canContinue}
+          onClick={() => router.push(`/org/formations/${formationId}/cadrage`)}
+        >
+          Continuer vers le cadrage
+          <ArrowRight size={16} />
+        </button>
       </div>
     </>
   );
