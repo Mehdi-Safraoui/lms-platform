@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Sparkles, RefreshCw, Plus, Trash2, ChevronUp, ChevronDown,
-  CheckCircle2, ClipboardList, GraduationCap,
+  CheckCircle2, ClipboardList, GraduationCap, ArrowRight,
 } from "lucide-react";
 import styles from "./structure.module.css";
 
@@ -53,6 +54,7 @@ export default function StructureClient({
   formationId: string;
   initialStructure: ExistingStructure | null;
 }) {
+  const router = useRouter();
   const [structure, setStructure] = React.useState<StructureProposal | null>(initialStructure?.proposal ?? null);
   const [validatedAt, setValidatedAt] = React.useState<string | null>(initialStructure?.validated_at ?? null);
   const [generating, setGenerating] = React.useState(false);
@@ -169,8 +171,16 @@ export default function StructureClient({
         <p className={styles.validatedTitle}>Structure validée</p>
         <p className={styles.validatedSubtitle}>
           {structure?.modules.length ?? 0} module{(structure?.modules.length ?? 0) > 1 ? "s" : ""} et {totalLessons} leçon
-          {totalLessons > 1 ? "s" : ""} créés. La génération du contenu leçon par leçon arrive dans une prochaine étape.
+          {totalLessons > 1 ? "s" : ""} créés.
         </p>
+        <button
+          type="button"
+          className={styles.primaryBtn}
+          onClick={() => router.push(`/org/formations/${formationId}/generation`)}
+        >
+          Générer le contenu des leçons
+          <ArrowRight size={16} />
+        </button>
       </div>
     );
   }

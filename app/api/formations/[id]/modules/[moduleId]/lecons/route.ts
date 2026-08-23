@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { assertGlobalCatalogueFormation } from "@/lib/api/assert-global-catalogue-formation";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
-  const { moduleId } = await params;
+  const { id: formationId, moduleId } = await params;
   const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, formationId))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
   const { data, error } = await supabase
     .from("lecons")
     .select("*")
@@ -28,7 +33,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
-  const { moduleId } = await params;
+  const { id: formationId, moduleId } = await params;
+  const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, formationId))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
   const body = await req.json();
   const { title, content_type, content_markdown, video_url, order_index, duration_minutes, is_preview } = body;
 
@@ -36,7 +46,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "title et content_type sont requis" }, { status: 400 });
   }
 
-  const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase
     .from("lecons")
     .insert({

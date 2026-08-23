@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock, BookOpen, Layers, Clock } from "lucide-react";
+import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock, BookOpen, Layers, Clock, Building2 } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { formatDuration } from "@/lib/utils";
@@ -34,7 +34,7 @@ export default async function FormationDetailPage({ params }: Props) {
   const [{ data: formation }, { data: modules }, { data: dbUser }] = await Promise.all([
     supabase
       .from("formations")
-      .select("id, title, description, niveau, estimated_duration_minutes, attestation_threshold_pct, videos")
+      .select("id, title, description, niveau, estimated_duration_minutes, attestation_threshold_pct, videos, tenant_id")
       .eq("id", formationId)
       .eq("is_published", true)
       .single(),
@@ -155,9 +155,17 @@ export default async function FormationDetailPage({ params }: Props) {
         <span>{formation.title}</span>
       </nav>
 
-      <div className={styles.eyebrow}>
-        <span className={styles.eyebrowDot} />
-        {formation.niveau ? NIVEAU_LABEL[formation.niveau] ?? formation.niveau : "Formation"}
+      <div className={styles.eyebrowRow}>
+        <div className={styles.eyebrow}>
+          <span className={styles.eyebrowDot} />
+          {formation.niveau ? NIVEAU_LABEL[formation.niveau] ?? formation.niveau : "Formation"}
+        </div>
+        {formation.tenant_id && (
+          <span className={styles.companyBadge}>
+            <Building2 size={11} />
+            Créée par votre entreprise
+          </span>
+        )}
       </div>
 
       <h1 className={styles.title}>{formation.title}</h1>

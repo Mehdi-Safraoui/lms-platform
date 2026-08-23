@@ -4,7 +4,10 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/formations — liste toutes les formations
+// GET /api/formations — liste les formations du catalogue global Ahead
+// (tenant_id null). Ne doit jamais inclure les formations créées par un
+// Formateur pour son propre tenant (V2) — voir app/api/formations/[id]/route.ts
+// pour le même garde-fou côté lecture/écriture/suppression individuelle.
 export async function GET() {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
@@ -13,6 +16,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("formations")
     .select("*")
+    .is("tenant_id", null)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

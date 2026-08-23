@@ -21,6 +21,14 @@
 
 .breadcrumb a:hover { color: var(--text); }
 
+.eyebrowRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
 .eyebrow {
   display: flex;
   align-items: center;
@@ -30,7 +38,18 @@
   text-transform: uppercase;
   letter-spacing: 1.1px;
   color: var(--coral);
-  margin-bottom: 12px;
+}
+
+.companyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--coral);
+  background: #fdf0ec;
+  border-radius: 999px;
+  padding: 2px 8px;
 }
 
 .eyebrowDot {

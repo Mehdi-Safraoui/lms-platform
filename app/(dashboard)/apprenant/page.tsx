@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Star, CheckCircle } from "lucide-react";
+import { Star, CheckCircle, Building2 } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { computeBadges, detectAndPersistNewBadges } from "@/lib/badges";
@@ -34,11 +34,16 @@ export default async function ApprenantPage() {
     tenantFormationIds.length > 0
       ? supabase
           .from("formations")
-          .select("id, title, description, niveau, thumbnail_url")
+          .select("id, title, description, niveau, thumbnail_url, tenant_id")
           .eq("is_published", true)
           .in("id", tenantFormationIds)
           .order("created_at", { ascending: false })
-      : { data: [] as { id: string; title: string; description: string | null; niveau: string | null; thumbnail_url: string | null }[] },
+      : {
+          data: [] as {
+            id: string; title: string; description: string | null; niveau: string | null;
+            thumbnail_url: string | null; tenant_id: string | null;
+          }[],
+        },
     dbUser
       ? supabase.from("user_enrollments").select("formation_id").eq("user_id", dbUser.id)
       : { data: null },
@@ -92,6 +97,12 @@ export default async function ApprenantPage() {
                       <div className={styles.cardFooter}>
                         {f.niveau && (
                           <span className={styles.badge}>{NIVEAU_LABEL[f.niveau] ?? f.niveau}</span>
+                        )}
+                        {f.tenant_id && (
+                          <span className={styles.companyBadge}>
+                            <Building2 size={11} />
+                            Créée par votre entreprise
+                          </span>
                         )}
                         {enrolled && (
                           <span className={styles.enrolledBadge}>

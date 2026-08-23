@@ -61,6 +61,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
         title: lesson.title,
         content_type: lesson.contentType === "quiz" ? "quiz" : "rich",
         content_blocks: null,
+        generation_brief: lesson.description,
         order_index: li,
       }));
       const { error: leconsError } = await supabase.from("lecons").insert(lessonRows);

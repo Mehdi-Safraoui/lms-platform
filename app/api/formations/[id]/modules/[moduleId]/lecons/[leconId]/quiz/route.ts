@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { assertGlobalCatalogueFormation } from "@/lib/api/assert-global-catalogue-formation";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
-  const { leconId } = await params;
+  const { id: formationId, leconId } = await params;
   const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, formationId))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
 
   const { data, error } = await supabase
     .from("quizzes")
@@ -31,10 +35,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
-  const { leconId } = await params;
-  const { title, pass_score = 70, questions = [] } = await req.json();
-
+  const { id: formationId, leconId } = await params;
   const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, formationId))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
+  const { title, pass_score = 70, questions = [] } = await req.json();
 
   const { data: quiz, error } = await supabase
     .from("quizzes")
@@ -74,10 +81,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
-  const { leconId } = await params;
-  const { title, pass_score, questions = [] } = await req.json();
-
+  const { id: formationId, leconId } = await params;
   const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, formationId))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
+  const { title, pass_score, questions = [] } = await req.json();
 
   const { data: quiz } = await supabase
     .from("quizzes")
@@ -120,8 +130,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
-  const { leconId } = await params;
+  const { id: formationId, leconId } = await params;
   const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, formationId))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
   const { error } = await supabase.from("quizzes").delete().eq("lecon_id", leconId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return new NextResponse(null, { status: 204 });

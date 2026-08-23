@@ -95,11 +95,13 @@ export const contentBlockSchema = z.discriminatedUnion("type", [
 
 export type ContentBlock = z.infer<typeof contentBlockSchema>;
 
-const quizQuestionSchema = z.object({
+export const quizQuestionSchema = z.object({
   question: z.string().min(1),
   options: z.array(z.string().min(1)).min(2).max(6),
   correctIndex: z.number().int().min(0),
 });
+
+export type QuizQuestion = z.infer<typeof quizQuestionSchema>;
 
 const lessonSchema = z.object({
   title: z.string().min(1),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { assertGlobalCatalogueFormation } from "@/lib/api/assert-global-catalogue-formation";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, id))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
   const { data, error } = await supabase.from("formations").select("*").eq("id", id).single();
 
   if (error) {
@@ -27,6 +32,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (guard instanceof NextResponse) return guard;
 
   const { id } = await params;
+  const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, id))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
   const body = await req.json();
   const {
     title,
@@ -41,7 +51,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     videos,
   } = body;
 
-  const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase
     .from("formations")
     .update({
@@ -74,6 +83,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const supabase = createServiceRoleSupabaseClient();
+  if (!(await assertGlobalCatalogueFormation(supabase, id))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
   const { error } = await supabase.from("formations").delete().eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
