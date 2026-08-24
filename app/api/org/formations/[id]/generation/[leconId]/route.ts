@@ -50,5 +50,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Même raisonnement que POST .../generate : ne jamais laisser des chunks
+  // périmés servir de réponse au chat apprenant pendant qu'une leçon déjà
+  // publiée est en cours de retouche.
+  await supabase.from("chunks").delete().eq("lesson_id", leconId);
+
   return NextResponse.json({ data });
 }

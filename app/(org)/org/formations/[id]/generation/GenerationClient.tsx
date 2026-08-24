@@ -4,7 +4,8 @@ import * as React from "react";
 import { toast } from "sonner";
 import {
   Sparkles, RefreshCw, CheckCircle2, Circle, Clock,
-  GraduationCap, ClipboardList, Save, ArrowRight, Rocket,
+  GraduationCap, ClipboardList, Save, ArrowRight, Rocket, Gauge,
+  Plus, Trash2, Pencil, Check, X,
 } from "lucide-react";
 import BlockEditor from "@/components/lessons/BlockEditor";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
@@ -40,8 +41,46 @@ interface ModuleGroup {
   lecons: Lesson[];
 }
 
+interface Quota {
+  used: number;
+  total: number | null; // null = illimité
+}
+
 function flatten(modules: ModuleGroup[]): Lesson[] {
   return modules.flatMap((m) => m.lecons);
+}
+
+function RenameInput({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className={styles.renameRow}>
+      <input
+        autoFocus
+        className={styles.renameInput}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onCommit();
+          if (e.key === "Escape") onCancel();
+        }}
+      />
+      <button type="button" className={styles.miniIconBtn} onClick={onCommit} aria-label="Confirmer">
+        <Check size={12} />
+      </button>
+      <button type="button" className={styles.miniIconBtn} onClick={onCancel} aria-label="Annuler">
+        <X size={12} />
+      </button>
+    </div>
+  );
 }
 
 export default function GenerationClient({
@@ -52,9 +91,13 @@ export default function GenerationClient({
   alreadyPublished: boolean;
 }) {
   const [modules, setModules] = React.useState<ModuleGroup[] | null>(null);
+  const [quota, setQuota] = React.useState<Quota | null>(null);
   const [selectedLeconId, setSelectedLeconId] = React.useState<string | null>(null);
   const [publishing, setPublishing] = React.useState(false);
   const [published, setPublished] = React.useState(alreadyPublished);
+  const [addingModule, setAddingModule] = React.useState(false);
+  const [addingLeconTo, setAddingLeconTo] = React.useState<string | null>(null);
+  const [renaming, setRenaming] = React.useState<{ kind: "module" | "lecon"; id: string; value: string } | null>(null);
   const fetchedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -63,11 +106,14 @@ export default function GenerationClient({
     fetch(`/api/org/formations/${formationId}/generation`)
       .then((res) => res.json())
       .then((json) => {
-        setModules(json.data);
-        const first = flatten(json.data)[0];
+        setModules(json.data.modules);
+        setQuota(json.data.quota);
+        const first = flatten(json.data.modules)[0];
         if (first) setSelectedLeconId(first.id);
       });
   }, [formationId]);
+
+  const quotaExhausted = quota !== null && quota.total !== null && quota.used >= quota.total;
 
   const allLecons = modules ? flatten(modules) : [];
   const selectedLecon = allLecons.find((l) => l.id === selectedLeconId) ?? null;
@@ -84,6 +130,109 @@ export default function GenerationClient({
     const idx = allLecons.findIndex((l) => l.id === leconId);
     const next = allLecons[idx + 1];
     if (next) setSelectedLeconId(next.id);
+  }
+
+  async function handleAddModule() {
+    setAddingModule(true);
+    try {
+      const res = await fetch(`/api/org/formations/${formationId}/generation/modules`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error("Erreur", { description: json.error });
+        return;
+      }
+      setModules((prev) => [...(prev ?? []), { id: json.data.id, title: json.data.title, lecons: json.data.lecons }]);
+      setSelectedLeconId(json.data.lecons[0].id);
+    } catch {
+      toast.error("Erreur réseau. Réessayez.");
+    } finally {
+      setAddingModule(false);
+    }
+  }
+
+  async function handleDeleteModule(moduleId: string) {
+    if (!window.confirm("Supprimer ce module et toutes ses leçons ?")) return;
+    const res = await fetch(`/api/org/formations/${formationId}/generation/modules/${moduleId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      toast.error("Erreur", { description: json?.error });
+      return;
+    }
+    setModules((prev) => {
+      const next = (prev ?? []).filter((m) => m.id !== moduleId);
+      if (selectedLecon && !next.some((m) => m.lecons.some((l) => l.id === selectedLecon.id))) {
+        setSelectedLeconId(flatten(next)[0]?.id ?? null);
+      }
+      return next;
+    });
+    toast.success("Module supprimé.");
+  }
+
+  async function handleAddLecon(moduleId: string) {
+    setAddingLeconTo(moduleId);
+    try {
+      const res = await fetch(`/api/org/formations/${formationId}/generation/modules/${moduleId}/lecons`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error("Erreur", { description: json.error });
+        return;
+      }
+      setModules((prev) => (prev ? prev.map((m) => (m.id === moduleId ? { ...m, lecons: [...m.lecons, json.data] } : m)) : prev));
+      setSelectedLeconId(json.data.id);
+    } catch {
+      toast.error("Erreur réseau. Réessayez.");
+    } finally {
+      setAddingLeconTo(null);
+    }
+  }
+
+  async function handleDeleteLecon(moduleId: string, leconId: string) {
+    if (!window.confirm("Supprimer cette leçon ?")) return;
+    const res = await fetch(`/api/org/formations/${formationId}/generation/modules/${moduleId}/lecons/${leconId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      toast.error("Erreur", { description: json?.error });
+      return;
+    }
+    setModules((prev) => {
+      const next = (prev ?? []).map((m) => (m.id === moduleId ? { ...m, lecons: m.lecons.filter((l) => l.id !== leconId) } : m));
+      if (selectedLeconId === leconId) setSelectedLeconId(flatten(next)[0]?.id ?? null);
+      return next;
+    });
+    toast.success("Leçon supprimée.");
+  }
+
+  async function commitRename() {
+    if (!renaming || !renaming.value.trim()) {
+      setRenaming(null);
+      return;
+    }
+    const { kind, id, value } = renaming;
+    const url =
+      kind === "module"
+        ? `/api/org/formations/${formationId}/generation/modules/${id}`
+        : `/api/org/formations/${formationId}/generation/modules/${modules?.find((m) => m.lecons.some((l) => l.id === id))?.id}/lecons/${id}`;
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: value.trim() }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      toast.error("Erreur", { description: json?.error });
+      setRenaming(null);
+      return;
+    }
+    setModules((prev) =>
+      prev
+        ? prev.map((m) =>
+            kind === "module" && m.id === id
+              ? { ...m, title: value.trim() }
+              : { ...m, lecons: m.lecons.map((l) => (kind === "lecon" && l.id === id ? { ...l, title: value.trim() } : l)) }
+          )
+        : prev
+    );
+    setRenaming(null);
   }
 
   async function handlePublish() {
@@ -111,30 +260,87 @@ export default function GenerationClient({
       <aside className={styles.sidebar}>
         {modules.map((mod) => (
           <div key={mod.id} className={styles.sidebarModule}>
-            <span className={styles.sidebarModuleTitle}>{mod.title}</span>
+            <div className={styles.sidebarModuleHeader}>
+              {renaming?.kind === "module" && renaming.id === mod.id ? (
+                <RenameInput value={renaming.value} onChange={(v) => setRenaming({ kind: "module", id: mod.id, value: v })} onCommit={commitRename} onCancel={() => setRenaming(null)} />
+              ) : (
+                <>
+                  <span className={styles.sidebarModuleTitle}>{mod.title}</span>
+                  {!published && (
+                    <div className={styles.sidebarModuleActions}>
+                      <button type="button" className={styles.miniIconBtn} onClick={() => setRenaming({ kind: "module", id: mod.id, value: mod.title })} aria-label="Renommer le module">
+                        <Pencil size={11} />
+                      </button>
+                      <button type="button" className={styles.miniIconBtnDanger} onClick={() => handleDeleteModule(mod.id)} aria-label="Supprimer le module">
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
             {mod.lecons.map((lecon) => (
-              <button
-                key={lecon.id}
-                type="button"
-                className={`${styles.sidebarLesson} ${lecon.id === selectedLeconId ? styles.sidebarLessonActive : ""}`}
-                onClick={() => setSelectedLeconId(lecon.id)}
-              >
-                {lecon.validatedAt ? (
-                  <CheckCircle2 size={14} className={styles.statusValidated} />
-                ) : lecon.hasContent ? (
-                  <Clock size={14} className={styles.statusPending} />
+              <div key={lecon.id} className={styles.sidebarLessonRow}>
+                {renaming?.kind === "lecon" && renaming.id === lecon.id ? (
+                  <RenameInput value={renaming.value} onChange={(v) => setRenaming({ kind: "lecon", id: lecon.id, value: v })} onCommit={commitRename} onCancel={() => setRenaming(null)} />
                 ) : (
-                  <Circle size={14} className={styles.statusEmpty} />
+                  <>
+                    <button
+                      type="button"
+                      className={`${styles.sidebarLesson} ${lecon.id === selectedLeconId ? styles.sidebarLessonActive : ""}`}
+                      onClick={() => setSelectedLeconId(lecon.id)}
+                    >
+                      {lecon.validatedAt ? (
+                        <CheckCircle2 size={14} className={styles.statusValidated} />
+                      ) : lecon.hasContent ? (
+                        <Clock size={14} className={styles.statusPending} />
+                      ) : (
+                        <Circle size={14} className={styles.statusEmpty} />
+                      )}
+                      <span className={styles.sidebarLessonTitle}>{lecon.title}</span>
+                    </button>
+                    {!published && (
+                      <div className={styles.sidebarLessonActions}>
+                        <button type="button" className={styles.miniIconBtn} onClick={() => setRenaming({ kind: "lecon", id: lecon.id, value: lecon.title })} aria-label="Renommer la leçon">
+                          <Pencil size={11} />
+                        </button>
+                        <button type="button" className={styles.miniIconBtnDanger} onClick={() => handleDeleteLecon(mod.id, lecon.id)} aria-label="Supprimer la leçon">
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
-                <span className={styles.sidebarLessonTitle}>{lecon.title}</span>
-              </button>
+              </div>
             ))}
+            {!published && (
+              <button type="button" className={styles.addLeconBtn} disabled={addingLeconTo === mod.id} onClick={() => handleAddLecon(mod.id)}>
+                <Plus size={12} />
+                {addingLeconTo === mod.id ? "Ajout…" : "Ajouter une leçon"}
+              </button>
+            )}
           </div>
         ))}
+
+        {!published && (
+          <button type="button" className={styles.addModuleBtn} disabled={addingModule} onClick={handleAddModule}>
+            <Plus size={13} />
+            {addingModule ? "Ajout…" : "Ajouter un module"}
+          </button>
+        )}
 
         <div className={styles.progressBox}>
           {validatedCount} / {allLecons.length} leçons validées
         </div>
+
+        {quota && (
+          <div className={`${styles.quotaBox} ${quotaExhausted ? styles.quotaBoxExhausted : ""}`}>
+            <Gauge size={13} />
+            {quota.total === null
+              ? `${quota.used} génération${quota.used > 1 ? "s" : ""} IA (illimité)`
+              : `${quota.used} / ${quota.total} générations IA utilisées`}
+          </div>
+        )}
 
         {allValidated && !published && (
           <button type="button" className={styles.publishBtn} disabled={publishing} onClick={handlePublish}>
@@ -158,8 +364,10 @@ export default function GenerationClient({
             key={selectedLecon.id}
             formationId={formationId}
             lecon={selectedLecon}
+            quotaExhausted={quotaExhausted}
             onUpdate={(patch) => updateLeconLocal(selectedLecon.id, patch)}
             onValidated={() => selectNextAfter(selectedLecon.id)}
+            onQuotaUpdate={setQuota}
           />
         )}
       </main>
@@ -175,13 +383,17 @@ export default function GenerationClient({
 function LessonPanel({
   formationId,
   lecon,
+  quotaExhausted,
   onUpdate,
   onValidated,
+  onQuotaUpdate,
 }: {
   formationId: string;
   lecon: Lesson;
+  quotaExhausted: boolean;
   onUpdate: (patch: Partial<Lesson>) => void;
   onValidated: () => void;
+  onQuotaUpdate: (quota: Quota) => void;
 }) {
   const [editedBlocks, setEditedBlocks] = React.useState<ContentBlock[]>(lecon.contentBlocks ?? []);
   const [dirty, setDirty] = React.useState(false);
@@ -190,6 +402,10 @@ function LessonPanel({
   const [validating, setValidating] = React.useState(false);
 
   async function handleGenerate() {
+    if (quotaExhausted) {
+      toast.error("Quota de générations IA atteint. Contactez Ahead pour l'augmenter.");
+      return;
+    }
     setGenerating(true);
     try {
       const res = await fetch(`/api/org/formations/${formationId}/generation/${lecon.id}/generate`, { method: "POST" });
@@ -198,6 +414,7 @@ function LessonPanel({
         toast.error("Erreur", { description: json.error });
         return;
       }
+      if (json.data.quota) onQuotaUpdate(json.data.quota);
       if (lecon.contentType === "rich") {
         setEditedBlocks(json.data.blocks);
         setDirty(false);
@@ -284,7 +501,8 @@ function LessonPanel({
         <div className={styles.emptyLesson}>
           <Sparkles size={26} className={styles.emptyLessonIcon} />
           <p className={styles.emptyLessonText}>Aucun contenu généré pour cette leçon pour l&apos;instant.</p>
-          <button type="button" className={styles.primaryBtn} disabled={generating} onClick={handleGenerate}>
+          {quotaExhausted && <p className={styles.quotaWarning}>Quota de générations IA atteint — contactez Ahead pour l&apos;augmenter.</p>}
+          <button type="button" className={styles.primaryBtn} disabled={generating || quotaExhausted} onClick={handleGenerate}>
             {generating ? "Génération en cours…" : "Générer le contenu"}
           </button>
         </div>
@@ -321,7 +539,13 @@ function LessonPanel({
           )}
 
           <div className={styles.actionsRow}>
-            <button type="button" className={styles.secondaryBtn} disabled={generating} onClick={handleGenerate}>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              disabled={generating || quotaExhausted}
+              title={quotaExhausted ? "Quota de générations IA atteint" : undefined}
+              onClick={handleGenerate}
+            >
               <RefreshCw size={14} className={generating ? styles.spin : undefined} />
               {generating ? "Régénération…" : "Régénérer"}
             </button>

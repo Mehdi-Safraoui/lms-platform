@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getAiGenerationQuota } from "@/lib/aiGenerationQuota";
 
 export const dynamic = "force-dynamic";
 
@@ -73,5 +74,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
         }),
     }));
 
-  return NextResponse.json({ data });
+  const quotaResult = await getAiGenerationQuota(guard.tenantId);
+
+  return NextResponse.json({
+    data: { modules: data, quota: { used: quotaResult.used, total: quotaResult.quota } },
+  });
 }

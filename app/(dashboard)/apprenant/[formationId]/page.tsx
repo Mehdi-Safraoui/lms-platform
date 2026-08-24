@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock, BookOpen, Layers, Clock, Building2 } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
 import { formatDuration } from "@/lib/utils";
 import EnrollButton from "./EnrollButton";
 import styles from "./formation.module.css";
@@ -45,6 +46,7 @@ export default async function FormationDetailPage({ params }: Props) {
   ]);
 
   if (!formation) notFound();
+  if (!(await isFormationAccessibleToTenant(supabase, dbUser?.tenant_id ?? null, formation))) notFound();
 
   const tenantHasSubscription = dbUser?.tenant_id ? await hasActiveSubscription(dbUser.tenant_id) : false;
 

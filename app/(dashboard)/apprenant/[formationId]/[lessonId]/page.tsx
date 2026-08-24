@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { ChevronLeft, Lock } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
 import LessonView from "./LessonView";
 import NotifyAdminButton from "./NotifyAdminButton";
 import styles from "./lesson.module.css";
@@ -18,7 +19,7 @@ export default async function ApprenantLessonPage({ params }: Props) {
   const { userId: clerkUserId } = await auth();
 
   const [{ data: formation }, { data: lecon }, { data: allModules }, { data: dbUser }] = await Promise.all([
-    supabase.from("formations").select("id, title, is_published").eq("id", formationId).single(),
+    supabase.from("formations").select("id, title, is_published, tenant_id").eq("id", formationId).single(),
     supabase.from("lecons").select("id, title, content_type, content_markdown, content_blocks, video_url").eq("id", lessonId).single(),
     supabase.from("modules").select("id, title, order_index, lecons(id, title, order_index)").eq("formation_id", formationId).order("order_index"),
     clerkUserId
@@ -27,6 +28,7 @@ export default async function ApprenantLessonPage({ params }: Props) {
   ]);
 
   if (!formation || !formation.is_published || !lecon) notFound();
+  if (!(await isFormationAccessibleToTenant(supabase, dbUser?.tenant_id ?? null, formation))) notFound();
 
   const sortedModules = (allModules ?? []).sort((a, b) => a.order_index - b.order_index);
   const allLessons = sortedModules.flatMap((m) =>

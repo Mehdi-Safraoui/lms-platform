@@ -6,6 +6,7 @@ import { canCreateFormationByAi } from "@/lib/subscription";
 import { searchChunks } from "@/lib/searchChunks";
 import { generateLessonContent, generateLessonQuiz, type LessonGenerationInput } from "@/lib/ai/generateLessonContent";
 import type { CadrageInput } from "@/lib/ai/generateStructureProposal";
+import { consumeAiGenerationQuota } from "@/lib/aiGenerationQuota";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -34,6 +35,17 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (!(await canCreateFormationByAi(guard.tenantId))) {
     return NextResponse.json(
       { error: "La génération de formation par IA nécessite l'offre Création ou Entreprise.", code: "plan_upgrade_required" },
+      { status: 403 }
+    );
+  }
+
+  const quotaResult = await consumeAiGenerationQuota(guard.tenantId);
+  if (!quotaResult.allowed) {
+    return NextResponse.json(
+      {
+        error: `Quota de générations IA atteint (${quotaResult.used}/${quotaResult.quota} utilisées). Contactez Ahead pour l'augmenter.`,
+        code: "quota_exceeded",
+      },
       { status: 403 }
     );
   }
@@ -101,7 +113,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       if (questionsError) throw new Error(`Échec de création des questions : ${questionsError.message}`);
 
       await supabase.from("lecons").update({ content_validated_at: null }).eq("id", leconId);
-      return NextResponse.json({ data: { quiz: questions } });
+      return NextResponse.json({ data: { quiz: questions, quota: { used: quotaResult.used, total: quotaResult.quota } } });
     }
 
     const query = `${lecon.title}. ${lecon.generation_brief ?? ""}`;
@@ -120,7 +132,15 @@ export async function POST(_req: NextRequest, { params }: Params) {
       .eq("id", leconId);
     if (updateError) throw new Error(updateError.message);
 
-    return NextResponse.json({ data: { blocks } });
+    // Désindexe immédiatement l'ancien contenu plutôt que d'attendre la
+    // revalidation : si cette leçon appartient à une formation déjà publiée,
+    // laisser les anciens chunks en place pendant l'édition ferait répondre le
+    // chat apprenant avec du contenu périmé jusqu'à ce que le Formateur
+    // revalide. Mieux vaut un "aucune info trouvée" honnête qu'une réponse
+    // fausse — les chunks sont réindexés avec le nouveau contenu à la validation.
+    await supabase.from("chunks").delete().eq("lesson_id", leconId);
+
+    return NextResponse.json({ data: { blocks, quota: { used: quotaResult.used, total: quotaResult.quota } } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue lors de la génération.";
     return NextResponse.json({ error: message }, { status: 500 });

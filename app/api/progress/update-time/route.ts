@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { isLeconAccessibleToTenant } from "@/lib/formationTenantAccess";
 
 export async function POST(req: Request) {
   const guard = await requireAuth();
@@ -12,6 +13,10 @@ export async function POST(req: Request) {
   }
 
   const supabase = createServiceRoleSupabaseClient();
+
+  if (!(await isLeconAccessibleToTenant(supabase, guard.tenantId, lecon_id))) {
+    return NextResponse.json({ error: "Leçon introuvable" }, { status: 404 });
+  }
 
   const { data: existing } = await supabase
     .from("progress")

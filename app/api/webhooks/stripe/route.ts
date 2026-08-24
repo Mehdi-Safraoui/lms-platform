@@ -9,6 +9,15 @@ const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.STRIPE_PRICE_ENTREPRISE ?? ""]: "entreprise",
 };
 
+// Même valeurs que le backfill de la migration 20260823000004 — gardées en
+// phase ici pour qu'un tenant qui active/change d'offre reparte avec le bon
+// quota, pas seulement les tenants déjà existants au moment de la migration.
+const QUOTA_BY_PLAN: Record<string, number> = {
+  decouverte: 0,
+  creation: 30,
+  entreprise: 100,
+};
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -46,6 +55,8 @@ export async function POST(req: NextRequest) {
           subscription_status: "active",
           stripe_subscription_id: subscriptionId,
           cancel_at_period_end: false,
+          ai_generation_quota: plan ? QUOTA_BY_PLAN[plan] : null,
+          ai_generation_used: 0,
         })
         .eq("id", tenantId)
         .select("name")
@@ -94,11 +105,22 @@ export async function POST(req: NextRequest) {
 
       if (!customerId) break;
 
+      // Un changement de plan via le Portail Stripe (upgrade/downgrade) déclenche
+      // ce même event, jamais checkout.session.completed (réservé au tout premier
+      // abonnement) — sans relire le prix ici, subscription_plan et le quota IA
+      // restaient figés sur l'ancien plan après un changement fait depuis le
+      // portail. ai_generation_used n'est volontairement pas remis à zéro ici
+      // (seulement à un nouveau checkout) pour éviter un contournement du quota
+      // par un downgrade/upgrade successif.
+      const newPriceId = subscription.items.data[0]?.price.id ?? "";
+      const newPlan = PRICE_TO_PLAN[newPriceId] ?? null;
+
       const { error } = await supabase
         .from("tenants")
         .update({
           subscription_status: subscription.status,
           cancel_at_period_end: subscription.cancel_at_period_end,
+          ...(newPlan && { subscription_plan: newPlan, ai_generation_quota: QUOTA_BY_PLAN[newPlan] }),
         })
         .eq("stripe_customer_id", customerId);
 

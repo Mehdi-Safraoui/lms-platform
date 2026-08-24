@@ -80,21 +80,61 @@
   margin-bottom: 10px;
 }
 
+.sidebarModuleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px 4px;
+}
+
 .sidebarModuleTitle {
-  display: block;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-light);
-  padding: 6px 8px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebarModuleActions,
+.sidebarLessonActions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.miniIconBtn,
+.miniIconBtnDanger {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.miniIconBtn:hover { background: var(--bg-alt); color: var(--text); }
+.miniIconBtnDanger:hover { background: #fef2f2; color: #dc2626; }
+
+.sidebarLessonRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .sidebarLesson {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   text-align: left;
   padding: 7px 8px;
   border-radius: 8px;
@@ -107,6 +147,61 @@
 }
 .sidebarLesson:hover { background: var(--bg-alt); color: var(--text); }
 .sidebarLessonActive { background: var(--bg-alt); color: var(--text); font-weight: 600; }
+
+.addLeconBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  color: var(--text-light);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.addLeconBtn:hover { color: var(--navy); }
+.addLeconBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.addModuleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.addModuleBtn:hover { border-color: var(--navy); color: var(--text); }
+.addModuleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.renameRow {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+}
+
+.renameInput {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--navy);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--card);
+  outline: none;
+}
 
 .sidebarLessonTitle {
   overflow: hidden;
@@ -125,6 +220,30 @@
   font-weight: 600;
   color: var(--text-muted);
   border-top: 1px solid var(--border-soft);
+}
+
+.quotaBox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-alt);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.quotaBoxExhausted {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.quotaWarning {
+  font-size: 12.5px;
+  color: #dc2626;
+  font-weight: 600;
 }
 
 .publishBtn {

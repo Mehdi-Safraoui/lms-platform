@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { isQuizAccessibleToTenant } from "@/lib/formationTenantAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,10 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceRoleSupabaseClient();
   const { userId, tenantId } = guard;
+
+  if (!(await isQuizAccessibleToTenant(supabase, tenantId, quiz_id))) {
+    return NextResponse.json({ error: "Quiz introuvable" }, { status: 404 });
+  }
 
   // Vérifier si l'utilisateur a déjà réussi ce quiz
   const { data: previousPass } = await supabase

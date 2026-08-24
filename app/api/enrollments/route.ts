@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
 
 export async function POST(req: Request) {
   const guard = await requireAuth();
@@ -10,6 +11,15 @@ export async function POST(req: Request) {
   if (!formationId) return NextResponse.json({ error: "formationId requis" }, { status: 400 });
 
   const supabase = createServiceRoleSupabaseClient();
+
+  // Défense en profondeur : même si les pages apprenant vérifient maintenant
+  // l'accès, cette route acceptait n'importe quel formationId sans validation
+  // — un apprenant aurait pu s'auto-inscrire à une formation d'une autre
+  // entreprise juste en connaissant son id.
+  const { data: formation } = await supabase.from("formations").select("id, is_published, tenant_id").eq("id", formationId).maybeSingle();
+  if (!formation || !formation.is_published || !(await isFormationAccessibleToTenant(supabase, guard.tenantId, formation))) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
 
   const { error } = await supabase.from("user_enrollments").insert({
     user_id: guard.userId,

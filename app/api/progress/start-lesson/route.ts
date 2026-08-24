@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { isLeconAccessibleToTenant } from "@/lib/formationTenantAccess";
 
 export async function POST(req: Request) {
   const guard = await requireAuth();
@@ -10,6 +11,10 @@ export async function POST(req: Request) {
   if (!lecon_id) return NextResponse.json({ error: "lecon_id requis" }, { status: 400 });
 
   const supabase = createServiceRoleSupabaseClient();
+
+  if (!(await isLeconAccessibleToTenant(supabase, guard.tenantId, lecon_id))) {
+    return NextResponse.json({ error: "Leçon introuvable" }, { status: 404 });
+  }
 
   // N'écrase pas le statut "completed" si la leçon est déjà terminée
   const { data: existing } = await supabase

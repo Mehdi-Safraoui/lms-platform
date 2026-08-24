@@ -5,6 +5,7 @@ import { Sparkles, ClipboardList, Layers, PenSquare, CheckCircle2, Plus } from "
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { canCreateFormationByAi } from "@/lib/subscription";
 import UpgradeNotice from "./UpgradeNotice";
+import FormationRow from "./FormationRow";
 import styles from "./formations.module.css";
 
 type Stage = "cadrage" | "structure" | "generation" | "published";
@@ -99,18 +100,17 @@ export default async function MyFormationsPage() {
             const stage = stageFor(f);
             const info = STAGE_INFO[stage];
             return (
-              <Link key={f.id} href={info.href(f.id)} className={styles.row}>
-                <div className={styles.rowMain}>
-                  <span className={styles.rowTitle}>{f.title}</span>
-                  <span className={styles.rowDate}>
-                    Créée le {new Date(f.created_at).toLocaleDateString("fr-FR")}
-                  </span>
-                </div>
-                <span className={`${styles.stageBadge} ${stage === "published" ? styles.stageBadgePublished : ""}`}>
-                  <info.icon size={13} />
-                  {info.label}
-                </span>
-              </Link>
+              <FormationRow
+                key={f.id}
+                formationId={f.id}
+                title={f.title}
+                createdAt={f.created_at}
+                href={info.href(f.id)}
+                stageLabel={info.label}
+                stageIcon={info.icon}
+                isPublished={f.is_published}
+                isFinal={stage === "published"}
+              />
             );
           })}
         </div>
