@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, ArrowRight, Sparkles, Pencil } from "lucide-react";
+import { CheckCircle2, ArrowRight, Sparkles, Pencil, Wand2 } from "lucide-react";
 import styles from "./cadrage.module.css";
 
 type Niveau = "debutant" | "intermediaire" | "avance";
@@ -89,6 +89,7 @@ export default function CadrageClient({
   const [reply, setReply] = React.useState<string | null>(null);
   const [pendingValue, setPendingValue] = React.useState<string | string[] | null>(null);
   const [reformulating, setReformulating] = React.useState(false);
+  const [deciding, setDeciding] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   // true quand on est entré dans le stepper via un crayon "Modifier" du récap :
   // valider cette seule étape doit ramener directement au récap, pas enchaîner
@@ -153,6 +154,44 @@ export default function CadrageClient({
       toast.error("Erreur réseau. Réessayez.");
     } finally {
       setReformulating(false);
+    }
+  }
+
+  // Bouton "Décider pour moi" : propose une réponse ancrée dans les documents
+  // source de la formation (voir /cadrage/suggest) plutôt que de forcer le
+  // Formateur à tout rédiger — jamais appliquée directement pour les champs
+  // texte/liste (elle passe par le même circuit reply+pendingValue que la
+  // reformulation, donc reste éditable avant de continuer).
+  async function decideForMe() {
+    setDeciding(true);
+    try {
+      const res = await fetch(`/api/org/formations/${formationId}/cadrage/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ field: step.key, context: answers }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error("Erreur", { description: json.error });
+        return;
+      }
+      if (step.kind === "open") {
+        setPendingValue(json.data.value);
+        setReply(json.data.reply);
+      } else if (step.kind === "list") {
+        setPendingValue(json.data.items);
+        setReply(json.data.reply);
+      } else if (step.kind === "select") {
+        setAnswers((prev) => ({ ...prev, niveau: json.data.value }));
+        advance();
+      } else if (step.kind === "number") {
+        const el = document.getElementById("nb-modules-input") as HTMLInputElement | null;
+        if (el) el.value = String(json.data.value);
+      }
+    } catch {
+      toast.error("Erreur réseau. Réessayez.");
+    } finally {
+      setDeciding(false);
     }
   }
 
@@ -276,6 +315,15 @@ export default function CadrageClient({
         </div>
       )}
 
+      {step.kind === "select" && (
+        <div className={styles.actionsRow}>
+          <button type="button" className={styles.secondaryBtn} onClick={decideForMe} disabled={deciding}>
+            <Wand2 size={14} />
+            {deciding ? "…" : "Décider pour moi"}
+          </button>
+        </div>
+      )}
+
       {step.kind === "number" && (
         <div className={styles.numberRow}>
           <input
@@ -286,6 +334,10 @@ export default function CadrageClient({
             defaultValue={answers.nb_modules_souhaite || ""}
             id="nb-modules-input"
           />
+          <button type="button" className={styles.secondaryBtn} onClick={decideForMe} disabled={deciding}>
+            <Wand2 size={14} />
+            {deciding ? "…" : "Décider pour moi"}
+          </button>
           <button
             type="button"
             className={styles.primaryBtn}
@@ -336,15 +388,19 @@ export default function CadrageClient({
                 disabled={reformulating}
               />
               <div className={styles.actionsRow}>
+                <button type="button" className={styles.secondaryBtn} onClick={decideForMe} disabled={reformulating || deciding}>
+                  <Wand2 size={14} />
+                  {deciding ? "…" : "Décider pour moi"}
+                </button>
                 {step.kind === "list" && step.skippable && (
-                  <button type="button" className={styles.secondaryBtn} onClick={skipListStep} disabled={reformulating}>
+                  <button type="button" className={styles.secondaryBtn} onClick={skipListStep} disabled={reformulating || deciding}>
                     Passer
                   </button>
                 )}
                 <button
                   type="button"
                   className={styles.primaryBtn}
-                  disabled={!rawInput.trim() || reformulating}
+                  disabled={!rawInput.trim() || reformulating || deciding}
                   onClick={submitOpenOrListStep}
                 >
                   {reformulating ? "…" : "Valider cette réponse"}

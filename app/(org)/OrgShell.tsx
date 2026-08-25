@@ -3,19 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { LayoutDashboard, Users, BookOpen, CreditCard, Sparkles, Wand2 } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, Sparkles, Wand2 } from "lucide-react";
 import styles from "./layout.module.css";
 import SubscriptionModal from "./SubscriptionModal";
 import NotificationBell from "@/components/shared/NotificationBell";
 
 const baseNavItems = [
   { href: "/org", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
-  { href: "/org/catalogue", label: "Catalogue", icon: BookOpen, exact: false },
   { href: "/org/apprenants", label: "Apprenants", icon: Users, exact: false },
 ];
 
+// "Formations" fusionne le catalogue Ahead et les formations créées par le
+// tenant (voir app/(org)/org/formations/page.tsx) — plus d'entrée "Catalogue"
+// séparée, elle induisait en erreur (une formation créée par le tenant n'y
+// apparaissait jamais, donnant l'impression qu'elle avait disparu).
 const adminOnlyNavItems = [
-  { href: "/org/formations", label: "Mes formations", icon: Wand2, exact: true },
+  { href: "/org/formations", label: "Formations", icon: Wand2, exact: true },
   { href: "/org/formations/new", label: "Générer une formation", icon: Sparkles, exact: false },
   { href: "/org/abonnement", label: "Abonnement", icon: CreditCard, exact: false },
 ];

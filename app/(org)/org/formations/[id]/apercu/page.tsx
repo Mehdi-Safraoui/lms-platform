@@ -1,48 +1,45 @@
 import { auth } from "@clerk/nextjs/server";
-import { notFound, redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { hasActiveSubscription } from "@/lib/subscription";
 import FormationContentPreview, {
   type PreviewModule,
   type PreviewLesson,
   type PreviewQuiz,
 } from "@/components/lessons/FormationContentPreview";
-import CatalogueToggle from "../CatalogueToggle";
 
 type Props = { params: Promise<{ id: string }> };
 
-export default async function CatalogueFormationPreviewPage({ params }: Props) {
+// Vue de lecture seule du contenu d'une formation créée par ce tenant via
+// l'assistant IA — jusqu'ici la seule façon de "voir" une formation depuis
+// /org/formations était d'entrer dans son éditeur (structure/génération), pas
+// de la relire telle qu'un apprenant la verrait. Réutilise exactement le même
+// rendu que le catalogue global (voir FormationContentPreview), avec un
+// contrôle d'accès direct par tenant_id plutôt que la double logique
+// catalogue/tenant_formations (une formation "Mes formations" appartient
+// toujours directement à ce tenant).
+export default async function FormationApercuPage({ params }: Props) {
   const { id: formationId } = await params;
   const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) notFound();
+  if (!clerkUserId) redirect("/sign-in");
 
   const supabase = createServiceRoleSupabaseClient();
-
-  const { data: dbUser } = await supabase
+  const { data: currentUser } = await supabase
     .from("users")
-    .select("tenant_id")
+    .select("role, tenant_id")
     .eq("clerk_user_id", clerkUserId)
     .single();
-  if (!dbUser?.tenant_id) notFound();
-  if (!(await hasActiveSubscription(dbUser.tenant_id))) redirect("/pricing");
 
-  const [{ data: formation }, { data: tenantFormation }] = await Promise.all([
-    supabase
-      .from("formations")
-      .select("id, title, description, niveau, estimated_duration_minutes")
-      .eq("id", formationId)
-      .eq("is_published", true)
-      .is("tenant_id", null)
-      .single(),
-    supabase
-      .from("tenant_formations")
-      .select("formation_id")
-      .eq("tenant_id", dbUser.tenant_id)
-      .eq("formation_id", formationId)
-      .maybeSingle(),
-  ]);
+  if (!currentUser?.tenant_id || currentUser.role !== "admin_tenant") {
+    redirect("/org");
+  }
+
+  const { data: formation } = await supabase
+    .from("formations")
+    .select("id, title, description, niveau, estimated_duration_minutes")
+    .eq("id", formationId)
+    .eq("tenant_id", currentUser.tenant_id)
+    .single();
   if (!formation) notFound();
-  const enabled = !!tenantFormation;
 
   const { data: modules } = await supabase
     .from("modules")
@@ -77,8 +74,8 @@ export default async function CatalogueFormationPreviewPage({ params }: Props) {
 
   return (
     <FormationContentPreview
-      backHref="/org/catalogue"
-      backLabel="Catalogue"
+      backHref="/org/formations"
+      backLabel="Mes formations"
       title={formation.title}
       description={formation.description}
       niveau={formation.niveau}
@@ -86,7 +83,6 @@ export default async function CatalogueFormationPreviewPage({ params }: Props) {
       modules={(modules ?? []) as PreviewModule[]}
       leconsByModule={leconsByModule}
       quizByLecon={quizByLecon}
-      headerRight={<CatalogueToggle formationId={formation.id} enabled={enabled} />}
     />
   );
 }

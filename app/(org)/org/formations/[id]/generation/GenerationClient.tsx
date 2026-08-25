@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import {
   Sparkles, RefreshCw, CheckCircle2, Circle, Clock,
   GraduationCap, ClipboardList, Save, ArrowRight, Rocket, Gauge,
-  Plus, Trash2, Pencil, Check, X,
+  Plus, Trash2, Pencil, Check, X, Eye,
 } from "lucide-react";
 import BlockEditor from "@/components/lessons/BlockEditor";
+import BlockRenderer from "@/components/lessons/BlockRenderer";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import styles from "./generation.module.css";
 
@@ -99,6 +100,11 @@ export default function GenerationClient({
   const [addingLeconTo, setAddingLeconTo] = React.useState<string | null>(null);
   const [renaming, setRenaming] = React.useState<{ kind: "module" | "lecon"; id: string; value: string } | null>(null);
   const fetchedRef = React.useRef(false);
+  // Instance de LessonPanel actuellement montée (voir key={selectedLecon.id}
+  // plus bas) — permet de forcer l'enregistrement de ses modifications non
+  // sauvegardées juste avant de la démonter (changement de leçon), au lieu de
+  // les perdre silencieusement. Voir selectLecon().
+  const lessonPanelRef = React.useRef<{ flushIfDirty: () => Promise<void> } | null>(null);
 
   React.useEffect(() => {
     if (fetchedRef.current) return;
@@ -132,7 +138,19 @@ export default function GenerationClient({
     if (next) setSelectedLeconId(next.id);
   }
 
+  // Point de passage unique pour tout changement de leçon sélectionnée
+  // déclenché manuellement (sidebar, ajout de leçon/module) : enregistre
+  // d'abord les modifications en cours si besoin, pour ne jamais les perdre au
+  // démontage de LessonPanel. selectNextAfter() (après validation) n'en a pas
+  // besoin : saveEdits() a déjà tourné dans handleValidate juste avant.
+  async function selectLecon(leconId: string) {
+    if (leconId === selectedLeconId) return;
+    await lessonPanelRef.current?.flushIfDirty();
+    setSelectedLeconId(leconId);
+  }
+
   async function handleAddModule() {
+    await lessonPanelRef.current?.flushIfDirty();
     setAddingModule(true);
     try {
       const res = await fetch(`/api/org/formations/${formationId}/generation/modules`, { method: "POST" });
@@ -169,6 +187,7 @@ export default function GenerationClient({
   }
 
   async function handleAddLecon(moduleId: string) {
+    await lessonPanelRef.current?.flushIfDirty();
     setAddingLeconTo(moduleId);
     try {
       const res = await fetch(`/api/org/formations/${formationId}/generation/modules/${moduleId}/lecons`, { method: "POST" });
@@ -288,7 +307,7 @@ export default function GenerationClient({
                     <button
                       type="button"
                       className={`${styles.sidebarLesson} ${lecon.id === selectedLeconId ? styles.sidebarLessonActive : ""}`}
-                      onClick={() => setSelectedLeconId(lecon.id)}
+                      onClick={() => selectLecon(lecon.id)}
                     >
                       {lecon.validatedAt ? (
                         <CheckCircle2 size={14} className={styles.statusValidated} />
@@ -362,6 +381,7 @@ export default function GenerationClient({
         ) : (
           <LessonPanel
             key={selectedLecon.id}
+            ref={lessonPanelRef}
             formationId={formationId}
             lecon={selectedLecon}
             quotaExhausted={quotaExhausted}
@@ -380,26 +400,24 @@ export default function GenerationClient({
 // toujours de la bonne valeur initiale sans jamais avoir besoin d'un effect
 // pour le resynchroniser au changement de leçon (règle react-hooks/purity —
 // même logique que le ref guard utilisé dans FormationChat.tsx).
-function LessonPanel({
-  formationId,
-  lecon,
-  quotaExhausted,
-  onUpdate,
-  onValidated,
-  onQuotaUpdate,
-}: {
+export interface LessonPanelHandle {
+  flushIfDirty: () => Promise<void>;
+}
+
+const LessonPanel = React.forwardRef<LessonPanelHandle, {
   formationId: string;
   lecon: Lesson;
   quotaExhausted: boolean;
   onUpdate: (patch: Partial<Lesson>) => void;
   onValidated: () => void;
   onQuotaUpdate: (quota: Quota) => void;
-}) {
+}>(function LessonPanel({ formationId, lecon, quotaExhausted, onUpdate, onValidated, onQuotaUpdate }, ref) {
   const [editedBlocks, setEditedBlocks] = React.useState<ContentBlock[]>(lecon.contentBlocks ?? []);
   const [dirty, setDirty] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [validating, setValidating] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
 
   async function handleGenerate() {
     if (quotaExhausted) {
@@ -462,6 +480,37 @@ function LessonPanel({
     }
   }
 
+  // Exposé au parent (voir lessonPanelRef dans GenerationClient) pour
+  // enregistrer silencieusement les modifications en cours avant de démonter
+  // ce panneau (changement de leçon) — sans ça, des changements non cliqués
+  // sur "Enregistrer" étaient perdus sans aucun avertissement.
+  React.useImperativeHandle(ref, () => ({
+    flushIfDirty: async () => {
+      if (lecon.contentType === "rich" && dirty) {
+        try {
+          await saveEdits();
+        } catch {
+          // Le changement de leçon ne doit pas être bloqué par un échec
+          // d'enregistrement réseau — au pire les modifications restent dans
+          // editedBlocks jusqu'au prochain clic manuel sur "Enregistrer".
+        }
+      }
+    },
+  }));
+
+  // Filet de sécurité pour la fermeture d'onglet / rechargement — le seul cas
+  // que flushIfDirty() (déclenché par la navigation interne) ne couvre pas.
+  React.useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirty]);
+
   async function handleValidate() {
     setValidating(true);
     try {
@@ -498,14 +547,18 @@ function LessonPanel({
       </div>
 
       {!lecon.hasContent ? (
-        <div className={styles.emptyLesson}>
-          <Sparkles size={26} className={styles.emptyLessonIcon} />
-          <p className={styles.emptyLessonText}>Aucun contenu généré pour cette leçon pour l&apos;instant.</p>
-          {quotaExhausted && <p className={styles.quotaWarning}>Quota de générations IA atteint — contactez Ahead pour l&apos;augmenter.</p>}
-          <button type="button" className={styles.primaryBtn} disabled={generating || quotaExhausted} onClick={handleGenerate}>
-            {generating ? "Génération en cours…" : "Générer le contenu"}
-          </button>
-        </div>
+        generating ? (
+          <SkeletonBlocks />
+        ) : (
+          <div className={styles.emptyLesson}>
+            <Sparkles size={26} className={styles.emptyLessonIcon} />
+            <p className={styles.emptyLessonText}>Aucun contenu généré pour cette leçon pour l&apos;instant.</p>
+            {quotaExhausted && <p className={styles.quotaWarning}>Quota de générations IA atteint — contactez Ahead pour l&apos;augmenter.</p>}
+            <button type="button" className={styles.primaryBtn} disabled={generating || quotaExhausted} onClick={handleGenerate}>
+              {generating ? "Génération en cours…" : "Générer le contenu"}
+            </button>
+          </div>
+        )
       ) : (
         <>
           {lecon.contentType === "rich" ? (
@@ -550,6 +603,12 @@ function LessonPanel({
               {generating ? "Régénération…" : "Régénérer"}
             </button>
             {lecon.contentType === "rich" && (
+              <button type="button" className={styles.secondaryBtn} onClick={() => setPreviewOpen(true)}>
+                <Eye size={14} />
+                Aperçu
+              </button>
+            )}
+            {lecon.contentType === "rich" && (
               <button type="button" className={styles.secondaryBtn} disabled={saving || !dirty} onClick={handleSaveEdits}>
                 <Save size={14} />
                 {saving ? "Enregistrement…" : "Enregistrer les modifications"}
@@ -562,6 +621,63 @@ function LessonPanel({
           </div>
         </>
       )}
+
+      {previewOpen && (
+        <PreviewModal title={lecon.title} blocks={editedBlocks} onClose={() => setPreviewOpen(false)} />
+      )}
     </>
+  );
+});
+
+// Aperçu fidèle à 100% : réutilise BlockRenderer, le même composant qui
+// affiche le contenu côté apprenant (LessonView.tsx) — pas de réimplémentation
+// qui risquerait de diverger du rendu réel. Affiche editedBlocks (donc les
+// modifications pas encore enregistrées), conformément à la demande de voir
+// l'aperçu "durant la construction".
+function PreviewModal({ title, blocks, onClose }: { title: string; blocks: ContentBlock[]; onClose: () => void }) {
+  React.useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className={styles.previewOverlay} onClick={onClose}>
+      <div className={styles.previewModal} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.previewHeader}>
+          <span className={styles.previewHeaderTitle}>
+            <Eye size={13} />
+            Aperçu — {title}
+          </span>
+          <button type="button" className={styles.previewCloseBtn} onClick={onClose} aria-label="Fermer l'aperçu">
+            <X size={15} />
+          </button>
+        </div>
+        <div className={styles.previewBody}>
+          <BlockRenderer blocks={blocks} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Skeleton affiché pendant la toute première génération d'une leçon (le
+// panneau était figé sur le message "Aucun contenu généré" + un bouton
+// désactivé pendant potentiellement de longues secondes) — la régénération
+// d'un contenu déjà existant garde son propre indicateur (icône qui tourne),
+// l'ancien contenu restant visible pendant le remplacement.
+function SkeletonBlocks() {
+  return (
+    <div className={styles.skeleton}>
+      <div className={`${styles.skeletonBar} ${styles.skeletonHeading}`} />
+      <div className={`${styles.skeletonBar} ${styles.skeletonLine}`} />
+      <div className={`${styles.skeletonBar} ${styles.skeletonLine}`} />
+      <div className={`${styles.skeletonBar} ${styles.skeletonLineShort}`} />
+      <div className={`${styles.skeletonBar} ${styles.skeletonCallout}`} />
+      <div className={`${styles.skeletonBar} ${styles.skeletonLine}`} />
+      <div className={`${styles.skeletonBar} ${styles.skeletonLineShort}`} />
+    </div>
   );
 }

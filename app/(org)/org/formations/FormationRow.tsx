@@ -4,9 +4,14 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Trash2, Eye, Pencil } from "lucide-react";
 import styles from "./formations.module.css";
 
+// Ligne d'une formation créée par CE tenant via l'assistant IA — pas de bouton
+// Activer/Désactiver ici (elle est déjà visible pour ses propres apprenants
+// dès publication, voir app/api/org/formations/[id]/publish/route.ts) :
+// seulement "Voir le contenu", "Modifier" (reprendre l'étape en cours) et
+// "Supprimer" (tant qu'elle n'est pas publiée).
 export default function FormationRow({
   formationId,
   title,
@@ -16,6 +21,7 @@ export default function FormationRow({
   stageIcon,
   isPublished,
   isFinal,
+  canPreview,
 }: {
   formationId: string;
   title: string;
@@ -25,20 +31,17 @@ export default function FormationRow({
   stageIcon: React.ReactNode;
   isPublished: boolean;
   isFinal: boolean;
+  canPreview: boolean;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
-  async function handleDelete(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-
+  async function handleDelete() {
     if (!confirming) {
       setConfirming(true);
       return;
     }
-
     setDeleting(true);
     try {
       const res = await fetch(`/api/org/formations/${formationId}`, { method: "DELETE" });
@@ -59,16 +62,27 @@ export default function FormationRow({
   }
 
   return (
-    <Link href={href} className={styles.row}>
+    <div className={styles.row}>
       <div className={styles.rowMain}>
-        <span className={styles.rowTitle}>{title}</span>
+        <Link href={href} className={styles.rowTitle}>{title}</Link>
         <span className={styles.rowDate}>Créée le {new Date(createdAt).toLocaleDateString("fr-FR")}</span>
       </div>
       <div className={styles.rowRight}>
+        <span className={styles.sourceBadge}>Votre entreprise</span>
         <span className={`${styles.stageBadge} ${isFinal ? styles.stageBadgePublished : ""}`}>
           {stageIcon}
           {stageLabel}
         </span>
+        {canPreview && (
+          <Link href={`/org/formations/${formationId}/apercu`} className={styles.rowIconBtn} title="Voir le contenu">
+            <Eye size={14} />
+            Voir le contenu
+          </Link>
+        )}
+        <Link href={href} className={styles.rowIconBtn} title="Modifier">
+          <Pencil size={14} />
+          Modifier
+        </Link>
         {!isPublished && (
           <button
             type="button"
@@ -84,6 +98,6 @@ export default function FormationRow({
           </button>
         )}
       </div>
-    </Link>
+    </div>
   );
 }

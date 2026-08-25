@@ -88,14 +88,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 16px 20px;
-  text-decoration: none;
-  transition: border-color 0.15s, transform 0.1s;
+  transition: border-color 0.15s;
 }
-.row:hover { border-color: var(--navy); transform: translateY(-1px); }
+.row:hover { border-color: var(--navy); }
 
 .rowMain {
   display: flex;
@@ -109,10 +109,12 @@
   font-size: 15.5px;
   font-weight: 700;
   color: var(--text);
+  text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.rowTitle:hover { color: var(--coral); }
 
 .rowDate {
   font-size: 12px;
@@ -169,3 +171,67 @@
   background: #fef2f2;
   padding: 0 10px;
 }
+
+.rowIconBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+.rowIconBtn:hover { border-color: var(--navy); color: var(--text); }
+
+.sourceBadge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-alt);
+  border-radius: 999px;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.sourceBadgeAhead {
+  color: var(--coral);
+  background: #fdf0ec;
+}
+
+/* ── Filtre catalogue / mes formations ── */
+.filterTabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.filterTab {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.filterTab:hover { border-color: var(--navy); color: var(--text); }
+.filterTabActive {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: #fff;
+}
+.filterTabActive:hover { color: #fff; }
