@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, type LucideIcon } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import styles from "./formations.module.css";
 
 export default function FormationRow({
@@ -13,7 +13,7 @@ export default function FormationRow({
   createdAt,
   href,
   stageLabel,
-  stageIcon: StageIcon,
+  stageIcon,
   isPublished,
   isFinal,
 }: {
@@ -22,7 +22,7 @@ export default function FormationRow({
   createdAt: string;
   href: string;
   stageLabel: string;
-  stageIcon: LucideIcon;
+  stageIcon: React.ReactNode;
   isPublished: boolean;
   isFinal: boolean;
 }) {
@@ -66,7 +66,7 @@ export default function FormationRow({
       </div>
       <div className={styles.rowRight}>
         <span className={`${styles.stageBadge} ${isFinal ? styles.stageBadgePublished : ""}`}>
-          <StageIcon size={13} />
+          {stageIcon}
           {stageLabel}
         </span>
         {!isPublished && (

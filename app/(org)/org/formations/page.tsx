@@ -107,7 +107,7 @@ export default async function MyFormationsPage() {
                 createdAt={f.created_at}
                 href={info.href(f.id)}
                 stageLabel={info.label}
-                stageIcon={info.icon}
+                stageIcon={<info.icon size={13} />}
                 isPublished={f.is_published}
                 isFinal={stage === "published"}
               />
