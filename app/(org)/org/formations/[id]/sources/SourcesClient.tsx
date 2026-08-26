@@ -87,6 +87,7 @@ export default function SourcesClient({ formationId }: { formationId: string }) 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragActive(false);
+    if (uploading) return;
     const file = e.dataTransfer.files?.[0];
     if (file) uploadFile(file);
   }
@@ -99,14 +100,24 @@ export default function SourcesClient({ formationId }: { formationId: string }) 
   return (
     <>
       <label
-        className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ""}`}
-        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ""} ${uploading ? styles.dropzoneUploading : ""}`}
+        onDragOver={(e) => { e.preventDefault(); if (!uploading) setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
       >
-        <UploadCloud size={26} strokeWidth={1.5} />
-        <span>Glissez un fichier ici ou cliquez pour choisir</span>
-        <span className={styles.hint}>PDF, .docx, .pptx, .txt — 4 Mo max</span>
+        {uploading ? (
+          <>
+            <Loader2 size={26} strokeWidth={1.5} className={styles.spin} />
+            <span>Traitement du document en cours…</span>
+            <span className={styles.hint}>Extraction et indexation — jusqu&apos;à une minute pour un gros fichier.</span>
+          </>
+        ) : (
+          <>
+            <UploadCloud size={26} strokeWidth={1.5} />
+            <span>Glissez un fichier ici ou cliquez pour choisir</span>
+            <span className={styles.hint}>PDF, .docx, .pptx, .txt — 4 Mo max</span>
+          </>
+        )}
         <input
           ref={fileInputRef}
           type="file"

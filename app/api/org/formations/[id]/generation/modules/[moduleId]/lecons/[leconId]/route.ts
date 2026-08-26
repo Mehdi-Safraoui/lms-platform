@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
+import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,8 @@ async function assertOwnLecon(supabase: Supabase, leconId: string, moduleId: str
 
 // PUT — renommer une leçon (le contenu lui-même se modifie via
 // .../generation/[leconId], distinct : ici c'est le titre/type, pas les blocs).
+// Interdit sur une formation publiée, même raison que modules/[moduleId] —
+// n'était bloqué que côté bouton, pas côté serveur.
 export async function PUT(req: NextRequest, { params }: Params) {
   const guard = await requireAdminTenant();
   if (guard instanceof NextResponse) return guard;
@@ -24,6 +27,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!(await assertOwnFormation(supabase, formationId, guard.tenantId)) || !(await assertOwnLecon(supabase, leconId, moduleId))) {
     return NextResponse.json({ error: "Leçon introuvable" }, { status: 404 });
   }
+  const { data: formation } = await supabase.from("formations").select("is_published").eq("id", formationId).single();
+  if (formation?.is_published) {
+    return NextResponse.json({ error: "Impossible de renommer une leçon d'une formation déjà publiée." }, { status: 409 });
+  }
 
   const { title } = await req.json().catch(() => ({}));
   if (typeof title !== "string" || !title.trim()) {
@@ -32,6 +39,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { data, error } = await supabase.from("lecons").update({ title: title.trim() }).eq("id", leconId).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await touchFormation(supabase, formationId);
   return NextResponse.json({ data });
 }
 
@@ -45,6 +53,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!(await assertOwnFormation(supabase, formationId, guard.tenantId)) || !(await assertOwnLecon(supabase, leconId, moduleId))) {
     return NextResponse.json({ error: "Leçon introuvable" }, { status: 404 });
   }
+  const { data: formation } = await supabase.from("formations").select("is_published").eq("id", formationId).single();
+  if (formation?.is_published) {
+    return NextResponse.json({ error: "Impossible de supprimer une leçon d'une formation déjà publiée." }, { status: 409 });
+  }
 
   const { count } = await supabase.from("lecons").select("*", { count: "exact", head: true }).eq("module_id", moduleId);
   if ((count ?? 0) <= 1) {
@@ -53,5 +65,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const { error } = await supabase.from("lecons").delete().eq("id", leconId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await touchFormation(supabase, formationId);
   return new NextResponse(null, { status: 204 });
 }

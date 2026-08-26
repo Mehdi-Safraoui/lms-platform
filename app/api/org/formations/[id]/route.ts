@@ -27,6 +27,41 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return NextResponse.json({ data });
 }
 
+// PATCH /api/org/formations/[id] — pour l'instant, seule l'image de couverture
+// est modifiable après création (voir RowThumb.tsx : crayon sur la vignette
+// dans la liste "Formations"). Avant ça, thumbnail_url ne pouvait être défini
+// qu'au moment de la création — aucun moyen d'en ajouter/changer une pour une
+// formation déjà existante.
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const guard = await requireAdminTenant();
+  if (guard instanceof NextResponse) return guard;
+
+  const { id } = await params;
+  const supabase = createServiceRoleSupabaseClient();
+
+  const { data: formation } = await supabase.from("formations").select("id, tenant_id").eq("id", id).single();
+  if (!formation || formation.tenant_id !== guard.tenantId) {
+    return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+  }
+
+  const body = await req.json().catch(() => null);
+  if (!body || !("thumbnailUrl" in body)) {
+    return NextResponse.json({ error: "thumbnailUrl requis" }, { status: 400 });
+  }
+  const { thumbnailUrl } = body;
+  if (thumbnailUrl !== null && typeof thumbnailUrl !== "string") {
+    return NextResponse.json({ error: "URL d'image invalide" }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("formations")
+    .update({ thumbnail_url: thumbnailUrl?.trim() || null, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ data: { thumbnailUrl: thumbnailUrl?.trim() || null } });
+}
+
 async function deleteUploadedDocuments(supabase: Supabase, formationId: string): Promise<void> {
   const { data: sources } = await supabase.from("knowledge_sources").select("storage_url, format").eq("formation_id", formationId);
   const paths = (sources ?? []).filter((s) => s.format !== "web" && s.storage_url).map((s) => s.storage_url as string);

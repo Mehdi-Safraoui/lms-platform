@@ -49,7 +49,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   const { error: publishError } = await supabase
     .from("formations")
-    .update({ is_published: true })
+    .update({ is_published: true, updated_at: new Date().toISOString() })
     .eq("id", formationId);
   if (publishError) return NextResponse.json({ error: publishError.message }, { status: 500 });
 

@@ -34,9 +34,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { title } = await req.json();
+  const { title, thumbnailUrl } = await req.json();
   if (!title || typeof title !== "string" || !title.trim()) {
     return NextResponse.json({ error: "Titre requis" }, { status: 400 });
+  }
+  if (thumbnailUrl !== undefined && thumbnailUrl !== null && typeof thumbnailUrl !== "string") {
+    return NextResponse.json({ error: "URL d'image invalide" }, { status: 400 });
   }
 
   const supabase = createServiceRoleSupabaseClient();
@@ -50,6 +53,7 @@ export async function POST(req: NextRequest) {
       tenant_id: guard.tenantId,
       is_published: false,
       created_by: guard.userId,
+      thumbnail_url: thumbnailUrl?.trim() || null,
     })
     .select("id")
     .single();

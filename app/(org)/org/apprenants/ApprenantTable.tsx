@@ -1,47 +1,32 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Users, Search, UserPlus } from "lucide-react";
+import { Users, Search, UserPlus, Star } from "lucide-react";
 import styles from "./apprenants.module.css";
 import InviteApprenantModal from "./InviteApprenantModal";
+import ApprenantDetailModal from "./ApprenantDetailModal";
+import { getCompletion, getLastActivity, type ProgressRecord } from "@/lib/apprenantProgress";
 
-interface Apprenant {
+export interface Apprenant {
   id: string;
   email: string;
   full_name: string | null;
   created_at: string;
+  total_points: number;
 }
 
-interface Formation {
+export interface Formation {
   id: string;
   title: string;
   lessonIds: string[];
 }
 
-interface ProgressRecord {
-  user_id: string;
-  lecon_id: string;
-  status: string;
-  updated_at: string;
-}
+export type { ProgressRecord };
 
 interface Props {
   apprenants: Apprenant[];
   formations: Formation[];
   progressRecords: ProgressRecord[];
-}
-
-function getCompletion(userId: string, lessonIds: string[], records: ProgressRecord[]) {
-  if (!lessonIds.length) return { completed: 0, total: 0, pct: 0 };
-  const completed = records.filter((p) => p.user_id === userId && lessonIds.includes(p.lecon_id) && p.status === "completed").length;
-  return { completed, total: lessonIds.length, pct: Math.round((completed / lessonIds.length) * 100) };
-}
-
-function getLastActivity(userId: string, records: ProgressRecord[]): string | null {
-  const userRecords = records.filter((p) => p.user_id === userId);
-  if (!userRecords.length) return null;
-  const latest = userRecords.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0];
-  return latest.updated_at;
 }
 
 function formatDate(iso: string) {
@@ -53,6 +38,12 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "not_started" | "in_progress" | "completed">("all");
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [selectedApprenantId, setSelectedApprenantId] = useState<string | null>(null);
+
+  const selectedApprenant = useMemo(
+    () => apprenants.find((a) => a.id === selectedApprenantId) ?? null,
+    [apprenants, selectedApprenantId]
+  );
 
   const currentFormation = useMemo(
     () => formations.find((f) => f.id === selectedFormation) ?? null,
@@ -84,6 +75,14 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
   return (
     <div className={styles.page}>
       {inviteModalOpen && <InviteApprenantModal onClose={() => setInviteModalOpen(false)} />}
+      {selectedApprenant && (
+        <ApprenantDetailModal
+          apprenant={selectedApprenant}
+          formations={formations}
+          progressRecords={progressRecords}
+          onClose={() => setSelectedApprenantId(null)}
+        />
+      )}
 
       <div className={styles.header}>
         <div>
@@ -144,6 +143,7 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
             <thead>
               <tr>
                 <th>Apprenant</th>
+                <th>Points</th>
                 <th>Progression</th>
                 <th>Statut</th>
                 <th>Dernière activité</th>
@@ -151,7 +151,7 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
             </thead>
             <tbody>
               {rows.map((a) => (
-                <tr key={a.id}>
+                <tr key={a.id} className={styles.clickableRow} onClick={() => setSelectedApprenantId(a.id)}>
                   <td>
                     <div className={styles.apprenantCell}>
                       <div className={styles.avatar}>{(a.full_name ?? a.email).charAt(0).toUpperCase()}</div>
@@ -160,6 +160,12 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
                         <div className={styles.apprenantEmail}>{a.email}</div>
                       </div>
                     </div>
+                  </td>
+                  <td>
+                    <span className={styles.pointsCell}>
+                      <Star size={13} />
+                      {a.total_points}
+                    </span>
                   </td>
                   <td>
                     {a.total > 0 ? (

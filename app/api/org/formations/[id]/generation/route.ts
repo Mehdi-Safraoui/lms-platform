@@ -11,9 +11,10 @@ type Params = { params: Promise<{ id: string }> };
 interface RawLeconRow {
   id: string;
   title: string;
-  content_type: "rich" | "quiz";
+  content_type: "rich" | "quiz" | "video";
   generation_brief: string | null;
   content_blocks: unknown;
+  video_url: string | null;
   content_validated_at: string | null;
   order_index: number;
 }
@@ -35,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { data: modules, error } = await supabase
     .from("modules")
     .select(
-      "id, title, order_index, lecons(id, title, content_type, generation_brief, content_blocks, content_validated_at, order_index)"
+      "id, title, order_index, lecons(id, title, content_type, generation_brief, content_blocks, video_url, content_validated_at, order_index)"
     )
     .eq("formation_id", formationId)
     .order("order_index");
@@ -61,13 +62,18 @@ export async function GET(_req: NextRequest, { params }: Params) {
         .sort((a, b) => a.order_index - b.order_index)
         .map((l) => {
           const quizQuestions = (quizByLecon.get(l.id) ?? []).sort((a, b) => a.order_index - b.order_index);
+          const hasContent =
+            l.content_type === "quiz" ? quizQuestions.length > 0
+            : l.content_type === "video" ? !!l.video_url
+            : !!l.content_blocks;
           return {
             id: l.id,
             title: l.title,
             contentType: l.content_type,
             generationBrief: l.generation_brief,
-            hasContent: l.content_type === "quiz" ? quizQuestions.length > 0 : !!l.content_blocks,
+            hasContent,
             contentBlocks: l.content_blocks,
+            videoUrl: l.video_url,
             quizQuestions: l.content_type === "quiz" ? quizQuestions : null,
             validatedAt: l.content_validated_at,
           };

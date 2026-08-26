@@ -10,7 +10,7 @@ import { openai, OPENAI_MODEL } from "@/lib/openai";
  * de ce traitement — un contrôle de formulaire classique suffit et évite de
  * dépendre d'un LLM pour parser une valeur qu'on pourrait juste demander proprement.
  */
-export type OpenCadrageField = "objectif" | "public_vise" | "duree_estimee";
+export type OpenCadrageField = "objectif" | "public_vise";
 export type ListCadrageField = "notions_a_inclure" | "notions_a_exclure";
 
 const openFieldResult = z.object({
@@ -28,8 +28,6 @@ const FIELD_INSTRUCTIONS: Record<OpenCadrageField | ListCadrageField, string> = 
     "L'objectif pédagogique global de la formation. Reformule en une ou deux phrases claires et actionnables (ce que l'apprenant doit être capable de faire à la fin), sans changer le sens de la réponse.",
   public_vise:
     "Le public visé par la formation. Reformule en une phrase concise décrivant qui sont les apprenants (rôle, niveau d'expérience si mentionné).",
-  duree_estimee:
-    "La durée estimée de la formation. Normalise en une expression courte et standard (ex : \"1h30\", \"une demi-journée\", \"3 heures\"), sans inventer de valeur si la réponse est vague.",
   notions_a_inclure:
     "Les notions que la formation doit absolument couvrir. Découpe la réponse en une liste de notions courtes et distinctes (une entrée par notion), sans en ajouter qui ne sont pas mentionnées.",
   notions_a_exclure:

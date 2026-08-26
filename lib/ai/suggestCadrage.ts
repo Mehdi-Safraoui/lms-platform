@@ -64,7 +64,7 @@ const FIELD_INSTRUCTIONS: Record<CadrageField, string> = {
   nb_modules_souhaite:
     "Propose un nombre de modules (entre 1 et 20) proportionné au volume et à la diversité des sujets couverts par les documents.",
   duree_estimee:
-    "Propose une durée totale réaliste et courte (ex : \"1h30\", \"une demi-journée\"), cohérente avec le nombre de modules déjà choisi si disponible.",
+    "Propose une durée totale réaliste, en minutes, multiple de 30 (le Formateur choisit ensuite via un sélecteur par tranches de 30 minutes), cohérente avec le nombre de modules déjà choisi si disponible.",
   notions_a_inclure:
     "Propose une liste de 3 à 8 notions clés que la formation doit absolument couvrir, tirées du contenu réel des documents (une entrée courte par notion).",
   notions_a_exclure:
@@ -75,6 +75,9 @@ const openFieldResult = z.object({ value: z.string().min(1), reply: z.string().m
 const listFieldResult = z.object({ items: z.array(z.string().min(1)), reply: z.string().min(1) });
 const niveauResult = z.object({ value: z.enum(["debutant", "intermediaire", "avance"]) });
 const nbModulesResult = z.object({ value: z.number().int().min(1).max(20) });
+// Multiple de 30, borné à la plage du sélecteur (30 min à 8h) — voir
+// DURATION_OPTIONS dans CadrageClient.tsx.
+const dureeMinutesResult = z.object({ value: z.number().int().min(30).max(480) });
 
 async function callModel<T extends z.ZodTypeAny>(
   field: CadrageField,
@@ -101,7 +104,7 @@ async function callModel<T extends z.ZodTypeAny>(
 }
 
 export async function suggestOpenField(
-  field: "objectif" | "public_vise" | "duree_estimee",
+  field: "objectif" | "public_vise",
   documentContext: string,
   context: CadrageContext
 ): Promise<{ value: string; reply: string }> {
@@ -128,4 +131,15 @@ export async function suggestNbModules(
   context: CadrageContext
 ): Promise<{ value: number }> {
   return callModel("nb_modules_souhaite", documentContext, context, nbModulesResult, "cadrage_suggest_nb_modules");
+}
+
+export async function suggestDureeMinutes(
+  documentContext: string,
+  context: CadrageContext
+): Promise<{ value: number }> {
+  const result = await callModel("duree_estimee", documentContext, context, dureeMinutesResult, "cadrage_suggest_duree");
+  // Le modèle respecte généralement la consigne "multiple de 30", mais on
+  // arrondit quand même au cas où — le sélecteur ne connaît que ces valeurs.
+  const rounded = Math.min(480, Math.max(30, Math.round(result.value / 30) * 30));
+  return { value: rounded };
 }

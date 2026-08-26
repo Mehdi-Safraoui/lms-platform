@@ -13,7 +13,10 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
-const OPEN_FIELDS: OpenCadrageField[] = ["objectif", "public_vise", "duree_estimee"];
+// duree_estimee n'est plus une réponse libre reformulée par l'IA : c'est un
+// sélecteur par tranches de 30 min côté client (voir CadrageClient.tsx), donc
+// jamais envoyé à cette route.
+const OPEN_FIELDS: OpenCadrageField[] = ["objectif", "public_vise"];
 const LIST_FIELDS: ListCadrageField[] = ["notions_a_inclure", "notions_a_exclure"];
 const MAX_ANSWER_LENGTH = 2000;
 

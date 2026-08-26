@@ -5,14 +5,15 @@ import { toast } from "sonner";
 import {
   Sparkles, RefreshCw, CheckCircle2, Circle, Clock,
   GraduationCap, ClipboardList, Save, ArrowRight, Rocket, Gauge,
-  Plus, Trash2, Pencil, Check, X, Eye,
+  Plus, Trash2, Pencil, Check, X, Eye, Video, FileText,
 } from "lucide-react";
 import BlockEditor from "@/components/lessons/BlockEditor";
 import BlockRenderer from "@/components/lessons/BlockRenderer";
+import { getVideoEmbedUrl } from "@/lib/video";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import styles from "./generation.module.css";
 
-type ContentType = "rich" | "quiz";
+type ContentType = "rich" | "quiz" | "video";
 
 interface QuizQuestionOption {
   text: string;
@@ -32,6 +33,7 @@ interface Lesson {
   generationBrief: string | null;
   hasContent: boolean;
   contentBlocks: ContentBlock[] | null;
+  videoUrl: string | null;
   quizQuestions: QuizQuestion[] | null;
   validatedAt: string | null;
 }
@@ -98,6 +100,7 @@ export default function GenerationClient({
   const [published, setPublished] = React.useState(alreadyPublished);
   const [addingModule, setAddingModule] = React.useState(false);
   const [addingLeconTo, setAddingLeconTo] = React.useState<string | null>(null);
+  const [leconMenuOpenFor, setLeconMenuOpenFor] = React.useState<string | null>(null);
   const [renaming, setRenaming] = React.useState<{ kind: "module" | "lecon"; id: string; value: string } | null>(null);
   const fetchedRef = React.useRef(false);
   // Instance de LessonPanel actuellement montée (voir key={selectedLecon.id}
@@ -159,8 +162,19 @@ export default function GenerationClient({
         toast.error("Erreur", { description: json.error });
         return;
       }
-      setModules((prev) => [...(prev ?? []), { id: json.data.id, title: json.data.title, lecons: json.data.lecons }]);
-      setSelectedLeconId(json.data.lecons[0].id);
+      const firstLecon: Lesson = {
+        id: json.data.lecons[0].id,
+        title: json.data.lecons[0].title,
+        contentType: json.data.lecons[0].content_type,
+        generationBrief: json.data.lecons[0].generation_brief,
+        hasContent: false,
+        contentBlocks: json.data.lecons[0].content_blocks,
+        videoUrl: json.data.lecons[0].video_url ?? null,
+        quizQuestions: null,
+        validatedAt: json.data.lecons[0].content_validated_at,
+      };
+      setModules((prev) => [...(prev ?? []), { id: json.data.id, title: json.data.title, lecons: [firstLecon] }]);
+      setSelectedLeconId(firstLecon.id);
     } catch {
       toast.error("Erreur réseau. Réessayez.");
     } finally {
@@ -186,18 +200,34 @@ export default function GenerationClient({
     toast.success("Module supprimé.");
   }
 
-  async function handleAddLecon(moduleId: string) {
+  async function handleAddLecon(moduleId: string, contentType: ContentType) {
+    setLeconMenuOpenFor(null);
     await lessonPanelRef.current?.flushIfDirty();
     setAddingLeconTo(moduleId);
     try {
-      const res = await fetch(`/api/org/formations/${formationId}/generation/modules/${moduleId}/lecons`, { method: "POST" });
+      const res = await fetch(`/api/org/formations/${formationId}/generation/modules/${moduleId}/lecons`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType }),
+      });
       const json = await res.json();
       if (!res.ok) {
         toast.error("Erreur", { description: json.error });
         return;
       }
-      setModules((prev) => (prev ? prev.map((m) => (m.id === moduleId ? { ...m, lecons: [...m.lecons, json.data] } : m)) : prev));
-      setSelectedLeconId(json.data.id);
+      const newLecon: Lesson = {
+        id: json.data.id,
+        title: json.data.title,
+        contentType: json.data.content_type,
+        generationBrief: json.data.generation_brief,
+        hasContent: false,
+        contentBlocks: json.data.content_blocks,
+        videoUrl: json.data.video_url,
+        quizQuestions: null,
+        validatedAt: json.data.content_validated_at,
+      };
+      setModules((prev) => (prev ? prev.map((m) => (m.id === moduleId ? { ...m, lecons: [...m.lecons, newLecon] } : m)) : prev));
+      setSelectedLeconId(newLecon.id);
     } catch {
       toast.error("Erreur réseau. Réessayez.");
     } finally {
@@ -332,8 +362,29 @@ export default function GenerationClient({
                 )}
               </div>
             ))}
-            {!published && (
-              <button type="button" className={styles.addLeconBtn} disabled={addingLeconTo === mod.id} onClick={() => handleAddLecon(mod.id)}>
+            {/* Ajouter reste possible même publiée (aucun risque pour la
+                progression déjà acquise) — seuls renommer/supprimer restent
+                verrouillés ci-dessus, voir handleDeleteLecon/commitRename. */}
+            {leconMenuOpenFor === mod.id ? (
+              <div className={styles.leconTypeMenu}>
+                <button type="button" className={styles.leconTypeOption} onClick={() => handleAddLecon(mod.id, "rich")}>
+                  <FileText size={13} />
+                  Contenu
+                </button>
+                <button type="button" className={styles.leconTypeOption} onClick={() => handleAddLecon(mod.id, "quiz")}>
+                  <ClipboardList size={13} />
+                  Quiz
+                </button>
+                <button type="button" className={styles.leconTypeOption} onClick={() => handleAddLecon(mod.id, "video")}>
+                  <Video size={13} />
+                  Vidéo
+                </button>
+                <button type="button" className={styles.leconTypeCancel} onClick={() => setLeconMenuOpenFor(null)} aria-label="Annuler">
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <button type="button" className={styles.addLeconBtn} disabled={addingLeconTo === mod.id} onClick={() => setLeconMenuOpenFor(mod.id)}>
                 <Plus size={12} />
                 {addingLeconTo === mod.id ? "Ajout…" : "Ajouter une leçon"}
               </button>
@@ -341,12 +392,10 @@ export default function GenerationClient({
           </div>
         ))}
 
-        {!published && (
-          <button type="button" className={styles.addModuleBtn} disabled={addingModule} onClick={handleAddModule}>
-            <Plus size={13} />
-            {addingModule ? "Ajout…" : "Ajouter un module"}
-          </button>
-        )}
+        <button type="button" className={styles.addModuleBtn} disabled={addingModule} onClick={handleAddModule}>
+          <Plus size={13} />
+          {addingModule ? "Ajout…" : "Ajouter un module"}
+        </button>
 
         <div className={styles.progressBox}>
           {validatedCount} / {allLecons.length} leçons validées
@@ -413,11 +462,16 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
   onQuotaUpdate: (quota: Quota) => void;
 }>(function LessonPanel({ formationId, lecon, quotaExhausted, onUpdate, onValidated, onQuotaUpdate }, ref) {
   const [editedBlocks, setEditedBlocks] = React.useState<ContentBlock[]>(lecon.contentBlocks ?? []);
+  const [editedVideoUrl, setEditedVideoUrl] = React.useState(lecon.videoUrl ?? "");
+  const [videoUrlTouched, setVideoUrlTouched] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [validating, setValidating] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
+
+  const isEditable = lecon.contentType === "rich" || lecon.contentType === "video";
+  const videoEmbedUrl = lecon.contentType === "video" ? getVideoEmbedUrl(editedVideoUrl) : null;
 
   async function handleGenerate() {
     if (quotaExhausted) {
@@ -454,17 +508,22 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
   }
 
   async function saveEdits(): Promise<boolean> {
+    const isVideo = lecon.contentType === "video";
     const res = await fetch(`/api/org/formations/${formationId}/generation/${lecon.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ blocks: editedBlocks }),
+      body: JSON.stringify(isVideo ? { videoUrl: editedVideoUrl.trim() } : { blocks: editedBlocks }),
     });
     const json = await res.json();
     if (!res.ok) {
       toast.error("Erreur lors de l'enregistrement", { description: json.error });
       return false;
     }
-    onUpdate({ contentBlocks: editedBlocks, validatedAt: null });
+    if (isVideo) {
+      onUpdate({ videoUrl: editedVideoUrl.trim(), hasContent: !!editedVideoUrl.trim(), validatedAt: null });
+    } else {
+      onUpdate({ contentBlocks: editedBlocks, validatedAt: null });
+    }
     setDirty(false);
     return true;
   }
@@ -486,13 +545,14 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
   // sur "Enregistrer" étaient perdus sans aucun avertissement.
   React.useImperativeHandle(ref, () => ({
     flushIfDirty: async () => {
-      if (lecon.contentType === "rich" && dirty) {
+      if (isEditable && dirty) {
         try {
           await saveEdits();
         } catch {
           // Le changement de leçon ne doit pas être bloqué par un échec
           // d'enregistrement réseau — au pire les modifications restent dans
-          // editedBlocks jusqu'au prochain clic manuel sur "Enregistrer".
+          // editedBlocks/editedVideoUrl jusqu'au prochain clic manuel sur
+          // "Enregistrer".
         }
       }
     },
@@ -514,7 +574,7 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
   async function handleValidate() {
     setValidating(true);
     try {
-      if (lecon.contentType === "rich" && dirty) {
+      if (isEditable && dirty) {
         if (!(await saveEdits())) return;
       }
 
@@ -538,7 +598,7 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
     <>
       <div className={styles.lessonHeader}>
         <span className={styles.lessonTypeIcon}>
-          {lecon.contentType === "quiz" ? <ClipboardList size={16} /> : <GraduationCap size={16} />}
+          {lecon.contentType === "quiz" ? <ClipboardList size={16} /> : lecon.contentType === "video" ? <Video size={16} /> : <GraduationCap size={16} />}
         </span>
         <div>
           <h2 className={styles.lessonTitle}>{lecon.title}</h2>
@@ -546,7 +606,46 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
         </div>
       </div>
 
-      {!lecon.hasContent ? (
+      {lecon.contentType === "video" ? (
+        <>
+          <div className={styles.videoEditorWrap}>
+            <label className={styles.videoUrlLabel}>URL de la vidéo</label>
+            <input
+              className={styles.videoUrlInput}
+              placeholder="https://www.youtube.com/watch?v=… ou https://vimeo.com/…"
+              value={editedVideoUrl}
+              onChange={(e) => {
+                setEditedVideoUrl(e.target.value);
+                setVideoUrlTouched(true);
+                setDirty(true);
+              }}
+            />
+            {videoEmbedUrl ? (
+              <div className={styles.videoPreviewWrap}>
+                <iframe
+                  src={videoEmbedUrl}
+                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                />
+              </div>
+            ) : (
+              videoUrlTouched && editedVideoUrl.trim() && (
+                <p className={styles.videoUrlError}>URL non reconnue — formats acceptés : YouTube (youtube.com, youtu.be) et Vimeo.</p>
+              )
+            )}
+          </div>
+          <div className={styles.actionsRow}>
+            <button type="button" className={styles.secondaryBtn} disabled={saving || !dirty} onClick={handleSaveEdits}>
+              <Save size={14} />
+              {saving ? "Enregistrement…" : "Enregistrer"}
+            </button>
+            <button type="button" className={styles.primaryBtn} disabled={validating || !editedVideoUrl.trim()} onClick={handleValidate}>
+              {validating ? "Validation…" : "Valider et passer à la leçon suivante"}
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        </>
+      ) : !lecon.hasContent ? (
         generating ? (
           <SkeletonBlocks />
         ) : (

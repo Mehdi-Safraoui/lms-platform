@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
+import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -41,5 +42,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single();
   if (leconError) return NextResponse.json({ error: leconError.message }, { status: 500 });
 
+  await touchFormation(supabase, formationId);
   return NextResponse.json({ data: { ...moduleRow, lecons: [leconRow] } }, { status: 201 });
 }

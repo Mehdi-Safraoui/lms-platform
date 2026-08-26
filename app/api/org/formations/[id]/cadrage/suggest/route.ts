@@ -7,6 +7,7 @@ import {
   suggestListField,
   suggestNiveau,
   suggestNbModules,
+  suggestDureeMinutes,
   type CadrageField,
   type CadrageContext,
 } from "@/lib/ai/suggestCadrage";
@@ -16,7 +17,7 @@ export const maxDuration = 30;
 
 type Params = { params: Promise<{ id: string }> };
 
-const OPEN_FIELDS: CadrageField[] = ["objectif", "public_vise", "duree_estimee"];
+const OPEN_FIELDS: CadrageField[] = ["objectif", "public_vise"];
 const LIST_FIELDS: CadrageField[] = ["notions_a_inclure", "notions_a_exclure"];
 
 // POST /api/org/formations/[id]/cadrage/suggest — bouton "Décider pour moi" du
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   try {
     if (OPEN_FIELDS.includes(field)) {
-      const result = await suggestOpenField(field as "objectif" | "public_vise" | "duree_estimee", documentContext, context);
+      const result = await suggestOpenField(field as "objectif" | "public_vise", documentContext, context);
       return NextResponse.json({ data: result });
     }
     if (LIST_FIELDS.includes(field)) {
@@ -76,6 +77,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
     if (field === "nb_modules_souhaite") {
       const result = await suggestNbModules(documentContext, context);
+      return NextResponse.json({ data: result });
+    }
+    if (field === "duree_estimee") {
+      const result = await suggestDureeMinutes(documentContext, context);
       return NextResponse.json({ data: result });
     }
     return NextResponse.json({ error: `Champ inconnu : "${field}".` }, { status: 400 });

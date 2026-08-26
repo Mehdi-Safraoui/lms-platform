@@ -76,6 +76,14 @@
   background: var(--card);
 }
 
+.dropzoneUploading {
+  border-color: var(--navy);
+  background: var(--card);
+  color: var(--navy);
+  cursor: default;
+  pointer-events: none;
+}
+
 .hint {
   font-size: 12px;
   color: var(--text-light);

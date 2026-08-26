@@ -10,12 +10,14 @@ export interface OwnFormationItem {
   id: string;
   title: string;
   createdAt: string;
+  updatedAt: string;
   href: string;
   stageLabel: string;
   stageIcon: React.ReactNode;
   isPublished: boolean;
   isFinal: boolean;
   canPreview: boolean;
+  thumbnailUrl: string | null;
 }
 
 export interface AheadFormationItem {
@@ -27,6 +29,7 @@ export interface AheadFormationItem {
   moduleCount: number;
   lessonCount: number;
   enabled: boolean;
+  thumbnailUrl: string | null;
 }
 
 export type FormationListItem = OwnFormationItem | AheadFormationItem;
@@ -68,12 +71,14 @@ export default function FormationsListClient({ items }: { items: FormationListIt
                 formationId={item.id}
                 title={item.title}
                 createdAt={item.createdAt}
+                updatedAt={item.updatedAt}
                 href={item.href}
                 stageLabel={item.stageLabel}
                 stageIcon={item.stageIcon}
                 isPublished={item.isPublished}
                 isFinal={item.isFinal}
                 canPreview={item.canPreview}
+                thumbnailUrl={item.thumbnailUrl}
               />
             ) : (
               <AheadFormationRow
@@ -85,6 +90,7 @@ export default function FormationsListClient({ items }: { items: FormationListIt
                 moduleCount={item.moduleCount}
                 lessonCount={item.lessonCount}
                 enabled={item.enabled}
+                thumbnailUrl={item.thumbnailUrl}
               />
             )
           )}

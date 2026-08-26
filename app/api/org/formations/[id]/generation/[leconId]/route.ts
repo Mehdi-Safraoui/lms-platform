@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
+import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,25 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!lecon || leconFormationId !== formationId) {
     return NextResponse.json({ error: "Leçon introuvable" }, { status: 404 });
   }
+  if (lecon.content_type === "video") {
+    // Pas de blocs à éditer pour une leçon vidéo — juste le lien. Pas de
+    // chunks à désindexer non plus : une vidéo n'a jamais alimenté le RAG.
+    const body = await req.json().catch(() => null);
+    if (typeof body?.videoUrl !== "string" || !body.videoUrl.trim()) {
+      return NextResponse.json({ error: "URL de vidéo requise." }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("lecons")
+      .update({ video_url: body.videoUrl.trim(), content_validated_at: null, updated_at: new Date().toISOString() })
+      .eq("id", leconId)
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await touchFormation(supabase, formationId);
+    return NextResponse.json({ data });
+  }
+
   if (lecon.content_type !== "rich") {
     return NextResponse.json({ error: "Seules les leçons de contenu peuvent être éditées ici." }, { status: 400 });
   }
@@ -55,6 +75,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   // périmés servir de réponse au chat apprenant pendant qu'une leçon déjà
   // publiée est en cours de retouche.
   await supabase.from("chunks").delete().eq("lesson_id", leconId);
+  await touchFormation(supabase, formationId);
 
   return NextResponse.json({ data });
 }

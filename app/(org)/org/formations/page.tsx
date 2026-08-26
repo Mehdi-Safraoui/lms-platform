@@ -49,7 +49,7 @@ export default async function FormationsPage() {
   // ── Formations créées par ce tenant (assistant IA) ──
   const { data: ownFormations } = await supabase
     .from("formations")
-    .select("id, title, is_published, created_at")
+    .select("id, title, is_published, created_at, updated_at, thumbnail_url")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false });
 
@@ -84,12 +84,14 @@ export default async function FormationsPage() {
           id: f.id,
           title: f.title,
           createdAt: f.created_at,
+          updatedAt: f.updated_at,
           href: info.href(f.id),
           stageLabel: info.label,
           stageIcon: <info.icon size={13} />,
           isPublished: f.is_published,
           isFinal: stage === "published",
           canPreview: stage !== "cadrage",
+          thumbnailUrl: f.thumbnail_url,
         };
       })
     : [];
@@ -100,7 +102,7 @@ export default async function FormationsPage() {
     const [{ data: aheadFormations }, { data: tenantFormations }] = await Promise.all([
       supabase
         .from("formations")
-        .select("id, title, niveau, created_at")
+        .select("id, title, niveau, created_at, thumbnail_url")
         .eq("is_published", true)
         .is("tenant_id", null)
         .order("created_at", { ascending: false }),
@@ -132,6 +134,7 @@ export default async function FormationsPage() {
         moduleCount: counts.moduleCount,
         lessonCount: counts.lessonCount,
         enabled: enabledIds.has(f.id),
+        thumbnailUrl: f.thumbnail_url,
       };
     });
   }

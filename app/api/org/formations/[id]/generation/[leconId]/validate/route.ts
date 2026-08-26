@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
+import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { embedAndInsertLessonChunks } from "@/lib/chunkLesson";
 
@@ -26,7 +27,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   const { data: lecon } = await supabase
     .from("lecons")
-    .select("id, content_type, content_blocks, modules!inner(formation_id)")
+    .select("id, content_type, content_blocks, video_url, modules!inner(formation_id)")
     .eq("id", leconId)
     .single();
   const leconFormationId = (lecon?.modules as unknown as { formation_id: string } | null)?.formation_id;
@@ -37,6 +38,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (lecon.content_type === "rich") {
     if (!lecon.content_blocks) {
       return NextResponse.json({ error: "Cette leçon n'a pas encore de contenu généré." }, { status: 400 });
+    }
+  } else if (lecon.content_type === "video") {
+    if (!lecon.video_url) {
+      return NextResponse.json({ error: "Cette leçon n'a pas encore de lien vidéo." }, { status: 400 });
     }
   } else {
     const { count } = await supabase
@@ -55,6 +60,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await touchFormation(supabase, formationId);
 
   if (lecon.content_type === "rich") {
     try {

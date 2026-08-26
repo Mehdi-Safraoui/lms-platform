@@ -26,7 +26,7 @@ export default async function ApprenantPage() {
   // Tous les apprenants du tenant
   const { data: apprenants } = await supabase
     .from("users")
-    .select("id, email, full_name, created_at")
+    .select("id, email, full_name, created_at, total_points")
     .eq("tenant_id", tenantId)
     .eq("role", "apprenant")
     .order("created_at");

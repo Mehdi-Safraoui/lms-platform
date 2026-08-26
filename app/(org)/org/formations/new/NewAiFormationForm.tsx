@@ -8,6 +8,8 @@ import styles from "./new.module.css";
 export default function NewAiFormationForm() {
   const router = useRouter();
   const [title, setTitle] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [thumbnailError, setThumbnailError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +21,7 @@ export default function NewAiFormationForm() {
     const res = await fetch("/api/org/formations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, thumbnailUrl: thumbnailUrl.trim() || undefined }),
     });
     const json = await res.json();
     if (!res.ok) {
@@ -43,10 +45,34 @@ export default function NewAiFormationForm() {
         />
       </div>
 
+      <div className={styles.field}>
+        <label className={styles.label}>Image de couverture (optionnel)</label>
+        <input
+          className={styles.input}
+          type="url"
+          placeholder="https://… (lien vers une image)"
+          value={thumbnailUrl}
+          onChange={(e) => { setThumbnailUrl(e.target.value); setThumbnailError(false); }}
+        />
+        <span className={styles.hint}>
+          Un lien vers une image existante — sans image, une couverture générée automatiquement sera utilisée.
+        </span>
+        {thumbnailUrl.trim() && !thumbnailError && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbnailUrl.trim()}
+            alt=""
+            className={styles.thumbnailPreview}
+            onError={() => setThumbnailError(true)}
+          />
+        )}
+        {thumbnailError && <span className={styles.hintError}>Impossible de charger cette image — vérifiez le lien.</span>}
+      </div>
+
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.actions}>
-        <Link href="/org/catalogue" className={styles.btnSecondary}>Annuler</Link>
+        <Link href="/org/formations" className={styles.btnSecondary}>Annuler</Link>
         <button type="submit" className={styles.btnPrimary} disabled={!title.trim() || saving}>
           {saving ? "Création…" : "Continuer"}
         </button>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
+import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { canCreateFormationByAi } from "@/lib/subscription";
 import { searchChunks } from "@/lib/searchChunks";
@@ -39,6 +40,22 @@ export async function POST(_req: NextRequest, { params }: Params) {
     );
   }
 
+  // Vérifié avant de consommer le quota : une leçon vidéo ne se génère jamais
+  // par IA, inutile (et malhonnête) de facturer une génération pour un appel
+  // qui échouera de toute façon.
+  const { data: lecon } = await supabase
+    .from("lecons")
+    .select("id, title, content_type, generation_brief, module_id, modules!inner(formation_id)")
+    .eq("id", leconId)
+    .single();
+  const leconFormationId = (lecon?.modules as unknown as { formation_id: string } | null)?.formation_id;
+  if (!lecon || leconFormationId !== formationId) {
+    return NextResponse.json({ error: "Leçon introuvable" }, { status: 404 });
+  }
+  if (lecon.content_type === "video") {
+    return NextResponse.json({ error: "Les leçons vidéo ne se génèrent pas par IA — ajoutez directement un lien." }, { status: 400 });
+  }
+
   const quotaResult = await consumeAiGenerationQuota(guard.tenantId);
   if (!quotaResult.allowed) {
     return NextResponse.json(
@@ -48,16 +65,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
       },
       { status: 403 }
     );
-  }
-
-  const { data: lecon } = await supabase
-    .from("lecons")
-    .select("id, title, content_type, generation_brief, module_id, modules!inner(formation_id)")
-    .eq("id", leconId)
-    .single();
-  const leconFormationId = (lecon?.modules as unknown as { formation_id: string } | null)?.formation_id;
-  if (!lecon || leconFormationId !== formationId) {
-    return NextResponse.json({ error: "Leçon introuvable" }, { status: 404 });
   }
 
   const { data: cadrageRow } = await supabase.from("formation_cadrage").select("*").eq("formation_id", formationId).maybeSingle();
@@ -113,6 +120,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       if (questionsError) throw new Error(`Échec de création des questions : ${questionsError.message}`);
 
       await supabase.from("lecons").update({ content_validated_at: null }).eq("id", leconId);
+      await touchFormation(supabase, formationId);
       return NextResponse.json({ data: { quiz: questions, quota: { used: quotaResult.used, total: quotaResult.quota } } });
     }
 
@@ -139,6 +147,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     // revalide. Mieux vaut un "aucune info trouvée" honnête qu'une réponse
     // fausse — les chunks sont réindexés avec le nouveau contenu à la validation.
     await supabase.from("chunks").delete().eq("lesson_id", leconId);
+    await touchFormation(supabase, formationId);
 
     return NextResponse.json({ data: { blocks, quota: { used: quotaResult.used, total: quotaResult.quota } } });
   } catch (err) {

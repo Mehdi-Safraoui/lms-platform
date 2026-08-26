@@ -45,18 +45,36 @@ const NIVEAU_LABEL: Record<Niveau, string> = {
   avance: "Avancé",
 };
 
-type OpenStep = { key: "objectif" | "public_vise" | "duree_estimee"; kind: "open"; question: string; placeholder: string };
+type OpenStep = { key: "objectif" | "public_vise"; kind: "open"; question: string; placeholder: string };
 type ListStep = { key: "notions_a_inclure" | "notions_a_exclure"; kind: "list"; question: string; placeholder: string; skippable: true };
 type SelectStep = { key: "niveau"; kind: "select"; question: string };
 type NumberStep = { key: "nb_modules_souhaite"; kind: "number"; question: string };
-type Step = OpenStep | ListStep | SelectStep | NumberStep;
+type DurationStep = { key: "duree_estimee"; kind: "duration"; question: string };
+type Step = OpenStep | ListStep | SelectStep | NumberStep | DurationStep;
+
+// Sélecteur de durée par tranches de 30 min, de 30 min à 8h — un champ texte
+// libre laissait passer des réponses trop hétérogènes ("2h", "environ deux
+// heures", "une demi-journée"...) pour un champ qui sert de contrainte
+// numérique à la génération de structure.
+const DURATION_OPTIONS = Array.from({ length: 16 }, (_, i) => (i + 1) * 30).map((minutes) => ({
+  minutes,
+  label: minutesToLabel(minutes),
+}));
+
+function minutesToLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${String(m).padStart(2, "0")}`;
+}
 
 const STEPS: Step[] = [
   { key: "objectif", kind: "open", question: "Quel est l'objectif de cette formation ?", placeholder: "Ex : permettre aux employés de reconnaître et signaler les tentatives de phishing" },
   { key: "public_vise", kind: "open", question: "À qui s'adresse cette formation ?", placeholder: "Ex : tous les employés, sans prérequis technique" },
   { key: "niveau", kind: "select", question: "Quel est le niveau visé ?" },
   { key: "nb_modules_souhaite", kind: "number", question: "Combien de modules souhaitez-vous ?" },
-  { key: "duree_estimee", kind: "open", question: "Quelle durée totale envisagez-vous ?", placeholder: "Ex : environ 2 heures" },
+  { key: "duree_estimee", kind: "duration", question: "Quelle durée totale envisagez-vous ?" },
   { key: "notions_a_inclure", kind: "list", question: "Quelles notions la formation doit-elle absolument couvrir ?", placeholder: "Ex : mots de passe, phishing, VPN", skippable: true },
   { key: "notions_a_exclure", kind: "list", question: "Des notions à exclure explicitement ?", placeholder: "Ex : cryptographie avancée (facultatif)", skippable: true },
 ];
@@ -187,6 +205,9 @@ export default function CadrageClient({
       } else if (step.kind === "number") {
         const el = document.getElementById("nb-modules-input") as HTMLInputElement | null;
         if (el) el.value = String(json.data.value);
+      } else if (step.kind === "duration") {
+        const el = document.getElementById("duree-select") as HTMLSelectElement | null;
+        if (el) el.value = minutesToLabel(json.data.value);
       }
     } catch {
       toast.error("Erreur réseau. Réessayez.");
@@ -349,6 +370,41 @@ export default function CadrageClient({
                 return;
               }
               setAnswers((prev) => ({ ...prev, nb_modules_souhaite: value }));
+              advance();
+            }}
+          >
+            Suivant
+            <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
+
+      {step.kind === "duration" && (
+        <div className={styles.numberRow}>
+          <select
+            className={styles.durationSelect}
+            id="duree-select"
+            defaultValue={answers.duree_estimee || ""}
+          >
+            <option value="" disabled>Choisir une durée</option>
+            {DURATION_OPTIONS.map((o) => (
+              <option key={o.minutes} value={o.label}>{o.label}</option>
+            ))}
+          </select>
+          <button type="button" className={styles.secondaryBtn} onClick={decideForMe} disabled={deciding}>
+            <Wand2 size={14} />
+            {deciding ? "…" : "Décider pour moi"}
+          </button>
+          <button
+            type="button"
+            className={styles.primaryBtn}
+            onClick={() => {
+              const el = document.getElementById("duree-select") as HTMLSelectElement;
+              if (!el.value) {
+                toast.error("Choisissez une durée.");
+                return;
+              }
+              setAnswers((prev) => ({ ...prev, duree_estimee: el.value }));
               advance();
             }}
           >

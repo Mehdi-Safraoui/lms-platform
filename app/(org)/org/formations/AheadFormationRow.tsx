@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Eye } from "lucide-react";
 import CatalogueToggle from "../catalogue/CatalogueToggle";
+import RowThumb from "./RowThumb";
 import styles from "./formations.module.css";
 
 const NIVEAU_LABEL: Record<string, string> = {
@@ -21,6 +22,7 @@ export default function AheadFormationRow({
   moduleCount,
   lessonCount,
   enabled,
+  thumbnailUrl,
 }: {
   formationId: string;
   title: string;
@@ -29,26 +31,29 @@ export default function AheadFormationRow({
   moduleCount: number;
   lessonCount: number;
   enabled: boolean;
+  thumbnailUrl: string | null;
 }) {
+  const metaLine = `Créée le ${new Date(createdAt).toLocaleDateString("fr-FR")} · ${moduleCount} module${moduleCount > 1 ? "s" : ""} · ${lessonCount} leçon${lessonCount > 1 ? "s" : ""}${niveau ? ` · ${NIVEAU_LABEL[niveau] ?? niveau}` : ""}`;
+
   return (
-    <div className={styles.row}>
-      <div className={styles.rowMain}>
-        <Link href={`/org/catalogue/${formationId}`} className={styles.rowTitle}>{title}</Link>
-        <span className={styles.rowDate}>
-          Créée le {new Date(createdAt).toLocaleDateString("fr-FR")}
-          {" · "}
-          {moduleCount} module{moduleCount > 1 ? "s" : ""} · {lessonCount} leçon{lessonCount > 1 ? "s" : ""}
-          {niveau && ` · ${NIVEAU_LABEL[niveau] ?? niveau}`}
-        </span>
+    <div className={styles.card}>
+      <div className={styles.cardCoverWrap}>
+        <RowThumb formationId={formationId} thumbnailUrl={thumbnailUrl} />
       </div>
-      <div className={styles.rowRight}>
-        <span className={`${styles.sourceBadge} ${styles.sourceBadgeAhead}`}>Ahead</span>
-        {enabled && <span className={styles.stageBadge}>Activée</span>}
-        <Link href={`/org/catalogue/${formationId}`} className={styles.rowIconBtn} title="Voir le contenu">
-          <Eye size={14} />
-          Voir le contenu
-        </Link>
-        <CatalogueToggle formationId={formationId} enabled={enabled} />
+      <div className={styles.cardBody}>
+        <div className={styles.cardBadgeRow}>
+          <span className={`${styles.sourceBadge} ${styles.sourceBadgeAhead}`}>Ahead</span>
+          {enabled && <span className={styles.stageBadge}>Activée</span>}
+        </div>
+        <Link href={`/org/catalogue/${formationId}`} className={styles.cardTitle} title={title}>{title}</Link>
+        <span className={styles.cardMeta} title={metaLine}>{metaLine}</span>
+        <div className={styles.cardActions}>
+          <Link href={`/org/catalogue/${formationId}`} className={styles.rowIconBtn} title="Voir le contenu">
+            <Eye size={14} />
+            Voir le contenu
+          </Link>
+          <CatalogueToggle formationId={formationId} enabled={enabled} />
+        </div>
       </div>
     </div>
   );
