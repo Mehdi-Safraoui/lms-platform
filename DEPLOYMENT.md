@@ -11,6 +11,8 @@ Pièges à connaître :
 - **`NEXT_PUBLIC_APP_URL`** doit pointer vers le vrai domaine de prod (`https://lms-platform-ten-gamma.vercel.app`), pas `localhost`. Elle sert aux `success_url`/`cancel_url` de Stripe Checkout.
 - **`STRIPE_WEBHOOK_SECRET`** et **`CLERK_WEBHOOK_SIGNING_SECRET`** de prod sont **différents** des secrets utilisés en local (voir étape 3). Ne jamais copier une valeur locale vers Vercel ou inversement.
 - **`OPENAI_API_KEY`** / **`OPENAI_MODEL`** (`gpt-5.6-luna`) — nécessaires pour la génération de formation par IA (`/admin/catalog/new`, `POST /api/formations/generate`). Sans elles, cette fonctionnalité échoue mais le reste de l'app n'est pas affecté.
+- **`VOYAGE_API_KEY`** / **`VOYAGE_MODEL`** (`voyage-3`) — nécessaires pour tout le pipeline RAG V2 (upload de documents, génération de formation par un `admin_tenant`, chat apprenant) : voir ARCHITECTURE.md, section RAG. Sans `VOYAGE_API_KEY`, l'upload d'un document reste bloqué en `ingestion_status = erreur` (échec silencieux à l'usage, pas d'erreur au démarrage de l'app).
+- **`YOUTUBE_API_KEY`** — nécessaire pour la recherche/validation de vidéos (`/api/admin/youtube/search`, `/resolve`). Doit être restreinte à "YouTube Data API v3" dans Google Cloud Console. Sans elle, seule cette fonctionnalité échoue.
 - **`NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL`** doit valoir `/create-organization` (pas `/invite-members`, une ancienne valeur qui menait à une impasse — voir ARCHITECTURE.md, onboarding chemin B). Si cette variable n'est pas à jour sur Vercel, l'auto-inscription d'un admin_tenant reste bloquée indéfiniment sur `WaitForSync`.
 
 ## 2. Migrations Supabase

@@ -135,3 +135,82 @@ Flow : `/admin/catalog/new` propose un choix Manuel / IA. En mode IA, `POST /api
 Point technique notable : `pdf-parse` (basé sur `pdfjs-dist`) a été abandonné après deux échecs en environnement Vercel Serverless — d'abord un chemin de worker relatif non résolu par le bundling Turbopack, puis un `ReferenceError: DOMMatrix is not defined` (pdfjs-dist attend des globals navigateur même pour de la simple extraction de texte). Remplacé par **`unpdf`**, qui embarque une build de PDF.js spécifiquement dépourvue de ces dépendances navigateur et sans worker externe — fonctionne nativement en Serverless, aucune configuration `serverExternalPackages` nécessaire.
 
 Limite connue : l'éditeur manuel actuel ne permet pas de modifier le contenu (blocs) d'une leçon générée par IA — seulement ses métadonnées (titre, publication). Un éditeur de blocs dédié serait nécessaire pour ça.
+
+## Pipeline RAG et génération de formation par IA (V2 — admin_tenant)
+
+Contrairement au V1 (super-admin, document unique tronqué à 60 000 caractères envoyé tel quel au LLM), le V2 permet à un `admin_tenant` de créer sa propre formation à partir de **plusieurs documents source**, indexés dans un vrai pipeline RAG (Retrieval-Augmented Generation) : les documents sont découpés en fragments ("chunks"), vectorisés, puis recherchés par similarité au moment de la génération plutôt que renvoyés en entier au modèle.
+
+```mermaid
+flowchart TB
+    A["Upload document ou URL\n(PDF, Word, PowerPoint, .txt, page web)\nPOST /api/org/formations/[id]/knowledge-sources"]
+    B["Extraction du texte\nlib/documentExtraction.ts\nunpdf · mammoth · JSZip (pptx) · cheerio (web)"]
+    C["Découpage en chunks\n~500 tokens, ~50 de chevauchement,\njamais au milieu d'une phrase — lib/chunking.ts"]
+    D["Embedding Voyage AI\nvoyage-3, 1024 dimensions, inputType=document\nlib/embeddings.ts"]
+    E[("Table chunks (pgvector)\nknowledge_source_id + formation_id")]
+
+    A --> B --> C --> D --> E
+
+    F["Proposition de structure\nlib/ai/generateStructureProposal.ts\nlit TOUS les chunks du document (vue d'ensemble)"]
+    G["Génération d'une leçon / d'un quiz\nlib/ai/generateLessonContent.ts\nrecherche ciblée top-K via searchChunks()"]
+    H["Validation de la leçon par le Formateur"]
+    I["Ré-indexation du contenu validé\nlib/chunkLesson.ts"]
+    J[("chunks : lesson_id\nremplace les chunks-document pour cette leçon")]
+
+    E -.-> F
+    E -.-> G
+    F --> G --> H --> I --> J
+
+    K["Question d'un apprenant\nPOST /api/agent/[formationId]"]
+    L["Embedding de la question\ninputType=query"]
+    M["match_chunks (RPC SQL, pgvector)\nfiltré par formation_id uniquement"]
+    N["Seuil de pertinence ≥ 0.25\n(calibré empiriquement, voir le code)"]
+    O["Réponse LLM ancrée dans le contexte\n+ citation des leçons sources"]
+
+    E -.-> M
+    J -.-> M
+    K --> L --> M --> N --> O
+```
+
+### 1. Ingestion des documents (`knowledge_sources` → `chunks`)
+
+- **Upload** — `POST /api/org/formations/[id]/knowledge-sources` accepte un fichier (PDF, `.docx`/`.doc`, `.pptx`/`.ppt`, `.txt`, 4 Mo max) ou une URL web, une ligne `knowledge_sources` par source (`ingestion_status` : `en_attente` → `en_cours` → `terminee`/`erreur`).
+- **Extraction** (`lib/documentExtraction.ts`, `extractKnowledgeSourceText`) — `unpdf` (PDF), `mammoth` (Word), extraction manuelle via `JSZip` pour PowerPoint (un `.pptx` est une archive zip, texte lu directement dans les XML `ppt/slides/slideN.xml`), lecture brute pour `.txt`, `fetch` + `cheerio` pour une URL. **Limite connue** : l'extraction web n'exécute aucun JavaScript — un site en SPA (React/Vue rendu côté client) ne renvoie que le conteneur HTML vide, sans le contenu réel (confirmé en conditions réelles sur un cas client).
+- **Découpage** (`lib/chunking.ts`, `chunkText`) — cible ~500 tokens par chunk avec ~50 tokens de chevauchement entre chunks consécutifs (pour ne pas perdre le contexte à la frontière), en respectant toujours les frontières de phrases (jamais coupées en deux). Comptage via `gpt-tokenizer` (BPE cl100k) — un ordre de grandeur, pas le tokenizer exact de Voyage AI.
+- **Embedding** (`lib/embeddings.ts`) — Voyage AI, modèle `voyage-3`, 1024 dimensions, par batchs de 100 textes max. `inputType` distingue `"document"` (un chunk à indexer) de `"query"` (une question de recherche) — Voyage optimise différemment les deux représentations.
+- **Stockage** (`lib/ingestChunks.ts`, `embedAndInsertChunks`) — une ligne par chunk dans la table `chunks` (colonne `embedding vector(1024)`, extension `pgvector`), avec `tenant_id`, `formation_id`, `knowledge_source_id`, et `metadata` (position, offsets, nombre de tokens).
+
+### 2. Deux populations de chunks pour une même formation
+
+La table `chunks` sert deux usages distincts pour une même formation, distingués par la colonne renseignée (`knowledge_source_id` XOR `lesson_id`) :
+
+- **Chunks-document** (`knowledge_source_id` renseigné) — issus directement des documents uploadés. Utilisés **pendant la création** : la proposition de structure (`generateStructureProposal`) lit la totalité des chunks-document d'une formation (vue d'ensemble, pas une recherche ciblée), tandis que la génération d'une leçon ou d'un quiz (`generateLessonContent`/`generateLessonQuiz`) fait une recherche vectorielle ciblée (top-8 pour une leçon, top-12 pour un quiz — le quiz couvre aussi les leçons sœurs du module).
+- **Chunks-leçon** (`lesson_id` renseigné) — générés à la **validation** d'une leçon (`lib/chunkLesson.ts`, `embedAndInsertLessonChunks`), à partir du contenu réel de la leçon (blocs aplatis en texte), pas du document source. Remplacent systématiquement les anciens chunks de cette leçon (delete puis insert) — y compris immédiatement après une régénération ou une édition manuelle, avant même la revalidation, pour ne jamais laisser le chat apprenant répondre avec un contenu périmé pendant qu'une leçon déjà publiée est retouchée.
+
+Cette distinction existe parce que le contenu réellement montré à l'apprenant (les blocs de la leçon, potentiellement retouchés manuellement après génération) peut diverger du document source brut — le chat apprenant doit répondre à partir de ce que l'apprenant voit vraiment, pas du PDF d'origine.
+
+### 3. Recherche vectorielle (`lib/searchChunks.ts` + fonction SQL `match_chunks`)
+
+`searchChunks(query, formationId, topK)` embedde la requête (`inputType: "query"`) puis appelle la fonction Postgres `match_chunks` (migration `20260822000002_chunks_lesson_based.sql`), qui trie les chunks par similarité cosinus (opérateur pgvector `<=>`) et filtre **uniquement par `formation_id`** — pas de re-vérification du tenant à ce niveau : l'accès à la formation précise doit déjà avoir été vérifié en amont par l'appelant (voir `isFormationAccessibleToTenant`/`authorizeAccess`). `formation_id` seul suffit puisqu'un chunk n'appartient jamais qu'à une seule formation.
+
+### 4. Chat RAG apprenant (`app/api/agent/[formationId]/route.ts`)
+
+Pipeline : vérification d'accès (rôle `apprenant`, formation publiée et accessible au tenant, apprenant inscrit) → `searchChunks` (top-5) → filtre de pertinence (similarité ≥ **0.25**, seuil calibré empiriquement sur des scores réels — voir le commentaire dans le code pour l'historique du calibrage) → si aucun chunk pertinent, le LLM répond honnêtement qu'il ne trouve pas l'information (jamais de réponse codée en dur, pour rester dans la langue de la question) → sinon, réponse construite uniquement à partir des extraits retrouvés, avec citation des leçons sources (titres résolus côté serveur, jamais laissés au LLM lui-même). Historique conservé dans `agent_messages` (question et réponse, avec les sources).
+
+### Isolation multi-tenant du RAG
+
+`chunks.tenant_id` est nullable (une formation du catalogue global a `tenant_id IS NULL`) — l'isolation réelle repose sur `formation_id`, combinée à la vérification d'accès à la formation faite **avant** tout appel RAG (double chemin déjà documenté : propriétaire direct via `formations.tenant_id`, ou catalogue global activé via `tenant_formations`).
+
+### Ajouter un nouveau format de document supporté
+
+Les 5 formats acceptés aujourd'hui (`pdf`, `word`, `ppt`, `texte`, `web`) suivent tous le même point d'entrée (`extractKnowledgeSourceText`, `lib/documentExtraction.ts`) — le reste du pipeline (découpage, embedding, stockage) est entièrement agnostique au format d'origine puisqu'il ne travaille que sur du texte brut déjà extrait. Ajouter un format se limite donc à 4 endroits :
+
+1. **`lib/documentExtraction.ts`**
+   - Ajouter la valeur au type `KnowledgeSourceFormat`.
+   - Étendre `detectKnowledgeSourceFormat(filename)` pour reconnaître la/les nouvelle(s) extension(s).
+   - Écrire une fonction `extractTextFromXxx(buffer)` qui renvoie le texte brut (voir `extractTextFromPptx` pour un exemple d'extraction "maison" sans dépendance lourde, ou `extractTextFromDocx` pour un exemple s'appuyant sur une lib dédiée) — toujours lever une `Error` explicite en cas de fichier corrompu/vide plutôt que renvoyer une chaîne vide silencieusement.
+   - Ajouter le nouveau `case` dans le `switch` d'`extractKnowledgeSourceText`.
+2. **Contrainte base de données** — le `CHECK` sur `knowledge_sources.format` (migration `20260812000001_knowledge_sources_and_storage.sql`) liste explicitement les valeurs autorisées : une nouvelle migration doit l'étendre (`ALTER TABLE ... DROP CONSTRAINT ... ADD CONSTRAINT ... CHECK (format IN (...))`), sans quoi l'insertion échouera même si le code applicatif accepte déjà le format.
+3. **Upload côté client** (`app/(org)/org/formations/[id]/sources/SourcesClient.tsx`) — ajouter la nouvelle extension à l'attribut `accept` de l'`<input type="file">`, et une entrée dans `FORMAT_LABEL` pour l'affichage du badge de format dans la liste des documents ajoutés.
+4. **Pareil côté V1** si le format doit aussi être proposé au super-admin (`lib/documentExtraction.ts` a un second couple type/detect historique, `SupportedDocumentType`/`detectDocumentType`, utilisé par `POST /api/formations/generate` — volontairement distinct du vocabulaire V2 `KnowledgeSourceFormat`, voir le commentaire dans le fichier).
+
+Rien à toucher côté chunking (`lib/chunking.ts`), embeddings (`lib/embeddings.ts`) ou recherche (`lib/searchChunks.ts`) — ces étapes ne connaissent jamais le format d'origine du document.
