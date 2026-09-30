@@ -70,22 +70,59 @@ export async function POST(_req: NextRequest, { params }: Params) {
     notionsAExclure: cadrage.notions_a_exclure ?? [],
   };
 
-  try {
-    const proposal = await generateStructureProposal(cadrageInput, sourceText);
+  // Réponse en streaming (NDJSON, une ligne JSON par événement) pour afficher
+  // le plan au fil de son écriture — la génération complète prend ~1 min 30
+  // sur un document de 60 pages, le premier module arrive après ~6 s :
+  //   { type: "delta", text }      morceau du JSON produit par le modèle
+  //   { type: "retry", attempt }   sortie invalide, régénération : jeter le texte reçu
+  //   { type: "done", data }       structure validée et enregistrée (ligne formation_structure)
+  //   { type: "error", error }     échec définitif
+  // Les erreurs de contrôle ci-dessus restent des réponses JSON classiques.
+  // Si le navigateur se déconnecte en cours de route, la génération continue
+  // et la structure est quand même enregistrée.
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let open = true;
+      const send = (event: Record<string, unknown>) => {
+        if (!open) return;
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          open = false;
+        }
+      };
 
-    const { data, error } = await supabase
-      .from("formation_structure")
-      .upsert(
-        { formation_id: formationId, proposal, updated_at: new Date().toISOString() },
-        { onConflict: "formation_id" }
-      )
-      .select()
-      .single();
+      try {
+        const proposal = await generateStructureProposal(cadrageInput, sourceText, {
+          onDelta: (text) => send({ type: "delta", text }),
+          onRetry: (attempt) => send({ type: "retry", attempt }),
+        });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ data });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur inconnue lors de la génération.";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+        const { data, error } = await supabase
+          .from("formation_structure")
+          .upsert(
+            { formation_id: formationId, proposal, updated_at: new Date().toISOString() },
+            { onConflict: "formation_id" }
+          )
+          .select()
+          .single();
+
+        if (error) send({ type: "error", error: error.message });
+        else send({ type: "done", data });
+      } catch (err) {
+        send({ type: "error", error: err instanceof Error ? err.message : "Erreur inconnue lors de la génération." });
+      } finally {
+        if (open) controller.close();
+      }
+    },
+  });
+
+  return new Response(body, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
