@@ -29,6 +29,8 @@ export interface CadrageContext {
   notions_a_exclure?: string[];
 }
 
+// S'applique à la fiche de synthèse (lib/sourcesSummary.ts, ~1 500 mots), pas
+// aux documents bruts : simple garde-fou.
 const MAX_DOCUMENT_CHARS = 20_000;
 
 function truncate(text: string): string {
@@ -47,11 +49,11 @@ function answeredSoFarBlock(context: CadrageContext): string {
   return lines.length ? lines.join("\n") : "(aucune réponse donnée pour l'instant)";
 }
 
-const SYSTEM_PROMPT = `Tu es un assistant pédagogique qui aide un Formateur pressé à cadrer une formation avant sa génération par IA. Il a cliqué sur "Décider pour moi" pour un champ du cadrage : à partir des extraits des documents source qu'il a fournis et des réponses déjà données pour les autres champs, propose une réponse plausible et cohérente pour CE champ précis.
+const SYSTEM_PROMPT = `Tu es un assistant pédagogique qui aide un Formateur pressé à cadrer une formation avant sa génération par IA. Il a cliqué sur "Décider pour moi" pour un champ du cadrage : à partir de la fiche de synthèse des documents source qu'il a fournis et des réponses déjà données pour les autres champs, propose une réponse plausible et cohérente pour CE champ précis.
 Règles impératives :
-1. Ancre ta proposition dans le contenu réel des extraits fournis — ne propose jamais un objectif, un public ou des notions qui ne sont pas soutenus par le document.
+1. Ancre ta proposition dans le contenu réel décrit par la synthèse — ne propose jamais un objectif, un public ou des notions qui ne sont pas soutenus par les documents.
 2. Reste cohérent avec les réponses déjà données pour les autres champs.
-3. Si les extraits ne permettent vraiment pas de juger un aspect précis, propose la valeur la plus raisonnable par défaut plutôt que de refuser de répondre.
+3. Si la synthèse ne permet vraiment pas de juger un aspect précis, propose la valeur la plus raisonnable par défaut plutôt que de refuser de répondre.
 4. Réponds uniquement avec les données structurées demandées — pas de texte hors schéma.`;
 
 const FIELD_INSTRUCTIONS: Record<CadrageField, string> = {
@@ -92,7 +94,7 @@ async function callModel<T extends z.ZodTypeAny>(
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
-        content: `Champ à proposer : ${field}\nConsigne : ${FIELD_INSTRUCTIONS[field]}\n\nRéponses déjà données pour les autres champs :\n${answeredSoFarBlock(context)}\n\n--- Extraits des documents source ---\n${truncate(documentContext)}`,
+        content: `Champ à proposer : ${field}\nConsigne : ${FIELD_INSTRUCTIONS[field]}\n\nRéponses déjà données pour les autres champs :\n${answeredSoFarBlock(context)}\n\n--- Synthèse des documents source ---\n${truncate(documentContext)}`,
       },
     ],
     text: { format: zodTextFormat(schema, schemaName) },

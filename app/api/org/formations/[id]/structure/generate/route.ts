@@ -4,19 +4,21 @@ import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { canAuthorFormationByAi } from "@/lib/subscription";
 import { generateStructureProposal, type CadrageInput } from "@/lib/ai/generateStructureProposal";
+import { loadSourceDocumentsText } from "@/lib/sourceDocumentsText";
 
 export const dynamic = "force-dynamic";
-// Génération par le modèle le plus capable (OPENAI_GENERATION_MODEL) : mesuré
-// à ~30-40 s par appel, et jusqu'à 3 tentatives en cas de sortie invalide.
-export const maxDuration = 180;
+// Génération par le modèle le plus capable (OPENAI_GENERATION_MODEL) sur le
+// texte complet des documents : mesuré à ~85 s pour un PDF de 60 pages, et
+// jusqu'à 3 tentatives en cas de sortie invalide.
+export const maxDuration = 300;
 
 type Params = { params: Promise<{ id: string }> };
 
 // POST /api/org/formations/[id]/structure/generate — génère (ou régénère) la
-// proposition de structure à partir du cadrage + de TOUS les chunks-documents de
-// la formation (pas une recherche vectorielle ciblée : on veut une vue
-// d'ensemble, voir Point 4 de l'architecture validée). Écrase tout brouillon
-// existant non encore validé.
+// proposition de structure à partir du cadrage + du texte COMPLET des documents
+// de la formation, reconstitué dans l'ordre (pas une recherche vectorielle
+// ciblée : on veut une vue d'ensemble, voir Point 4 de l'architecture
+// validée). Écrase tout brouillon existant non encore validé.
 export async function POST(_req: NextRequest, { params }: Params) {
   const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
@@ -48,13 +50,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Le cadrage de cette formation n'a pas encore été validé." }, { status: 400 });
   }
 
-  const { data: chunks, error: chunksError } = await supabase
-    .from("chunks")
-    .select("content")
-    .eq("formation_id", formationId)
-    .not("knowledge_source_id", "is", null);
-  if (chunksError) return NextResponse.json({ error: chunksError.message }, { status: 500 });
-  if (!chunks || chunks.length === 0) {
+  let sourceText: string;
+  try {
+    ({ text: sourceText } = await loadSourceDocumentsText(supabase, formationId));
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Lecture des documents impossible." }, { status: 500 });
+  }
+  if (!sourceText) {
     return NextResponse.json({ error: "Aucun document indexé pour cette formation." }, { status: 400 });
   }
 
@@ -69,7 +71,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   };
 
   try {
-    const proposal = await generateStructureProposal(cadrageInput, chunks.map((c) => c.content).join("\n\n"));
+    const proposal = await generateStructureProposal(cadrageInput, sourceText);
 
     const { data, error } = await supabase
       .from("formation_structure")

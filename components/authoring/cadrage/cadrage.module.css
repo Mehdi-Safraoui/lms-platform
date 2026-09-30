@@ -76,6 +76,29 @@
   margin-top: 2px;
 }
 
+/* ── Préremplissage automatique ("Décider pour moi" activé) ── */
+.autoDecideNotice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 16px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.autoDecideNotice svg { color: var(--coral); flex-shrink: 0; }
+
+.autoDecideOff {
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--text-light);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.autoDecideOff:hover { color: var(--text-muted); }
+
 .question {
   font-family: var(--font-barlow), sans-serif;
   font-size: 18px;
