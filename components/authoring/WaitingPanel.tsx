@@ -99,7 +99,7 @@ export default function WaitingPanel({
       </ul>
 
       <div className={styles.bar}>
-        <div className={styles.barFill} style={{ width: `${progress}%` }} />
+        <div className={styles.barFill} style={{ transform: `scaleX(${progress / 100})` }} />
       </div>
       <p className={styles.remaining}>
         {remaining > 0 ? `Temps restant estimé : ${formatRemaining(remaining)}` : "Encore quelques secondes…"}
