@@ -881,6 +881,7 @@ function LessonPanel({ lesson, formationId, onSave }: { lesson: Lesson; formatio
               <p className={styles.hint}>Aucun bloc pour l&apos;instant — ajoutez-en un ci-dessous.</p>
             ) : null}
             <BlockEditor
+              formationId={formationId}
               blocks={form.content_blocks}
               onChange={(content_blocks) => setForm((p) => ({ ...p, content_blocks }))}
             />

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { deleteUploadedDocuments } from "@/lib/knowledgeSourceStorage";
+import { deleteLessonMedia, deleteUploadedDocuments } from "@/lib/knowledgeSourceStorage";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +88,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   // une contrainte FK et doivent être nettoyés explicitement, avant que la
   // ligne knowledge_sources qui référence leur chemin ne disparaisse.
   await deleteUploadedDocuments(supabase, id);
+  await deleteLessonMedia(supabase, id);
   await supabase.from("tenant_formations").delete().eq("formation_id", id);
 
   const { error: deleteError } = await supabase.from("formations").delete().eq("id", id);

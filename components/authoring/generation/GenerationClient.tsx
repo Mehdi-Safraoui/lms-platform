@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import {
   Sparkles, RefreshCw, CheckCircle2, Circle, Clock,
   GraduationCap, ClipboardList, Save, ArrowRight, Rocket, Gauge,
-  Plus, Trash2, Pencil, Check, X, Eye, Video, FileText,
+  Plus, Trash2, Pencil, Check, X, Eye, Video, FileText, ImageIcon,
+  Loader2, Pause, Play,
 } from "lucide-react";
 import BlockEditor from "@/components/lessons/BlockEditor";
 import BlockRenderer from "@/components/lessons/BlockRenderer";
@@ -54,6 +55,51 @@ interface Quota {
 
 function flatten(modules: ModuleGroup[]): Lesson[] {
   return modules.flatMap((m) => m.lecons);
+}
+
+/** Réponse de POST .../generate pour un quiz → questions au format affiché. */
+function toQuizQuestions(quiz: { question: string; options: string[]; correctIndex: number }[]): QuizQuestion[] {
+  return quiz.map((q, i) => ({
+    question_text: q.question,
+    options: q.options.map((text, oi) => ({ text, is_correct: oi === q.correctIndex })),
+    order_index: i,
+  }));
+}
+
+// Autopilote : leçons générées dans l'ordre, AUTOPILOT_CONCURRENCY à la fois
+// (chaque leçon ne s'appuie que sur les documents source, pas sur les autres
+// leçons). Durées mesurées avec le modèle de génération : ~30-40 s pour une
+// leçon, ~16 s pour un quiz.
+const AUTOPILOT_CONCURRENCY = 2;
+const ESTIMATED_SECONDS = { rich: 35, quiz: 18 } as const;
+
+interface AutopilotState {
+  status: "idle" | "running" | "pausing" | "finished";
+  total: number;
+  done: number;
+  inProgress: string[];
+  failed: { id: string; title: string; error: string }[];
+  stoppedReason: string | null;
+}
+
+const AUTOPILOT_IDLE: AutopilotState = { status: "idle", total: 0, done: 0, inProgress: [], failed: [], stoppedReason: null };
+
+function isAutopilotCandidate(lecon: Lesson): boolean {
+  return (lecon.contentType === "rich" || lecon.contentType === "quiz") && !lecon.hasContent;
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.max(1, Math.round(seconds))} s`;
+  return `${Math.round(seconds / 60)} min`;
+}
+
+/** Images et vidéos suggérées par l'IA mais pas encore ajoutées par le Formateur. */
+function missingMedia(lecon: Lesson): { images: number; videos: number } {
+  const blocks = lecon.contentType === "rich" ? (lecon.contentBlocks ?? []) : [];
+  return {
+    images: blocks.filter((b) => b.type === "image_text" && !b.image_url).length,
+    videos: blocks.filter((b) => b.type === "video" && !b.url).length,
+  };
 }
 
 function RenameInput({
@@ -113,6 +159,25 @@ export default function GenerationClient({
   // sauvegardées juste avant de la démonter (changement de leçon), au lieu de
   // les perdre silencieusement. Voir selectLecon().
   const lessonPanelRef = React.useRef<{ flushIfDirty: () => Promise<void> } | null>(null);
+  const [autopilot, setAutopilot] = React.useState<AutopilotState>(AUTOPILOT_IDLE);
+  const autopilotStopRef = React.useRef(false);
+  // Dernier état connu des leçons, lu par les générations de l'autopilote qui
+  // tournent en arrière-plan (évite de générer une leçon remplie entre-temps).
+  const modulesRef = React.useRef<ModuleGroup[] | null>(null);
+  React.useEffect(() => {
+    modulesRef.current = modules;
+  }, [modules]);
+
+  // Pendant l'autopilote, fermer l'onglet l'interromprait : on prévient.
+  React.useEffect(() => {
+    if (autopilot.status !== "running" && autopilot.status !== "pausing") return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [autopilot.status]);
 
   React.useEffect(() => {
     if (fetchedRef.current) return;
@@ -132,12 +197,92 @@ export default function GenerationClient({
   const allLecons = modules ? flatten(modules) : [];
   const selectedLecon = allLecons.find((l) => l.id === selectedLeconId) ?? null;
   const validatedCount = allLecons.filter((l) => l.validatedAt).length;
+  const missing = allLecons.map((l) => ({ id: l.id, ...missingMedia(l) }));
+  const missingImages = missing.reduce((n, m) => n + m.images, 0);
+  const missingVideos = missing.reduce((n, m) => n + m.videos, 0);
+  const firstMissingId = missing.find((m) => m.images + m.videos > 0)?.id ?? null;
+  const autopilotRunning = autopilot.status === "running" || autopilot.status === "pausing";
+  const candidates = allLecons.filter(isAutopilotCandidate);
+  const remainingSeconds =
+    candidates.reduce((sum, l) => sum + ESTIMATED_SECONDS[l.contentType === "quiz" ? "quiz" : "rich"], 0) / AUTOPILOT_CONCURRENCY;
   const allValidated = allLecons.length > 0 && validatedCount === allLecons.length;
 
   function updateLeconLocal(leconId: string, patch: Partial<Lesson>) {
     setModules((prev) =>
       prev ? prev.map((m) => ({ ...m, lecons: m.lecons.map((l) => (l.id === leconId ? { ...l, ...patch } : l)) })) : prev
     );
+  }
+
+  async function generateForAutopilot(lecon: Lesson): Promise<"ok" | "stop" | string> {
+    try {
+      const res = await fetch(`/api/org/formations/${formationId}/generation/${lecon.id}/generate`, { method: "POST" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        // Quota ou abonnement : inutile de continuer avec les leçons suivantes.
+        if (json?.code === "quota_exceeded" || json?.code === "plan_upgrade_required") return "stop";
+        return json?.error ?? `Erreur ${res.status}`;
+      }
+      if (json.data.quota) setQuota(json.data.quota);
+      if (lecon.contentType === "rich") {
+        updateLeconLocal(lecon.id, { hasContent: true, contentBlocks: json.data.blocks, validatedAt: null });
+      } else {
+        updateLeconLocal(lecon.id, { hasContent: true, quizQuestions: toQuizQuestions(json.data.quiz), validatedAt: null });
+      }
+      return "ok";
+    } catch {
+      return "Erreur réseau";
+    }
+  }
+
+  async function startAutopilot() {
+    await lessonPanelRef.current?.flushIfDirty();
+    const queue = allLecons.filter(isAutopilotCandidate);
+    if (queue.length === 0) return;
+
+    autopilotStopRef.current = false;
+    setAutopilot({ ...AUTOPILOT_IDLE, status: "running", total: queue.length });
+    // Empêche la mise en veille de l'écran pendant la génération (si le
+    // navigateur le permet) — la génération est pilotée par cette page.
+    const wakeLock = await navigator.wakeLock?.request("screen").catch(() => null);
+    let stoppedReason: string | null = null;
+
+    async function worker() {
+      while (!autopilotStopRef.current) {
+        const next = queue.shift();
+        if (!next) return;
+        const current = modulesRef.current ? flatten(modulesRef.current).find((l) => l.id === next.id) : null;
+        if (!current || !isAutopilotCandidate(current)) {
+          setAutopilot((a) => ({ ...a, done: a.done + 1 }));
+          continue;
+        }
+        setAutopilot((a) => ({ ...a, inProgress: [...a.inProgress, current.id] }));
+        const result = await generateForAutopilot(current);
+        if (result === "stop") {
+          autopilotStopRef.current = true;
+          stoppedReason = "Quota de générations IA atteint — contactez Ahead pour l'augmenter.";
+        }
+        setAutopilot((a) => ({
+          ...a,
+          done: a.done + (result === "stop" ? 0 : 1),
+          inProgress: a.inProgress.filter((id) => id !== current.id),
+          failed: result === "ok" || result === "stop" ? a.failed : [...a.failed, { id: current.id, title: current.title, error: result }],
+        }));
+      }
+    }
+
+    await Promise.all(Array.from({ length: AUTOPILOT_CONCURRENCY }, worker));
+    await wakeLock?.release().catch(() => undefined);
+
+    const paused = autopilotStopRef.current && !stoppedReason;
+    setAutopilot((a) => ({ ...a, status: paused ? "idle" : "finished", inProgress: [], stoppedReason }));
+    if (stoppedReason) toast.error("Autopilote arrêté", { description: stoppedReason });
+    else if (paused) toast("Autopilote en pause.");
+    else toast.success("Autopilote terminé — relisez et validez chaque leçon.");
+  }
+
+  function pauseAutopilot() {
+    autopilotStopRef.current = true;
+    setAutopilot((a) => ({ ...a, status: "pausing" }));
   }
 
   function selectNextAfter(leconId: string) {
@@ -312,6 +457,50 @@ export default function GenerationClient({
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
+        {!published && (autopilotRunning || candidates.length > 0 || autopilot.status === "finished") && (
+          <div className={styles.autopilotBox}>
+            <span className={styles.autopilotTitle}>
+              <Sparkles size={13} />
+              Autopilote
+            </span>
+            {autopilotRunning ? (
+              <>
+                <span className={styles.autopilotText}>
+                  {autopilot.done} / {autopilot.total} générées
+                  {autopilot.status === "running" && candidates.length > 0 && ` · ≈ ${formatDuration(remainingSeconds)} restantes`}
+                </span>
+                <div className={styles.autopilotBar}>
+                  <div className={styles.autopilotBarFill} style={{ transform: `scaleX(${autopilot.total ? autopilot.done / autopilot.total : 0})` }} />
+                </div>
+                <button type="button" className={styles.autopilotBtnSecondary} onClick={pauseAutopilot} disabled={autopilot.status === "pausing"}>
+                  <Pause size={13} />
+                  {autopilot.status === "pausing" ? "Pause après les leçons en cours…" : "Mettre en pause"}
+                </button>
+              </>
+            ) : candidates.length > 0 ? (
+              <>
+                <span className={styles.autopilotText}>
+                  {candidates.length} leçon{candidates.length > 1 ? "s" : ""} à générer · ≈ {formatDuration(remainingSeconds)}. Vous relisez et validez ensuite.
+                </span>
+                <button type="button" className={styles.autopilotBtn} onClick={startAutopilot} disabled={quotaExhausted}>
+                  <Play size={13} />
+                  {autopilot.done > 0 ? "Reprendre" : "Tout générer automatiquement"}
+                </button>
+                <span className={styles.autopilotHint}>Gardez cet onglet ouvert pendant la génération.</span>
+              </>
+            ) : (
+              <span className={styles.autopilotText}>Toutes les leçons sont générées. Relisez et validez-les une par une.</span>
+            )}
+            {autopilot.stoppedReason && <span className={styles.autopilotError}>{autopilot.stoppedReason}</span>}
+            {autopilot.failed.length > 0 && (
+              <span className={styles.autopilotError}>
+                {autopilot.failed.length} leçon{autopilot.failed.length > 1 ? "s" : ""} en échec ({autopilot.failed.map((f) => f.title).join(", ")}) — relancez
+                « Tout générer » ou générez-{autopilot.failed.length > 1 ? "les" : "la"} à la main.
+              </span>
+            )}
+          </div>
+        )}
+
         {modules.map((mod) => (
           <div key={mod.id} className={styles.sidebarModule}>
             <div className={styles.sidebarModuleHeader}>
@@ -344,7 +533,9 @@ export default function GenerationClient({
                       className={`${styles.sidebarLesson} ${lecon.id === selectedLeconId ? styles.sidebarLessonActive : ""}`}
                       onClick={() => selectLecon(lecon.id)}
                     >
-                      {lecon.validatedAt ? (
+                      {autopilot.inProgress.includes(lecon.id) ? (
+                        <Loader2 size={14} className={`${styles.statusEmpty} ${styles.spin}`} />
+                      ) : lecon.validatedAt ? (
                         <CheckCircle2 size={14} className={styles.statusValidated} />
                       ) : lecon.hasContent ? (
                         <Clock size={14} className={styles.statusPending} />
@@ -406,6 +597,23 @@ export default function GenerationClient({
           {validatedCount} / {allLecons.length} leçons validées
         </div>
 
+        {firstMissingId && (
+          <div className={styles.missingMediaBox}>
+            <ImageIcon size={13} />
+            <span>
+              À ajouter :{" "}
+              {[
+                missingImages ? `${missingImages} image${missingImages > 1 ? "s" : ""}` : null,
+                missingVideos ? `${missingVideos} vidéo${missingVideos > 1 ? "s" : ""}` : null,
+              ].filter(Boolean).join(" et ")}{" "}
+              — masquées pour l&apos;apprenant tant qu&apos;elles manquent.
+            </span>
+            <button type="button" className={styles.missingMediaLink} onClick={() => selectLecon(firstMissingId)}>
+              Voir
+            </button>
+          </div>
+        )}
+
         {/* Pas de quota pour le catalogue global (super_admin). */}
         {quota && space === "org" && (
           <div className={`${styles.quotaBox} ${quotaExhausted ? styles.quotaBoxExhausted : ""}`}>
@@ -442,10 +650,13 @@ export default function GenerationClient({
           <p className={styles.loading}>Sélectionnez une leçon.</p>
         ) : (
           <LessonPanel
-            key={selectedLecon.id}
+            // hasContent dans la clé : quand l'autopilote remplit la leçon
+            // affichée, le panneau repart du contenu généré.
+            key={`${selectedLecon.id}:${selectedLecon.hasContent}`}
             ref={lessonPanelRef}
             formationId={formationId}
             lecon={selectedLecon}
+            autopilotGenerating={autopilot.inProgress.includes(selectedLecon.id)}
             quotaExhausted={quotaExhausted}
             onUpdate={(patch) => updateLeconLocal(selectedLecon.id, patch)}
             onValidated={() => selectNextAfter(selectedLecon.id)}
@@ -469,16 +680,19 @@ export interface LessonPanelHandle {
 const LessonPanel = React.forwardRef<LessonPanelHandle, {
   formationId: string;
   lecon: Lesson;
+  /** Leçon en cours de génération par l'autopilote (et non par ce panneau). */
+  autopilotGenerating: boolean;
   quotaExhausted: boolean;
   onUpdate: (patch: Partial<Lesson>) => void;
   onValidated: () => void;
   onQuotaUpdate: (quota: Quota) => void;
-}>(function LessonPanel({ formationId, lecon, quotaExhausted, onUpdate, onValidated, onQuotaUpdate }, ref) {
+}>(function LessonPanel({ formationId, lecon, autopilotGenerating, quotaExhausted, onUpdate, onValidated, onQuotaUpdate }, ref) {
   const [editedBlocks, setEditedBlocks] = React.useState<ContentBlock[]>(lecon.contentBlocks ?? []);
   const [editedVideoUrl, setEditedVideoUrl] = React.useState(lecon.videoUrl ?? "");
   const [videoUrlTouched, setVideoUrlTouched] = React.useState(false);
   const [dirty, setDirty] = React.useState(false);
-  const [generating, setGenerating] = React.useState(false);
+  const [generatingHere, setGenerating] = React.useState(false);
+  const generating = generatingHere || autopilotGenerating;
   const [saving, setSaving] = React.useState(false);
   const [validating, setValidating] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
@@ -505,12 +719,7 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
         setDirty(false);
         onUpdate({ hasContent: true, contentBlocks: json.data.blocks, validatedAt: null });
       } else {
-        const quizQuestions = json.data.quiz.map((q: { question: string; options: string[]; correctIndex: number }, i: number) => ({
-          question_text: q.question,
-          options: q.options.map((text, oi) => ({ text, is_correct: oi === q.correctIndex })),
-          order_index: i,
-        }));
-        onUpdate({ hasContent: true, quizQuestions, validatedAt: null });
+        onUpdate({ hasContent: true, quizQuestions: toQuizQuestions(json.data.quiz), validatedAt: null });
       }
       toast.success(lecon.hasContent ? "Contenu régénéré." : "Contenu généré — relisez-le avant de valider.");
     } catch {
@@ -680,6 +889,7 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
           {lecon.contentType === "rich" ? (
             <div className={styles.editorWrap}>
               <BlockEditor
+                formationId={formationId}
                 blocks={editedBlocks}
                 onChange={(blocks) => {
                   setEditedBlocks(blocks);
@@ -772,7 +982,7 @@ function PreviewModal({ title, blocks, onClose }: { title: string; blocks: Conte
           </button>
         </div>
         <div className={styles.previewBody}>
-          <BlockRenderer blocks={blocks} />
+          <BlockRenderer blocks={blocks} showPlaceholders />
         </div>
       </div>
     </div>
@@ -784,7 +994,7 @@ function PreviewModal({ title, blocks, onClose }: { title: string; blocks: Conte
 // désactivé pendant potentiellement de longues secondes) — la régénération
 // d'un contenu déjà existant garde son propre indicateur (icône qui tourne),
 // l'ancien contenu restant visible pendant le remplacement.
-// Durées mesurées avec le modèle de génération sur un vrai document : ~28 s
+// Durées mesurées avec le modèle de génération sur un vrai document : ~30-40 s
 // pour une leçon, ~16 s pour un quiz.
 function LessonWaitingPanel({ formationId, isQuiz }: { formationId: string; isQuiz: boolean }) {
   return isQuiz ? (
@@ -796,7 +1006,7 @@ function LessonWaitingPanel({ formationId, isQuiz }: { formationId: string; isQu
   ) : (
     <WaitingPanel
       formationId={formationId}
-      estimatedSeconds={30}
+      estimatedSeconds={35}
       steps={["Recherche des passages pertinents dans vos documents", "Rédaction de la leçon", "Mise en forme des blocs"]}
     />
   );

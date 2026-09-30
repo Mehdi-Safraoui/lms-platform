@@ -190,6 +190,15 @@ La table `chunks` sert deux usages distincts pour une même formation, distingu�
 
 Cette distinction existe parce que le contenu réellement montré à l'apprenant (les blocs de la leçon, potentiellement retouchés manuellement après génération) peut diverger du document source brut — le chat apprenant doit répondre à partir de ce que l'apprenant voit vraiment, pas du PDF d'origine.
 
+### Autopilote
+
+Bouton « Tout générer automatiquement » de l'étape Génération (`GenerationClient.tsx`) : génère dans l'ordre toutes les leçons et tous les quiz encore vides, deux à la fois (`AUTOPILOT_CONCURRENCY` — chaque leçon ne s'appuie que sur les documents source), en appelant la même route que le bouton manuel. Pause / reprise (la reprise repart des leçons encore vides), arrêt sur quota atteint, leçons en échec listées, écran maintenu allumé (Wake Lock) et avertissement à la fermeture de l'onglet. Rien n'est validé automatiquement : le Formateur relit et valide chaque leçon. La génération est pilotée par la page — elle s'arrête si l'onglet est fermé ou l'ordinateur en veille.
+
+### Blocs image, vidéo et prompt
+
+- **`image_text`** (image à gauche / à droite / pleine largeur + texte) et **`video`** (YouTube / Vimeo) : l'IA peut les proposer, mais ne fournit jamais le média — `image_url` / `url` sont forcés à `null` après génération (`withoutGeneratedMedia`, `lib/ai/generateLessonContent.ts`). Elle décrit l'image attendue (`image_description`) ou propose une recherche YouTube (`search_query`). Le Formateur ajoute ensuite l'image (`POST /api/org/formations/[id]/media` → bucket public `lesson-media`, chemin `{formation_id}/{uuid}.{ext}`, migration `20260930000003_lesson_media_bucket.sql`) ou choisit une vraie vidéo (`/api/admin/youtube/search`, ouvert aux deux rôles auteurs). Tant qu'un média manque, l'apprenant ne voit que le texte ; l'aperçu du Formateur (`BlockRenderer showPlaceholders`) et la barre latérale de l'étape Génération signalent les médias à ajouter. Les images d'une formation sont supprimées avec elle (`deleteLessonMedia`).
+- **`prompt`** : prompt prêt à copier-coller par l'apprenant (bouton Copier), avec un conseil d'utilisation optionnel.
+
 ### Attentes de génération côté interface
 
 - **Structure en streaming** — `POST .../structure/generate` répond en NDJSON (`delta` / `retry` / `done` / `error`, voir le commentaire de la route) ; `StreamingStructurePreview` relit le JSON partiel (bibliothèque `partial-json`) et affiche les modules au fil de leur écriture, avec un squelette clignotant avant le premier module (~6-9 s) et un en-tête de progression fixe « module X / N ». Mesuré sur un PDF de 60 pages : 13 modules affichés entre 9 s et 76 s, structure complète à ~80 s. La validation Zod et les nouvelles tentatives restent faites côté serveur, à la fin ; la structure est enregistrée même si le navigateur se déconnecte.

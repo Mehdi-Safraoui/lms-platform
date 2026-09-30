@@ -6,9 +6,10 @@ import {
   Sparkles, Wand2, Share2, ShieldCheck, PenTool, BarChart3,
   BookOpen, Brain, Rocket, Target, Lightbulb, Users,
   Search, Monitor, CheckCircle2, AlertTriangle, Info, Star,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Copy, Check, ImageIcon, Video, Terminal,
 } from "lucide-react";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
+import { getVideoEmbedUrl } from "@/lib/video";
 import styles from "./blocks.module.css";
 
 const Markdown = dynamic(
@@ -84,7 +85,43 @@ function ExerciseBlockView({ prompt, answer }: { prompt: string; answer: string 
   );
 }
 
-export default function BlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
+function PromptBlockView({ title, prompt, tip }: { title: string; prompt: string; tip: string | null }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className={styles.prompt}>
+      <div className={styles.promptHeader}>
+        <span className={styles.promptTitle}>
+          <Terminal size={15} />
+          {title}
+        </span>
+        <button type="button" className={styles.promptCopy} onClick={copy} aria-live="polite">
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? "Copié" : "Copier"}
+        </button>
+      </div>
+      <pre className={styles.promptText}>{prompt}</pre>
+      {tip && <p className={styles.promptTip}>{tip}</p>}
+    </div>
+  );
+}
+
+/**
+ * showPlaceholders : dans l'aperçu du Formateur, les images et vidéos
+ * suggérées par l'IA mais pas encore ajoutées s'affichent comme des
+ * emplacements à remplir ; côté apprenant (par défaut), elles sont masquées.
+ */
+export default function BlockRenderer({ blocks, showPlaceholders = false }: { blocks: ContentBlock[]; showPlaceholders?: boolean }) {
   return (
     <div className={styles.blocks}>
       {blocks.map((block, i) => {
@@ -189,6 +226,70 @@ export default function BlockRenderer({ blocks }: { blocks: ContentBlock[] }) {
 
           case "exercise":
             return <ExerciseBlockView key={i} prompt={block.prompt} answer={block.answer} />;
+
+          case "image_text": {
+            const hasImage = !!block.image_url;
+            const showImage = hasImage || showPlaceholders;
+            return (
+              <figure
+                key={i}
+                className={`${styles.imageText} ${showImage ? styles[`imageText_${block.layout}`] : ""}`}
+              >
+                {showImage && (
+                  <div className={styles.imageTextMedia}>
+                    {hasImage ? (
+                      // Image uploadée par le Formateur (Supabase Storage) : pas
+                      // d'optimisation next/image pour un domaine non configuré.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={block.image_url!} alt={block.image_description} className={styles.imageTextImg} />
+                    ) : (
+                      <div className={styles.mediaPlaceholder}>
+                        <ImageIcon size={20} />
+                        <span>Image à ajouter : {block.image_description}</span>
+                      </div>
+                    )}
+                    {block.caption && <figcaption className={styles.imageTextCaption}>{block.caption}</figcaption>}
+                  </div>
+                )}
+                <div className={styles.imageTextBody}>
+                  <InlineMarkdown text={block.text} />
+                </div>
+              </figure>
+            );
+          }
+
+          case "video": {
+            const embedUrl = block.url ? getVideoEmbedUrl(block.url) : null;
+            if (!embedUrl && !showPlaceholders) return null;
+            return (
+              <figure key={i} className={styles.videoBlock}>
+                {embedUrl ? (
+                  <div className={styles.videoFrame}>
+                    <iframe
+                      src={embedUrl}
+                      title={block.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <div className={styles.mediaPlaceholder}>
+                    <Video size={20} />
+                    <span>Vidéo à ajouter : {block.title} (recherche suggérée : « {block.search_query} »)</span>
+                  </div>
+                )}
+                {(block.caption || embedUrl) && (
+                  <figcaption className={styles.videoCaption}>
+                    <strong>{block.title}</strong>
+                    {block.caption && <span> — {block.caption}</span>}
+                  </figcaption>
+                )}
+              </figure>
+            );
+          }
+
+          case "prompt":
+            return <PromptBlockView key={i} title={block.title} prompt={block.prompt} tip={block.tip} />;
 
           default:
             return null;
