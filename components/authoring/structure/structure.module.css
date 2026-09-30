@@ -228,11 +228,18 @@
   background: transparent;
   font-size: 12.5px;
   color: var(--text-muted);
-  padding: 2px;
+  padding: 2px 4px;
+  margin: 0 -2px;
+  border-radius: 6px;
   resize: none;
+  overflow: hidden;
   font-family: var(--font-jakarta), sans-serif;
   line-height: 1.4;
+  transition: background 0.15s;
 }
+
+.lessonDescInput:hover { background: rgba(0, 0, 0, 0.025); }
+.lessonDescInput:focus { background: var(--card); color: var(--text); }
 
 .typeToggle {
   flex-shrink: 0;
