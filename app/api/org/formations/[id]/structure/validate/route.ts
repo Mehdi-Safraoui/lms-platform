@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import type { StructureProposal } from "@/lib/ai/structureProposal";
@@ -16,7 +16,7 @@ type Params = { params: Promise<{ id: string }> };
 // validée ne peut pas être matérialisée une seconde fois (éviterait des
 // modules/leçons en double).
 export async function POST(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;

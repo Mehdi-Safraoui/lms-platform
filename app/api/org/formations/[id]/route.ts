@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { deleteUploadedDocuments } from "@/lib/knowledgeSourceStorage";
 
 export const dynamic = "force-dynamic";
-type Supabase = ReturnType<typeof createServiceRoleSupabaseClient>;
 
 type Params = { params: Promise<{ id: string }> };
 
 // GET /api/org/formations/[id] — formation du tenant (créée par l'admin_tenant lui-même)
 export async function GET(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id } = await params;
@@ -33,7 +33,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 // qu'au moment de la création — aucun moyen d'en ajouter/changer une pour une
 // formation déjà existante.
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id } = await params;
@@ -62,21 +62,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json({ data: { thumbnailUrl: thumbnailUrl?.trim() || null } });
 }
 
-async function deleteUploadedDocuments(supabase: Supabase, formationId: string): Promise<void> {
-  const { data: sources } = await supabase.from("knowledge_sources").select("storage_url, format").eq("formation_id", formationId);
-  const paths = (sources ?? []).filter((s) => s.format !== "web" && s.storage_url).map((s) => s.storage_url as string);
-  if (paths.length > 0) {
-    await supabase.storage.from("knowledge-sources").remove(paths);
-  }
-}
-
 // DELETE /api/org/formations/[id] — carte "trouvée en creusant" : rien ne
 // permettait à un Formateur de supprimer un brouillon abandonné, qui restait
 // indéfiniment dans "Mes formations". Volontairement interdit sur une
 // formation déjà publiée (risque réel pour des apprenants inscrits) — il
 // faudrait une dépublication explicite d'abord, pas encore construite.
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id } = await params;

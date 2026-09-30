@@ -94,9 +94,11 @@ function fromExisting(existing: ExistingCadrage | null): CadrageAnswers {
 
 export default function CadrageClient({
   formationId,
+  basePath,
   initialCadrage,
 }: {
   formationId: string;
+  basePath: string;
   initialCadrage: ExistingCadrage | null;
 }) {
   const router = useRouter();
@@ -254,7 +256,7 @@ export default function CadrageClient({
         return;
       }
       toast.success("Cadrage enregistré.");
-      router.push(`/org/formations/${formationId}/structure`);
+      router.push(`${basePath}/${formationId}/structure`);
     } catch {
       toast.error("Erreur réseau. Réessayez.");
     } finally {

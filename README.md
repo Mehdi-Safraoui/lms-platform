@@ -77,7 +77,7 @@ Le fichier [.env.example](.env.example) liste **toutes** les variables nécessai
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Accès à la base de données |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Paiements et abonnements |
 | `STRIPE_PRICE_DECOUVERTE`, `STRIPE_PRICE_CREATION`, `STRIPE_PRICE_ENTREPRISE` | Identifiants des 3 offres dans le catalogue Stripe |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | Génération de formation par IA + agent conversationnel |
+| `OPENAI_API_KEY`, `OPENAI_MODEL_GENERATION`, `OPENAI_MODEL_CHAT` | Génération de formation par IA (défaut `gpt-6.1-sol`) + agent conversationnel (défaut `gpt-6-luna`) |
 | `VOYAGE_API_KEY`, `VOYAGE_MODEL` | Embeddings du pipeline RAG (V2) — sans elle, l'upload d'un document reste bloqué en erreur |
 | `YOUTUBE_API_KEY` | Recherche/validation de vidéos pour les leçons |
 | `NEXT_PUBLIC_APP_URL` | URL publique de l'app (redirections Stripe et invitations Clerk) |

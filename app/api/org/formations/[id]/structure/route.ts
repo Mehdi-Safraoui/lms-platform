@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
@@ -10,7 +10,7 @@ type Params = { params: Promise<{ id: string }> };
 // GET /api/org/formations/[id]/structure — relit le brouillon de structure
 // (généré puis potentiellement édité côté client) pour reprendre où on en était.
 export async function GET(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;
@@ -28,7 +28,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 // par le Formateur (renommer/réordonner/ajouter/supprimer, carte 45) sans jamais
 // relancer l'IA — la génération est un appel séparé (POST .../structure/generate).
 export async function PUT(req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;

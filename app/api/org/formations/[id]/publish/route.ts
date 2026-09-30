@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
@@ -19,8 +19,11 @@ type Params = { params: Promise<{ id: string }> };
 // Elle n'apparaît jamais dans /org/catalogue (filtré sur tenant_id IS NULL),
 // donc la carte "visible uniquement dans le tenant du Formateur" est garantie
 // par construction, sans code supplémentaire à écrire pour ça.
+//
+// Également utilisée par le super_admin pour une formation du catalogue
+// global (guard.tenantId null) : seul is_published change dans ce cas.
 export async function POST(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;
@@ -52,6 +55,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
     .update({ is_published: true, updated_at: new Date().toISOString() })
     .eq("id", formationId);
   if (publishError) return NextResponse.json({ error: publishError.message }, { status: 500 });
+
+  // Catalogue global (super_admin) : aucune activation à créer — la formation
+  // devient simplement activable par chaque tenant depuis son catalogue.
+  if (guard.tenantId === null) {
+    return NextResponse.json({ data: { formationId, published: true } });
+  }
 
   const { data: existingLink } = await supabase
     .from("tenant_formations")

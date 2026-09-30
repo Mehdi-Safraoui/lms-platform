@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { deleteUploadedDocuments } from "@/lib/knowledgeSourceStorage";
 import { assertGlobalCatalogueFormation } from "@/lib/api/assert-global-catalogue-formation";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   if (!(await assertGlobalCatalogueFormation(supabase, id))) {
     return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
   }
+
+  // Formation créée par le flow IA : ses documents source sont aussi dans le
+  // Storage, que la cascade base ne couvre pas.
+  await deleteUploadedDocuments(supabase, id);
 
   const { error } = await supabase.from("formations").delete().eq("id", id);
 

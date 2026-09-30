@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
@@ -12,7 +12,7 @@ const NIVEAUX = ["debutant", "intermediaire", "avance"] as const;
 // GET /api/org/formations/[id]/cadrage — relit les réponses déjà enregistrées
 // (permet de reprendre le stepper là où le Formateur l'a laissé).
 export async function GET(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;
@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 // étape du stepper, "Valider le cadrage") — un seul upsert plutôt qu'une écriture
 // par étape, le state intermédiaire du stepper vit côté client jusqu'à validation.
 export async function POST(req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { canCreateFormationByAi } from "@/lib/subscription";
+import { canAuthorFormationByAi } from "@/lib/subscription";
 import { detectKnowledgeSourceFormat } from "@/lib/documentExtraction";
 import { processKnowledgeSource } from "@/lib/processKnowledgeSource";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
@@ -36,7 +36,7 @@ async function ingestAndReturn(supabase: SupabaseClient, knowledgeSourceId: stri
 
 // GET /api/org/formations/[id]/knowledge-sources — liste les sources déjà uploadées
 export async function GET(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;
@@ -58,7 +58,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 // POST /api/org/formations/[id]/knowledge-sources — upload d'un fichier OU d'une URL web
 export async function POST(req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
   }
 
-  if (!(await canCreateFormationByAi(guard.tenantId))) {
+  if (!(await canAuthorFormationByAi(guard.tenantId))) {
     return NextResponse.json(
       { error: "La génération de formation par IA nécessite l'offre Création ou Entreprise.", code: "plan_upgrade_required" },
       { status: 403 }
@@ -124,9 +124,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   // Id généré à l'avance pour construire le chemin de stockage
-  // {tenant_id}/{knowledge_source_id}/{file_name} avant l'insert DB.
+  // {tenant_id}/{knowledge_source_id}/{file_name} avant l'insert DB — préfixe
+  // "catalogue" pour une formation du catalogue global (super_admin).
   const knowledgeSourceId = crypto.randomUUID();
-  const storagePath = `${guard.tenantId}/${knowledgeSourceId}/${file.name}`;
+  const storagePath = `${guard.tenantId ?? "catalogue"}/${knowledgeSourceId}/${file.name}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const { error: uploadError } = await supabase.storage

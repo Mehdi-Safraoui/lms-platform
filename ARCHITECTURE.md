@@ -8,7 +8,7 @@ Plateforme LMS multi-tenant : Ahead (super-admin) fournit un catalogue de format
 - **Clerk** — authentification + gestion des Organizations (= tenants)
 - **Supabase** (Postgres) — base de données, avec Row Level Security
 - **Stripe** — abonnements SaaS (Checkout + Webhooks)
-- **OpenAI API** (`gpt-5.6-luna`) — génération de formation par IA (super-admin, V1)
+- **OpenAI API** — génération de formation par IA (`OPENAI_MODEL_GENERATION`, défaut `gpt-6.1-sol`) et chat apprenant (`OPENAI_MODEL_CHAT`, défaut `gpt-6-luna`), voir `lib/openai/index.ts`
 
 ## Schéma général
 
@@ -121,24 +121,24 @@ Deux chemins possibles :
 - Table `user_badges` sert uniquement à détecter un déblocage "nouveau" pour déclencher un toast (`BadgeUnlockToasts.tsx`), pas de source de vérité pour l'état des badges
 - Points crédités via `total_points` sur `users`, niveau = `floor(points / 500) + 1`
 
-## Génération de formation par IA (Super-admin uniquement, V1)
+## Contenu riche des leçons
 
-Réservée au `super_admin` en V1 — les `admin_tenant` n'y ont pas accès (prévu en V2 avec leurs propres documents).
+Une leçon avec `content_type = 'rich'` stocke ses blocs typés (`heading`, `paragraph`, `list`, `callout`, `comparison`, `feature_grid`, `highlight`… — schéma Zod dans `lib/ai/contentBlocks.ts`) dans `lecons.content_blocks` (jsonb). Ils sont affichés par `components/lessons/BlockRenderer.tsx` côté apprenant et éditables avec `components/lessons/BlockEditor.tsx`, aussi bien dans le flow de création par IA que dans l'éditeur admin (`/admin/catalog/[id]/edit`).
 
-Flow : `/admin/catalog/new` propose un choix Manuel / IA. En mode IA, `POST /api/formations/generate` reçoit un PDF ou `.docx` et exécute :
+Point technique notable (extraction PDF) : `pdf-parse` (basé sur `pdfjs-dist`) a été abandonné après deux échecs en environnement Vercel Serverless — d'abord un chemin de worker relatif non résolu par le bundling Turbopack, puis un `ReferenceError: DOMMatrix is not defined` (pdfjs-dist attend des globals navigateur même pour de la simple extraction de texte). Remplacé par **`unpdf`**, qui embarque une build de PDF.js spécifiquement dépourvue de ces dépendances navigateur et sans worker externe — fonctionne nativement en Serverless, aucune configuration `serverExternalPackages` nécessaire.
 
-1. **Extraction de texte** (`lib/documentExtraction.ts`) — `unpdf` pour PDF, `mammoth` pour `.docx`. Document tronqué à 60 000 caractères si trop volumineux (pas de découpage/résumé progressif pour l'instant).
-2. **Génération structurée** (`lib/ai/generateFormation.ts`) — appel à l'API Responses d'OpenAI avec sortie JSON strict contrainte par un schéma Zod (`lib/ai/contentBlocks.ts`). Le contenu de chaque leçon est une liste de blocs typés (`heading`, `paragraph`, `list`, `callout`, `comparison`, `feature_grid`, `highlight`). Règle métier forcée par validation : exactement une leçon `quiz` par module, en dernière position — retry automatique avec message de correction si la sortie du modèle est invalide.
-3. **Sauvegarde** (`lib/ai/saveGeneratedFormation.ts`) — écrit dans les tables existantes (`formations`, `modules`, `lecons`, `quizzes`, `quiz_questions`). La formation est créée en **brouillon** (`is_published: false`) : le super-admin doit relire et publier explicitement depuis l'éditeur.
-4. **Rendu** — une leçon avec `content_type = 'rich'` stocke ses blocs dans `lecons.content_blocks` (jsonb) et est affichée par `components/lessons/BlockRenderer.tsx` côté apprenant.
+> Historique : une première version (V1) réservée au super_admin générait une formation entière en un seul appel à partir d'un unique PDF/Word tronqué à 60 000 caractères (`POST /api/formations/generate`). Elle a été retirée au profit du flow complet ci-dessous, désormais commun au super_admin et aux admin_tenant.
 
-Point technique notable : `pdf-parse` (basé sur `pdfjs-dist`) a été abandonné après deux échecs en environnement Vercel Serverless — d'abord un chemin de worker relatif non résolu par le bundling Turbopack, puis un `ReferenceError: DOMMatrix is not defined` (pdfjs-dist attend des globals navigateur même pour de la simple extraction de texte). Remplacé par **`unpdf`**, qui embarque une build de PDF.js spécifiquement dépourvue de ces dépendances navigateur et sans worker externe — fonctionne nativement en Serverless, aucune configuration `serverExternalPackages` nécessaire.
+## Pipeline RAG et génération de formation par IA (super_admin et admin_tenant)
 
-Limite connue : l'éditeur manuel actuel ne permet pas de modifier le contenu (blocs) d'une leçon générée par IA — seulement ses métadonnées (titre, publication). Un éditeur de blocs dédié serait nécessaire pour ça.
+Le même flow (documents source → cadrage → structure → génération leçon par leçon → publication) sert deux espaces :
 
-## Pipeline RAG et génération de formation par IA (V2 — admin_tenant)
+- **`admin_tenant`** (`/org/formations/...`) — formation privée de son entreprise (`formations.tenant_id` = son tenant), soumise à l'offre Création/Entreprise et au quota `ai_generation_quota`.
+- **`super_admin`** (`/admin/catalog/...`) — formation du catalogue global Ahead (`tenant_id IS NULL`), sans abonnement ni quota. Une fois publiée, elle devient activable par chaque tenant ; une dernière étape propose une vidéo d'accompagnement (`/admin/catalog/[id]/video`) puis l'éditeur admin pour compléter description/niveau/durée.
 
-Contrairement au V1 (super-admin, document unique tronqué à 60 000 caractères envoyé tel quel au LLM), le V2 permet à un `admin_tenant` de créer sa propre formation à partir de **plusieurs documents source**, indexés dans un vrai pipeline RAG (Retrieval-Augmented Generation) : les documents sont découpés en fragments ("chunks"), vectorisés, puis recherchés par similarité au moment de la génération plutôt que renvoyés en entier au modèle.
+Les écrans vivent une seule fois dans `components/authoring/` (paramètre `space: "org" | "admin"`, voir `components/authoring/space.ts`) ; les pages de `app/(org)/org/formations/[id]/*` et `app/(dashboard)/admin/catalog/[id]/*` ne font que les instancier. Les routes API sont communes (`/api/org/formations/[id]/...`, nom historique) : `requireFormationAuthor()` (`lib/api/require-formation-author.ts`) accepte les deux rôles et renvoie `tenantId` (null pour le super_admin), puis `assertOwnFormation(supabase, formationId, guard.tenantId)` compare `formations.tenant_id` à cette valeur — un super_admin n'atteint donc jamais la formation privée d'un tenant, et inversement. Les documents du catalogue sont stockés sous `catalogue/{knowledge_source_id}/{file_name}` (`knowledge_sources.tenant_id` null).
+
+Le flow crée une formation à partir de **plusieurs documents source**, indexés dans un vrai pipeline RAG (Retrieval-Augmented Generation) : les documents sont découpés en fragments ("chunks"), vectorisés, puis recherchés par similarité au moment de la génération plutôt que renvoyés en entier au modèle.
 
 ```mermaid
 flowchart TB
@@ -151,7 +151,7 @@ flowchart TB
     A --> B --> C --> D --> E
 
     F["Proposition de structure\nlib/ai/generateStructureProposal.ts\nlit TOUS les chunks du document (vue d'ensemble)"]
-    G["Génération d'une leçon / d'un quiz\nlib/ai/generateLessonContent.ts\nrecherche ciblée top-K via searchChunks()"]
+    G["Génération d'une leçon / d'un quiz\nlib/ai/generateLessonContent.ts\nrecherche ciblée top-K via searchChunks(…, \"document\")"]
     H["Validation de la leçon par le Formateur"]
     I["Ré-indexation du contenu validé\nlib/chunkLesson.ts"]
     J[("chunks : lesson_id\nremplace les chunks-document pour cette leçon")]
@@ -162,7 +162,7 @@ flowchart TB
 
     K["Question d'un apprenant\nPOST /api/agent/[formationId]"]
     L["Embedding de la question\ninputType=query"]
-    M["match_chunks (RPC SQL, pgvector)\nfiltré par formation_id uniquement"]
+    M["match_chunks (RPC SQL, pgvector)\nfiltré par formation_id + chunks-leçon uniquement"]
     N["Seuil de pertinence ≥ 0.25\n(calibré empiriquement, voir le code)"]
     O["Réponse LLM ancrée dans le contexte\n+ citation des leçons sources"]
 
@@ -190,11 +190,11 @@ Cette distinction existe parce que le contenu réellement montré à l'apprenant
 
 ### 3. Recherche vectorielle (`lib/searchChunks.ts` + fonction SQL `match_chunks`)
 
-`searchChunks(query, formationId, topK)` embedde la requête (`inputType: "query"`) puis appelle la fonction Postgres `match_chunks` (migration `20260822000002_chunks_lesson_based.sql`), qui trie les chunks par similarité cosinus (opérateur pgvector `<=>`) et filtre **uniquement par `formation_id`** — pas de re-vérification du tenant à ce niveau : l'accès à la formation précise doit déjà avoir été vérifié en amont par l'appelant (voir `isFormationAccessibleToTenant`/`authorizeAccess`). `formation_id` seul suffit puisqu'un chunk n'appartient jamais qu'à une seule formation.
+`searchChunks(query, formationId, topK, source)` embedde la requête (`inputType: "query"`) puis appelle la fonction Postgres `match_chunks` (migration `20260930000001_catalogue_ai_authoring.sql`), qui trie les chunks par similarité cosinus (opérateur pgvector `<=>`). `source` choisit la population de chunks : `"document"` pour la génération des leçons/quiz (elle doit s'appuyer sur les sources, pas sur des leçons déjà générées), `"lesson"` pour le chat apprenant (il répond à partir de ce que l'apprenant voit réellement). Côté isolation, la fonction filtre **uniquement par `formation_id`** — pas de re-vérification du tenant à ce niveau : l'accès à la formation précise doit déjà avoir été vérifié en amont par l'appelant (voir `isFormationAccessibleToTenant`/`authorizeAccess`). `formation_id` seul suffit puisqu'un chunk n'appartient jamais qu'à une seule formation.
 
 ### 4. Chat RAG apprenant (`app/api/agent/[formationId]/route.ts`)
 
-Pipeline : vérification d'accès (rôle `apprenant`, formation publiée et accessible au tenant, apprenant inscrit) → `searchChunks` (top-5) → filtre de pertinence (similarité ≥ **0.25**, seuil calibré empiriquement sur des scores réels — voir le commentaire dans le code pour l'historique du calibrage) → si aucun chunk pertinent, le LLM répond honnêtement qu'il ne trouve pas l'information (jamais de réponse codée en dur, pour rester dans la langue de la question) → sinon, réponse construite uniquement à partir des extraits retrouvés, avec citation des leçons sources (titres résolus côté serveur, jamais laissés au LLM lui-même). Historique conservé dans `agent_messages` (question et réponse, avec les sources).
+Pipeline : vérification d'accès (rôle `apprenant`, formation publiée et accessible au tenant, apprenant inscrit) → `searchChunks` (top-5, chunks-leçon uniquement) → filtre de pertinence (similarité ≥ **0.25**, seuil calibré empiriquement sur des scores réels — voir le commentaire dans le code pour l'historique du calibrage) → si aucun chunk pertinent, le LLM répond honnêtement qu'il ne trouve pas l'information (jamais de réponse codée en dur, pour rester dans la langue de la question) → sinon, réponse construite uniquement à partir des extraits retrouvés, avec citation des leçons sources (titres résolus côté serveur, jamais laissés au LLM lui-même). Historique conservé dans `agent_messages` (question et réponse, avec les sources).
 
 ### Isolation multi-tenant du RAG
 
@@ -210,7 +210,6 @@ Les 5 formats acceptés aujourd'hui (`pdf`, `word`, `ppt`, `texte`, `web`) suive
    - Écrire une fonction `extractTextFromXxx(buffer)` qui renvoie le texte brut (voir `extractTextFromPptx` pour un exemple d'extraction "maison" sans dépendance lourde, ou `extractTextFromDocx` pour un exemple s'appuyant sur une lib dédiée) — toujours lever une `Error` explicite en cas de fichier corrompu/vide plutôt que renvoyer une chaîne vide silencieusement.
    - Ajouter le nouveau `case` dans le `switch` d'`extractKnowledgeSourceText`.
 2. **Contrainte base de données** — le `CHECK` sur `knowledge_sources.format` (migration `20260812000001_knowledge_sources_and_storage.sql`) liste explicitement les valeurs autorisées : une nouvelle migration doit l'étendre (`ALTER TABLE ... DROP CONSTRAINT ... ADD CONSTRAINT ... CHECK (format IN (...))`), sans quoi l'insertion échouera même si le code applicatif accepte déjà le format.
-3. **Upload côté client** (`app/(org)/org/formations/[id]/sources/SourcesClient.tsx`) — ajouter la nouvelle extension à l'attribut `accept` de l'`<input type="file">`, et une entrée dans `FORMAT_LABEL` pour l'affichage du badge de format dans la liste des documents ajoutés.
-4. **Pareil côté V1** si le format doit aussi être proposé au super-admin (`lib/documentExtraction.ts` a un second couple type/detect historique, `SupportedDocumentType`/`detectDocumentType`, utilisé par `POST /api/formations/generate` — volontairement distinct du vocabulaire V2 `KnowledgeSourceFormat`, voir le commentaire dans le fichier).
+3. **Upload côté client** (`components/authoring/sources/SourcesClient.tsx`) — ajouter la nouvelle extension à l'attribut `accept` de l'`<input type="file">`, et une entrée dans `FORMAT_LABEL` pour l'affichage du badge de format dans la liste des documents ajoutés.
 
 Rien à toucher côté chunking (`lib/chunking.ts`), embeddings (`lib/embeddings.ts`) ou recherche (`lib/searchChunks.ts`) — ces étapes ne connaissent jamais le format d'origine du document.

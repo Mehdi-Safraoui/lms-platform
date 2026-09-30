@@ -1,11 +1,10 @@
 import { zodTextFormat } from "openai/helpers/zod";
-import { openai, OPENAI_MODEL } from "@/lib/openai";
+import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
 import { structureProposalSchema, type StructureProposal } from "./structureProposal";
 
-// Même ordre de grandeur que MAX_SOURCE_CHARS en V1 (lib/ai/generateFormation.ts) —
-// mais ici la source, c'est la concaténation de TOUS les chunks-documents de la
+// La source, c'est la concaténation de TOUS les chunks-documents de la
 // formation (vue d'ensemble nécessaire pour une structure cohérente, voir Point 4
-// de l'architecture validée), pas un seul document : plafond un peu plus haut.
+// de l'architecture validée), pas un seul document.
 const MAX_CHUNKS_CHARS = 90_000;
 
 export interface CadrageInput {
@@ -48,7 +47,7 @@ function truncateChunksText(text: string): string {
 
 async function callModel(cadrage: CadrageInput, chunksText: string, repairNote?: string): Promise<string> {
   const response = await openai.responses.create({
-    model: OPENAI_MODEL,
+    model: OPENAI_GENERATION_MODEL,
     input: [
       { role: "system", content: buildSystemPrompt(cadrage) },
       {
@@ -68,8 +67,7 @@ async function callModel(cadrage: CadrageInput, chunksText: string, repairNote?:
   return response.output_text;
 }
 
-// Même budget de tentatives que la génération V1 (lib/ai/generateFormation.ts) —
-// motif identique : la contrainte "un seul quiz, en dernière position" par module
+// Budget de tentatives : la contrainte "un seul quiz, en dernière position" par module
 // peut faire échouer une sortie par ailleurs correcte 1 à 2 fois de suite.
 const MAX_GENERATION_ATTEMPTS = 3;
 

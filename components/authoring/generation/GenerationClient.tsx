@@ -11,6 +11,8 @@ import BlockEditor from "@/components/lessons/BlockEditor";
 import BlockRenderer from "@/components/lessons/BlockRenderer";
 import { getVideoEmbedUrl } from "@/lib/video";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
+import Link from "next/link";
+import type { AuthoringSpace } from "../space";
 import styles from "./generation.module.css";
 
 type ContentType = "rich" | "quiz" | "video";
@@ -89,9 +91,11 @@ function RenameInput({
 export default function GenerationClient({
   formationId,
   alreadyPublished,
+  space,
 }: {
   formationId: string;
   alreadyPublished: boolean;
+  space: AuthoringSpace;
 }) {
   const [modules, setModules] = React.useState<ModuleGroup[] | null>(null);
   const [quota, setQuota] = React.useState<Quota | null>(null);
@@ -401,7 +405,8 @@ export default function GenerationClient({
           {validatedCount} / {allLecons.length} leçons validées
         </div>
 
-        {quota && (
+        {/* Pas de quota pour le catalogue global (super_admin). */}
+        {quota && space === "org" && (
           <div className={`${styles.quotaBox} ${quotaExhausted ? styles.quotaBoxExhausted : ""}`}>
             <Gauge size={13} />
             {quota.total === null
@@ -421,6 +426,13 @@ export default function GenerationClient({
             <CheckCircle2 size={15} />
             Formation publiée
           </div>
+        )}
+        {/* Vidéo d'accompagnement, puis description/niveau/durée dans l'éditeur
+            admin — le flow IA ne renseigne pas ces champs du catalogue. */}
+        {published && space === "admin" && (
+          <Link href={`/admin/catalog/${formationId}/video`} className={styles.editDetailsLink}>
+            Vidéo et fiche catalogue
+          </Link>
         )}
       </aside>
 

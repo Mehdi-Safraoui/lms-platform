@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./new.module.css";
 
-export default function NewAiFormationForm() {
+export default function NewAiFormationForm({ basePath }: { basePath: string }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -29,7 +29,7 @@ export default function NewAiFormationForm() {
       setSaving(false);
       return;
     }
-    router.push(`/org/formations/${json.data.id}/sources`);
+    router.push(`${basePath}/${json.data.id}/sources`);
   }
 
   return (
@@ -72,7 +72,7 @@ export default function NewAiFormationForm() {
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.actions}>
-        <Link href="/org/formations" className={styles.btnSecondary}>Annuler</Link>
+        <Link href={basePath} className={styles.btnSecondary}>Annuler</Link>
         <button type="submit" className={styles.btnPrimary} disabled={!title.trim() || saving}>
           {saving ? "Création…" : "Continuer"}
         </button>

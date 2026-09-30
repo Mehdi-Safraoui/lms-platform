@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { canCreateFormationByAi } from "@/lib/subscription";
+import { canAuthorFormationByAi } from "@/lib/subscription";
 import { slugify } from "@/lib/slug";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +22,13 @@ async function uniqueSlug(
 }
 
 // POST /api/org/formations — crée une formation brouillon privée au tenant
-// (point de départ du flow "création de formation par IA", V2).
+// (point de départ du flow "création de formation par IA", V2) — ou, pour le
+// super_admin, une formation brouillon du catalogue global (tenant_id null).
 export async function POST(req: NextRequest) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
-  if (!(await canCreateFormationByAi(guard.tenantId))) {
+  if (!(await canAuthorFormationByAi(guard.tenantId))) {
     return NextResponse.json(
       { error: "La génération de formation par IA nécessite l'offre Création ou Entreprise.", code: "plan_upgrade_required" },
       { status: 403 }

@@ -4,5 +4,8 @@ export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-// Identifiant exact confirmé via GET /v1/models (voir .env.example).
-export const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.6-luna";
+// Identifiants exacts confirmés via GET /v1/models (voir .env.example).
+// Génération de formation (cadrage, structure, leçons, quiz) : modèle le plus
+// capable. Chat apprenant : modèle plus léger, appelé à chaque question.
+export const OPENAI_GENERATION_MODEL = process.env.OPENAI_MODEL_GENERATION || "gpt-6.1-sol";
+export const OPENAI_CHAT_MODEL = process.env.OPENAI_MODEL_CHAT || "gpt-6-luna";
