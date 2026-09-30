@@ -92,6 +92,11 @@ function fromExisting(existing: ExistingCadrage | null): CadrageAnswers {
   };
 }
 
+function isAnswered(answers: CadrageAnswers, key: keyof CadrageAnswers): boolean {
+  const value = answers[key];
+  return Array.isArray(value) ? value.length > 0 : value !== "";
+}
+
 export default function CadrageClient({
   formationId,
   basePath,
@@ -108,13 +113,30 @@ export default function CadrageClient({
   const [rawInput, setRawInput] = React.useState("");
   const [reply, setReply] = React.useState<string | null>(null);
   const [pendingValue, setPendingValue] = React.useState<string | string[] | null>(null);
+  const [numberDraft, setNumberDraft] = React.useState(() => String(initialCadrage?.nb_modules_souhaite ?? ""));
+  const [durationDraft, setDurationDraft] = React.useState(() => initialCadrage?.duree_estimee ?? "");
   const [reformulating, setReformulating] = React.useState(false);
   const [deciding, setDeciding] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  // Activé au premier clic sur "Décider pour moi" : les étapes suivantes
+  // encore vides sont alors préremplies d'office par une proposition de l'IA
+  // (toujours à confirmer par "Suivant", jamais validée à la place du Formateur).
+  const [autoDecide, setAutoDecide] = React.useState(false);
   // true quand on est entré dans le stepper via un crayon "Modifier" du récap :
   // valider cette seule étape doit ramener directement au récap, pas enchaîner
   // sur les étapes suivantes qui ont déjà une réponse enregistrée.
   const editingFromSummaryRef = React.useRef(false);
+  // Étape réellement affichée — une proposition qui arrive après que le
+  // Formateur a changé d'étape est ignorée.
+  const currentStepRef = React.useRef(0);
+  // Préparation de la fiche de synthèse des documents (POST .../cadrage/summary),
+  // lancée à l'ouverture : les suggestions l'attendent au lieu de la générer
+  // une seconde fois en parallèle.
+  const summaryReadyRef = React.useRef<Promise<unknown> | null>(null);
+
+  React.useEffect(() => {
+    summaryReadyRef.current = fetch(`/api/org/formations/${formationId}/cadrage/summary`, { method: "POST" }).catch(() => null);
+  }, [formationId]);
 
   const step = STEPS[stepIndex];
   const isLastStep = stepIndex === STEPS.length - 1;
@@ -125,10 +147,32 @@ export default function CadrageClient({
     setPendingValue(null);
   }
 
-  function goToStep(index: number) {
+  // Point d'entrée unique pour afficher une étape : réinitialise la saisie,
+  // recharge les brouillons nombre/durée depuis les réponses connues, et
+  // lance le préremplissage automatique si besoin.
+  function enterStep(index: number, currentAnswers: CadrageAnswers, options?: { prefillFromAnswer?: boolean }) {
+    const target = STEPS[index];
+    currentStepRef.current = index;
     setStepIndex(index);
-    resetStepInput();
+    setReply(null);
+    setPendingValue(null);
+    setNumberDraft(String(currentAnswers.nb_modules_souhaite || ""));
+    setDurationDraft(currentAnswers.duree_estimee || "");
+    if (options?.prefillFromAnswer && (target.kind === "open" || target.kind === "list")) {
+      const existing = currentAnswers[target.key];
+      setRawInput(Array.isArray(existing) ? existing.join(", ") : existing);
+    } else {
+      setRawInput("");
+    }
     setMode("stepper");
+
+    if (autoDecide && !editingFromSummaryRef.current && !isAnswered(currentAnswers, target.key)) {
+      void decideForMe(index, currentAnswers);
+    }
+  }
+
+  function goToStep(index: number) {
+    enterStep(index, answers);
   }
 
   // Depuis le récap : préremplit la réponse déjà connue pour ce champ (pas
@@ -136,17 +180,7 @@ export default function CadrageClient({
   // direct au récap est attendu après validation de cette seule étape.
   function editStepFromSummary(index: number) {
     editingFromSummaryRef.current = true;
-    setStepIndex(index);
-    setReply(null);
-    setPendingValue(null);
-    const targetStep = STEPS[index];
-    if (targetStep.kind === "open" || targetStep.kind === "list") {
-      const existing = answers[targetStep.key];
-      setRawInput(Array.isArray(existing) ? existing.join(", ") : existing);
-    } else {
-      setRawInput("");
-    }
-    setMode("stepper");
+    enterStep(index, answers, { prefillFromAnswer: true });
   }
 
   async function submitOpenOrListStep() {
@@ -177,69 +211,92 @@ export default function CadrageClient({
     }
   }
 
-  // Bouton "Décider pour moi" : propose une réponse ancrée dans les documents
-  // source de la formation (voir /cadrage/suggest) plutôt que de forcer le
-  // Formateur à tout rédiger — jamais appliquée directement pour les champs
-  // texte/liste (elle passe par le même circuit reply+pendingValue que la
-  // reformulation, donc reste éditable avant de continuer).
-  async function decideForMe() {
+  // "Décider pour moi" : propose une réponse ancrée dans les documents source
+  // de la formation (voir /cadrage/suggest), jamais validée à la place du
+  // Formateur — texte/liste passent par le même circuit reply+pendingValue que
+  // la reformulation, niveau/nombre/durée sont présélectionnés, et dans tous
+  // les cas "Suivant" reste à cliquer.
+  async function decideForMe(index: number, context: CadrageAnswers) {
+    const target = STEPS[index];
     setDeciding(true);
     try {
+      await summaryReadyRef.current;
       const res = await fetch(`/api/org/formations/${formationId}/cadrage/suggest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ field: step.key, context: answers }),
+        body: JSON.stringify({ field: target.key, context }),
       });
       const json = await res.json();
+      if (currentStepRef.current !== index) return;
       if (!res.ok) {
         toast.error("Erreur", { description: json.error });
         return;
       }
-      if (step.kind === "open") {
+      if (target.kind === "open") {
         setPendingValue(json.data.value);
         setReply(json.data.reply);
-      } else if (step.kind === "list") {
+      } else if (target.kind === "list") {
         setPendingValue(json.data.items);
         setReply(json.data.reply);
-      } else if (step.kind === "select") {
+      } else if (target.kind === "select") {
         setAnswers((prev) => ({ ...prev, niveau: json.data.value }));
-        advance();
-      } else if (step.kind === "number") {
-        const el = document.getElementById("nb-modules-input") as HTMLInputElement | null;
-        if (el) el.value = String(json.data.value);
-      } else if (step.kind === "duration") {
-        const el = document.getElementById("duree-select") as HTMLSelectElement | null;
-        if (el) el.value = minutesToLabel(json.data.value);
+      } else if (target.kind === "number") {
+        setNumberDraft(String(json.data.value));
+      } else if (target.kind === "duration") {
+        setDurationDraft(minutesToLabel(json.data.value));
       }
     } catch {
-      toast.error("Erreur réseau. Réessayez.");
+      if (currentStepRef.current === index) toast.error("Erreur réseau. Réessayez.");
     } finally {
-      setDeciding(false);
+      if (currentStepRef.current === index) setDeciding(false);
     }
   }
 
+  function handleDecideClick() {
+    setAutoDecide(true);
+    void decideForMe(stepIndex, answers);
+  }
+
+  function commit(patch: Partial<CadrageAnswers>) {
+    const next = { ...answers, ...patch };
+    setAnswers(next);
+    advance(next);
+  }
+
   function acceptPendingValue() {
-    if (pendingValue === null || step.kind === "select" || step.kind === "number") return;
-    setAnswers((prev) => ({ ...prev, [step.key]: pendingValue }));
-    advance();
+    if (pendingValue === null || step.kind === "select" || step.kind === "number" || step.kind === "duration") return;
+    commit({ [step.key]: pendingValue });
+  }
+
+  function editPendingValue() {
+    setRawInput(Array.isArray(pendingValue) ? pendingValue.join(", ") : (pendingValue ?? ""));
+    setReply(null);
+    setPendingValue(null);
   }
 
   function skipListStep() {
     if (step.kind !== "list") return;
-    setAnswers((prev) => ({ ...prev, [step.key]: [] }));
-    advance();
+    commit({ [step.key]: [] });
   }
 
-  function advance() {
-    resetStepInput();
+  function advance(nextAnswers: CadrageAnswers) {
+    setDeciding(false);
     if (editingFromSummaryRef.current) {
       editingFromSummaryRef.current = false;
+      currentStepRef.current = -1;
+      resetStepInput();
       setMode("summary");
     } else if (isLastStep) {
+      currentStepRef.current = -1;
+      resetStepInput();
       setMode("summary");
     } else {
-      setStepIndex((i) => i + 1);
+      enterStep(stepIndex + 1, nextAnswers);
     }
+  }
+
+  function disableAutoDecide() {
+    setAutoDecide(false);
   }
 
   async function handleValidateCadrage() {
@@ -320,6 +377,16 @@ export default function CadrageClient({
         <p className={styles.question}>{step.question}</p>
       </div>
 
+      {autoDecide && (
+        <p className={styles.autoDecideNotice}>
+          <Wand2 size={13} />
+          {deciding ? "L'IA prépare une proposition à partir de vos documents…" : "Préremplissage par l'IA activé — vérifiez chaque proposition avant de continuer."}
+          <button type="button" className={styles.autoDecideOff} onClick={disableAutoDecide}>
+            Désactiver
+          </button>
+        </p>
+      )}
+
       {step.kind === "select" && (
         <div className={styles.optionsRow}>
           {(["debutant", "intermediaire", "avance"] as Niveau[]).map((n) => (
@@ -327,10 +394,7 @@ export default function CadrageClient({
               key={n}
               type="button"
               className={`${styles.optionBtn} ${answers.niveau === n ? styles.optionBtnActive : ""}`}
-              onClick={() => {
-                setAnswers((prev) => ({ ...prev, niveau: n }));
-                advance();
-              }}
+              onClick={() => commit({ niveau: n })}
             >
               {NIVEAU_LABEL[n]}
             </button>
@@ -340,10 +404,16 @@ export default function CadrageClient({
 
       {step.kind === "select" && (
         <div className={styles.actionsRow}>
-          <button type="button" className={styles.secondaryBtn} onClick={decideForMe} disabled={deciding}>
+          <button type="button" className={styles.secondaryBtn} onClick={handleDecideClick} disabled={deciding}>
             <Wand2 size={14} />
             {deciding ? "…" : "Décider pour moi"}
           </button>
+          {answers.niveau && (
+            <button type="button" className={styles.primaryBtn} onClick={() => commit({})} disabled={deciding}>
+              Suivant
+              <ArrowRight size={15} />
+            </button>
+          )}
         </div>
       )}
 
@@ -354,25 +424,24 @@ export default function CadrageClient({
             min={1}
             max={20}
             className={styles.numberInput}
-            defaultValue={answers.nb_modules_souhaite || ""}
-            id="nb-modules-input"
+            value={numberDraft}
+            onChange={(e) => setNumberDraft(e.target.value)}
           />
-          <button type="button" className={styles.secondaryBtn} onClick={decideForMe} disabled={deciding}>
+          <button type="button" className={styles.secondaryBtn} onClick={handleDecideClick} disabled={deciding}>
             <Wand2 size={14} />
             {deciding ? "…" : "Décider pour moi"}
           </button>
           <button
             type="button"
             className={styles.primaryBtn}
+            disabled={deciding}
             onClick={() => {
-              const el = document.getElementById("nb-modules-input") as HTMLInputElement;
-              const value = parseInt(el.value, 10);
+              const value = parseInt(numberDraft, 10);
               if (!value || value < 1 || value > 20) {
                 toast.error("Entrez un nombre entre 1 et 20.");
                 return;
               }
-              setAnswers((prev) => ({ ...prev, nb_modules_souhaite: value }));
-              advance();
+              commit({ nb_modules_souhaite: value });
             }}
           >
             Suivant
@@ -385,29 +454,28 @@ export default function CadrageClient({
         <div className={styles.numberRow}>
           <select
             className={styles.durationSelect}
-            id="duree-select"
-            defaultValue={answers.duree_estimee || ""}
+            value={durationDraft}
+            onChange={(e) => setDurationDraft(e.target.value)}
           >
             <option value="" disabled>Choisir une durée</option>
             {DURATION_OPTIONS.map((o) => (
               <option key={o.minutes} value={o.label}>{o.label}</option>
             ))}
           </select>
-          <button type="button" className={styles.secondaryBtn} onClick={decideForMe} disabled={deciding}>
+          <button type="button" className={styles.secondaryBtn} onClick={handleDecideClick} disabled={deciding}>
             <Wand2 size={14} />
             {deciding ? "…" : "Décider pour moi"}
           </button>
           <button
             type="button"
             className={styles.primaryBtn}
+            disabled={deciding}
             onClick={() => {
-              const el = document.getElementById("duree-select") as HTMLSelectElement;
-              if (!el.value) {
+              if (!durationDraft) {
                 toast.error("Choisissez une durée.");
                 return;
               }
-              setAnswers((prev) => ({ ...prev, duree_estimee: el.value }));
-              advance();
+              commit({ duree_estimee: durationDraft });
             }}
           >
             Suivant
@@ -425,7 +493,7 @@ export default function CadrageClient({
                 {Array.isArray(pendingValue) ? pendingValue.join(", ") : pendingValue}
               </div>
               <div className={styles.actionsRow}>
-                <button type="button" className={styles.secondaryBtn} onClick={resetStepInput}>
+                <button type="button" className={styles.secondaryBtn} onClick={editPendingValue}>
                   <Pencil size={14} />
                   Modifier ma réponse
                 </button>
@@ -439,14 +507,14 @@ export default function CadrageClient({
             <>
               <textarea
                 className={styles.textarea}
-                placeholder={step.placeholder}
+                placeholder={deciding ? "L'IA prépare une proposition…" : step.placeholder}
                 value={rawInput}
                 onChange={(e) => setRawInput(e.target.value)}
                 rows={3}
-                disabled={reformulating}
+                disabled={reformulating || deciding}
               />
               <div className={styles.actionsRow}>
-                <button type="button" className={styles.secondaryBtn} onClick={decideForMe} disabled={reformulating || deciding}>
+                <button type="button" className={styles.secondaryBtn} onClick={handleDecideClick} disabled={reformulating || deciding}>
                   <Wand2 size={14} />
                   {deciding ? "…" : "Décider pour moi"}
                 </button>

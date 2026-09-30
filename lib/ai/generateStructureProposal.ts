@@ -2,10 +2,13 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
 import { structureProposalSchema, type StructureProposal } from "./structureProposal";
 
-// La source, c'est la concaténation de TOUS les chunks-documents de la
-// formation (vue d'ensemble nécessaire pour une structure cohérente, voir Point 4
-// de l'architecture validée), pas un seul document.
-const MAX_CHUNKS_CHARS = 90_000;
+// La source, c'est le texte COMPLET des documents de la formation, reconstitué
+// dans l'ordre (lib/sourceDocumentsText.ts) : une structure a besoin d'une vue
+// d'ensemble, qu'une recherche vectorielle top-K ne donnerait pas. ~400 000
+// caractères ≈ 100 000 tokens (environ 150 pages), largement dans la fenêtre du
+// modèle de génération ; au-delà, seul le début serait lu — il faudrait alors
+// résumer chaque document avant de proposer la structure.
+const MAX_SOURCE_CHARS = 400_000;
 
 export interface CadrageInput {
   objectif: string;
@@ -39,13 +42,13 @@ Règles :
 7. Réponds uniquement avec les données structurées demandées — pas de texte hors schéma.`;
 }
 
-function truncateChunksText(text: string): string {
-  if (text.length <= MAX_CHUNKS_CHARS) return text;
-  console.warn(`[generateStructureProposal] Chunks source tronqués : ${text.length} → ${MAX_CHUNKS_CHARS} caractères.`);
-  return text.slice(0, MAX_CHUNKS_CHARS);
+function truncateSourceText(text: string): string {
+  if (text.length <= MAX_SOURCE_CHARS) return text;
+  console.warn(`[generateStructureProposal] Documents source tronqués : ${text.length} → ${MAX_SOURCE_CHARS} caractères.`);
+  return text.slice(0, MAX_SOURCE_CHARS);
 }
 
-async function callModel(cadrage: CadrageInput, chunksText: string, repairNote?: string): Promise<string> {
+async function callModel(cadrage: CadrageInput, sourceText: string, repairNote?: string): Promise<string> {
   const response = await openai.responses.create({
     model: OPENAI_GENERATION_MODEL,
     input: [
@@ -53,12 +56,14 @@ async function callModel(cadrage: CadrageInput, chunksText: string, repairNote?:
       {
         role: "user",
         content: repairNote
-          ? `${repairNote}\n\n--- Extraits des documents source ---\n${chunksText}`
-          : `--- Extraits des documents source ---\n${chunksText}`,
+          ? `--- Documents source (texte complet) ---\n${sourceText}\n\n--- Correction demandée ---\n${repairNote}`
+          : `--- Documents source (texte complet) ---\n${sourceText}`,
       },
     ],
     text: { format: zodTextFormat(structureProposalSchema(cadrage.nbModulesSouhaite), "structure_proposal") },
-    max_output_tokens: 6_000,
+    // Jusqu'à 20 modules × plusieurs leçons avec leur description : marge large
+    // pour ne jamais tronquer le JSON.
+    max_output_tokens: 16_000,
   });
 
   if (!response.output_text) {
@@ -71,9 +76,9 @@ async function callModel(cadrage: CadrageInput, chunksText: string, repairNote?:
 // peut faire échouer une sortie par ailleurs correcte 1 à 2 fois de suite.
 const MAX_GENERATION_ATTEMPTS = 3;
 
-export async function generateStructureProposal(cadrage: CadrageInput, rawChunksText: string): Promise<StructureProposal> {
-  const chunksText = truncateChunksText(rawChunksText.trim());
-  if (!chunksText) {
+export async function generateStructureProposal(cadrage: CadrageInput, rawSourceText: string): Promise<StructureProposal> {
+  const sourceText = truncateSourceText(rawSourceText.trim());
+  if (!sourceText) {
     throw new Error("Aucun contenu exploitable trouvé dans les documents source.");
   }
 
@@ -82,7 +87,7 @@ export async function generateStructureProposal(cadrage: CadrageInput, rawChunks
   let lastMessage = "";
 
   for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
-    const output = await callModel(cadrage, chunksText, repairNote);
+    const output = await callModel(cadrage, sourceText, repairNote);
     let json: unknown;
     try {
       json = JSON.parse(output);

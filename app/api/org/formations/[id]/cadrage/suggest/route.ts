@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getOrCreateSourcesSummary } from "@/lib/sourcesSummary";
 import {
   suggestOpenField,
   suggestListField,
@@ -13,7 +14,8 @@ import {
 } from "@/lib/ai/suggestCadrage";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Le premier appel peut devoir générer la synthèse (~30 s) avant la suggestion.
+export const maxDuration = 120;
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,10 +24,12 @@ const LIST_FIELDS: CadrageField[] = ["notions_a_inclure", "notions_a_exclure"];
 
 // POST /api/org/formations/[id]/cadrage/suggest — bouton "Décider pour moi" du
 // stepper de cadrage : propose une réponse pour UN champ, ancrée dans les vrais
-// documents source de la formation (mêmes chunks-documents que la proposition
-// de structure — voir structure/generate/route.ts, une vue d'ensemble, pas une
-// recherche vectorielle ciblée) et cohérente avec les réponses déjà données
-// pour les champs précédents.
+// documents source de la formation et cohérente avec les réponses déjà données
+// pour les champs précédents. Le modèle reçoit la fiche de synthèse des
+// documents (lib/sourcesSummary.ts), produite une fois à partir de leur texte
+// complet puis réutilisée : les champs du cadrage demandent une vue
+// d'ensemble, qu'une recherche vectorielle ciblée ne donnerait pas, et
+// renvoyer tout le document à chacun des 7 champs serait lent et coûteux.
 //
 // Ne compte PAS dans ai_generation_quota — décision produit (aide à la saisie,
 // pas une génération de formation), voir échange avec l'encadrant.
@@ -48,21 +52,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Champ manquant." }, { status: 400 });
   }
 
-  const { data: chunks, error: chunksError } = await supabase
-    .from("chunks")
-    .select("content")
-    .eq("formation_id", formationId)
-    .not("knowledge_source_id", "is", null);
-  if (chunksError) return NextResponse.json({ error: chunksError.message }, { status: 500 });
-  if (!chunks || chunks.length === 0) {
-    return NextResponse.json(
-      { error: "Aucun document indexé pour cette formation — impossible de proposer une réponse." },
-      { status: 400 }
-    );
-  }
-  const documentContext = chunks.map((c) => c.content).join("\n\n");
-
   try {
+    const documentContext = await getOrCreateSourcesSummary(supabase, formationId);
+    if (!documentContext) {
+      return NextResponse.json(
+        { error: "Aucun document indexé pour cette formation — impossible de proposer une réponse." },
+        { status: 400 }
+      );
+    }
+
     if (OPEN_FIELDS.includes(field)) {
       const result = await suggestOpenField(field as "objectif" | "public_vise", documentContext, context);
       return NextResponse.json({ data: result });

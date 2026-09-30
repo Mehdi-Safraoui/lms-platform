@@ -150,7 +150,7 @@ flowchart TB
 
     A --> B --> C --> D --> E
 
-    F["Proposition de structure\nlib/ai/generateStructureProposal.ts\nlit TOUS les chunks du document (vue d'ensemble)"]
+    F["Proposition de structure\nlib/ai/generateStructureProposal.ts\nlit le texte complet, dans l'ordre (vue d'ensemble)"]
     G["Génération d'une leçon / d'un quiz\nlib/ai/generateLessonContent.ts\nrecherche ciblée top-K via searchChunks(…, \"document\")"]
     H["Validation de la leçon par le Formateur"]
     I["Ré-indexation du contenu validé\nlib/chunkLesson.ts"]
@@ -183,7 +183,9 @@ flowchart TB
 
 La table `chunks` sert deux usages distincts pour une même formation, distingués par la colonne renseignée (`knowledge_source_id` XOR `lesson_id`) :
 
-- **Chunks-document** (`knowledge_source_id` renseigné) — issus directement des documents uploadés. Utilisés **pendant la création** : la proposition de structure (`generateStructureProposal`) lit la totalité des chunks-document d'une formation (vue d'ensemble, pas une recherche ciblée), tandis que la génération d'une leçon ou d'un quiz (`generateLessonContent`/`generateLessonQuiz`) fait une recherche vectorielle ciblée (top-8 pour une leçon, top-12 pour un quiz — le quiz couvre aussi les leçons sœurs du module).
+- **Chunks-document** (`knowledge_source_id` renseigné) — issus directement des documents uploadés. Utilisés **pendant la création**, de deux façons :
+  - **Vue d'ensemble** (pas de recherche vectorielle) : `loadSourceDocumentsText` (`lib/sourceDocumentsText.ts`) reconstitue le texte complet des documents — documents dans leur ordre d'ajout, chunks dans leur ordre d'origine, chevauchements retirés. La proposition de structure (`generateStructureProposal`) lit ce texte entier (jusqu'à ~400 000 caractères, environ 150 pages). Le bouton « Décider pour moi » du cadrage lit une **fiche de synthèse** générée une fois à partir de ce même texte (`lib/sourcesSummary.ts`, table `formation_sources_summary`, régénérée si la liste des documents change, préparée dès l'ouverture du cadrage par `POST .../cadrage/summary`). Une recherche top-K ne convient pas ici : un plan ou un cadrage doit couvrir tout le document, pas seulement les passages proches d'une requête.
+  - **Recherche ciblée** : la génération d'une leçon ou d'un quiz (`generateLessonContent`/`generateLessonQuiz`) fait une recherche vectorielle limitée aux chunks-document (top-8 pour une leçon, top-12 pour un quiz — le quiz couvre aussi les leçons sœurs du module).
 - **Chunks-leçon** (`lesson_id` renseigné) — générés à la **validation** d'une leçon (`lib/chunkLesson.ts`, `embedAndInsertLessonChunks`), à partir du contenu réel de la leçon (blocs aplatis en texte), pas du document source. Remplacent systématiquement les anciens chunks de cette leçon (delete puis insert) — y compris immédiatement après une régénération ou une édition manuelle, avant même la revalidation, pour ne jamais laisser le chat apprenant répondre avec un contenu périmé pendant qu'une leçon déjà publiée est retouchée.
 
 Cette distinction existe parce que le contenu réellement montré à l'apprenant (les blocs de la leçon, potentiellement retouchés manuellement après génération) peut diverger du document source brut — le chat apprenant doit répondre à partir de ce que l'apprenant voit vraiment, pas du PDF d'origine.
