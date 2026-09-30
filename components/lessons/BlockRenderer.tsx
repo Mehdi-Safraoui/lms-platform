@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import { getVideoEmbedUrl } from "@/lib/video";
+import { renderInlineMarkdown as md } from "./inlineMarkdown";
 import styles from "./blocks.module.css";
 
 const Markdown = dynamic(
@@ -111,7 +112,7 @@ function PromptBlockView({ title, prompt, tip }: { title: string; prompt: string
         </button>
       </div>
       <pre className={styles.promptText}>{prompt}</pre>
-      {tip && <p className={styles.promptTip}>{tip}</p>}
+      {tip && <p className={styles.promptTip}>{md(tip)}</p>}
     </div>
   );
 }
@@ -147,7 +148,7 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
             return (
               <ListTag key={i} className={styles.list}>
                 {block.items.map((item, j) => (
-                  <li key={j}>{item}</li>
+                  <li key={j}>{md(item)}</li>
                 ))}
               </ListTag>
             );
@@ -161,8 +162,8 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
                   <Icon size={18} />
                 </span>
                 <div className={styles.calloutBody}>
-                  <strong>{block.title}</strong>
-                  <p>{block.text}</p>
+                  <strong>{md(block.title)}</strong>
+                  <p>{md(block.text)}</p>
                 </div>
               </div>
             );
@@ -184,7 +185,7 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
                       <span className={styles.comparisonColLabel}>{col.label}</span>
                       <ul className={styles.comparisonColItems}>
                         {col.items.map((item, k) => (
-                          <li key={k}>{item}</li>
+                          <li key={k}>{md(item)}</li>
                         ))}
                       </ul>
                     </div>
@@ -204,7 +205,7 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
                         <Icon size={18} />
                       </span>
                       <span className={styles.featureTitle}>{item.title}</span>
-                      <p className={styles.featureDesc}>{item.description}</p>
+                      <p className={styles.featureDesc}>{md(item.description)}</p>
                     </div>
                   );
                 })}
@@ -218,8 +219,8 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
                   <Star size={18} />
                 </span>
                 <div className={styles.highlightBody}>
-                  <strong>{block.title}</strong>
-                  <p>{block.text}</p>
+                  <strong>{md(block.title)}</strong>
+                  <p>{md(block.text)}</p>
                 </div>
               </div>
             );
@@ -248,7 +249,7 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
                         <span>Image à ajouter : {block.image_description}</span>
                       </div>
                     )}
-                    {block.caption && <figcaption className={styles.imageTextCaption}>{block.caption}</figcaption>}
+                    {block.caption && <figcaption className={styles.imageTextCaption}>{md(block.caption)}</figcaption>}
                   </div>
                 )}
                 <div className={styles.imageTextBody}>
@@ -281,7 +282,7 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
                 {(block.caption || embedUrl) && (
                   <figcaption className={styles.videoCaption}>
                     <strong>{block.title}</strong>
-                    {block.caption && <span> — {block.caption}</span>}
+                    {block.caption && <span> — {md(block.caption)}</span>}
                   </figcaption>
                 )}
               </figure>
