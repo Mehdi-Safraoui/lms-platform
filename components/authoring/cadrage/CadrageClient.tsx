@@ -93,6 +93,51 @@ function fromExisting(existing: ExistingCadrage | null): CadrageAnswers {
   };
 }
 
+// Proposition complète renvoyée par POST .../cadrage/suggest (les 7 champs d'un coup).
+interface FullProposal {
+  objectif: { value: string; reply: string };
+  public_vise: { value: string; reply: string };
+  niveau: Niveau;
+  nb_modules_souhaite: number;
+  duree_minutes: number;
+  notions_a_inclure: { items: string[]; reply: string };
+  notions_a_exclure: { items: string[]; reply: string };
+}
+
+function proposedValue(proposal: FullProposal, key: keyof CadrageAnswers): string | number | string[] {
+  switch (key) {
+    case "objectif":
+    case "public_vise":
+      return proposal[key].value;
+    case "notions_a_inclure":
+    case "notions_a_exclure":
+      return proposal[key].items;
+    case "duree_estimee":
+      return minutesToLabel(proposal.duree_minutes);
+    default:
+      return proposal[key];
+  }
+}
+
+function sameValue(a: string | number | string[], b: string | number | string[]): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    const x = Array.isArray(a) ? a : [];
+    const y = Array.isArray(b) ? b : [];
+    return x.length === y.length && x.every((v, i) => v.trim() === y[i]?.trim());
+  }
+  return String(a).trim() === String(b).trim();
+}
+
+/**
+ * Une proposition reste valable tant que toutes les réponses déjà données
+ * sont celles qu'elle contient : dès que le Formateur s'écarte d'une valeur
+ * proposée, les champs suivants doivent être reproposés en tenant compte de sa
+ * réponse.
+ */
+function proposalMatches(proposal: FullProposal, answers: CadrageAnswers): boolean {
+  return STEPS.every((s) => !isAnswered(answers, s.key) || sameValue(proposedValue(proposal, s.key), answers[s.key]));
+}
+
 function isAnswered(answers: CadrageAnswers, key: keyof CadrageAnswers): boolean {
   const value = answers[key];
   return Array.isArray(value) ? value.length > 0 : value !== "";
@@ -138,11 +183,45 @@ export default function CadrageClient({
   // fois pour un document de 60 pages, instantané ensuite) : un "Décider pour
   // moi" cliqué pendant ce temps affiche l'attente détaillée.
   const [summaryPending, setSummaryPending] = React.useState(true);
+  // Proposition complète du cadrage (un seul appel IA pour les 7 champs),
+  // demandée en arrière-plan dès l'ouverture puis réutilisée à chaque étape ;
+  // `result` est renseigné à son arrivée (null en cas d'échec).
+  const proposalRef = React.useRef<{ promise: Promise<FullProposal | null>; result?: FullProposal | null } | null>(null);
+  // Vrai quand le Formateur attend réellement une proposition pas encore arrivée.
+  const [waitingProposal, setWaitingProposal] = React.useState(false);
+
+  function requestProposal(context: CadrageAnswers) {
+    const entry: { promise: Promise<FullProposal | null>; result?: FullProposal | null } = {
+      promise: Promise.resolve(summaryReadyRef.current)
+        .then(() =>
+          fetch(`/api/org/formations/${formationId}/cadrage/suggest`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ context }),
+          })
+        )
+        .then(async (res) => (res.ok ? ((await res.json()).data as FullProposal) : null))
+        .catch(() => null),
+    };
+    entry.promise.then((result) => {
+      entry.result = result;
+    });
+    proposalRef.current = entry;
+    return entry;
+  }
 
   React.useEffect(() => {
+    // Déjà lancé (double exécution des effets en mode strict de React).
+    if (summaryReadyRef.current) return;
     summaryReadyRef.current = fetch(`/api/org/formations/${formationId}/cadrage/summary`, { method: "POST" })
       .catch(() => null)
       .finally(() => setSummaryPending(false));
+    // Cadrage encore à faire : on prépare la proposition complète tout de
+    // suite, pour qu'elle soit prête au premier "Décider pour moi".
+    if (!initialCadrage?.completed_at) requestProposal(fromExisting(initialCadrage));
+    // Une seule fois à l'ouverture : initialCadrage est la donnée serveur
+    // initiale, requestProposal ne lit que formationId et des refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formationId]);
 
   const step = STEPS[stepIndex];
@@ -223,39 +302,48 @@ export default function CadrageClient({
   // Formateur — texte/liste passent par le même circuit reply+pendingValue que
   // la reformulation, niveau/nombre/durée sont présélectionnés, et dans tous
   // les cas "Suivant" reste à cliquer.
-  async function decideForMe(index: number, context: CadrageAnswers) {
+  async function decideForMe(index: number, answersSoFar: CadrageAnswers) {
     const target = STEPS[index];
+    // Le champ demandé est à reproposer, même s'il a déjà une réponse (retour
+    // à une étape, modification depuis le récap) : il ne doit pas être envoyé
+    // comme "déjà répondu", sinon il serait simplement recopié.
+    const context: CadrageAnswers = { ...answersSoFar, [target.key]: EMPTY[target.key] };
     setDeciding(true);
     try {
-      await summaryReadyRef.current;
-      const res = await fetch(`/api/org/formations/${formationId}/cadrage/suggest`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ field: target.key, context }),
-      });
-      const json = await res.json();
+      let entry = proposalRef.current;
+      if (!entry || (entry.result !== undefined && (!entry.result || !proposalMatches(entry.result, context)))) {
+        entry = requestProposal(context);
+      }
+      if (entry.result === undefined) setWaitingProposal(true);
+      let proposal = await entry.promise;
+      // Proposition demandée avant une réponse divergente : on la refait.
+      if (proposal && !proposalMatches(proposal, context)) {
+        proposal = await requestProposal(context).promise;
+      }
       if (currentStepRef.current !== index) return;
-      if (!res.ok) {
-        toast.error("Erreur", { description: json.error });
+      if (!proposal) {
+        toast.error("La proposition n'a pas pu être générée. Réessayez.");
+        proposalRef.current = null;
         return;
       }
       if (target.kind === "open") {
-        setPendingValue(json.data.value);
-        setReply(json.data.reply);
+        setPendingValue(proposal[target.key].value);
+        setReply(proposal[target.key].reply);
       } else if (target.kind === "list") {
-        setPendingValue(json.data.items);
-        setReply(json.data.reply);
+        setPendingValue(proposal[target.key].items);
+        setReply(proposal[target.key].reply);
       } else if (target.kind === "select") {
-        setAnswers((prev) => ({ ...prev, niveau: json.data.value }));
+        setAnswers((prev) => ({ ...prev, niveau: proposal.niveau }));
       } else if (target.kind === "number") {
-        setNumberDraft(String(json.data.value));
+        setNumberDraft(String(proposal.nb_modules_souhaite));
       } else if (target.kind === "duration") {
-        setDurationDraft(minutesToLabel(json.data.value));
+        setDurationDraft(minutesToLabel(proposal.duree_minutes));
       }
-    } catch {
-      if (currentStepRef.current === index) toast.error("Erreur réseau. Réessayez.");
     } finally {
-      if (currentStepRef.current === index) setDeciding(false);
+      if (currentStepRef.current === index) {
+        setDeciding(false);
+        setWaitingProposal(false);
+      }
     }
   }
 
@@ -267,6 +355,11 @@ export default function CadrageClient({
   function commit(patch: Partial<CadrageAnswers>) {
     const next = { ...answers, ...patch };
     setAnswers(next);
+    // Réponse différente de la proposition : les étapes suivantes seront
+    // reproposées en tenant compte de ce choix — la demande part tout de
+    // suite, pendant que le Formateur passe à l'étape suivante.
+    const known = proposalRef.current?.result;
+    if (autoDecide && known && !proposalMatches(known, next)) requestProposal(next);
     advance(next);
   }
 
@@ -288,6 +381,7 @@ export default function CadrageClient({
 
   function advance(nextAnswers: CadrageAnswers) {
     setDeciding(false);
+    setWaitingProposal(false);
     if (editingFromSummaryRef.current) {
       editingFromSummaryRef.current = false;
       currentStepRef.current = -1;
@@ -394,11 +488,16 @@ export default function CadrageClient({
         </p>
       )}
 
-      {deciding && summaryPending && (
+      {deciding && waitingProposal && (
         <WaitingPanel
+          key={summaryPending ? "summary" : "proposal"}
           formationId={formationId}
-          estimatedSeconds={45}
-          steps={["Lecture de vos documents", "Rédaction de la fiche de synthèse", "Proposition pour cette question"]}
+          estimatedSeconds={summaryPending ? 55 : 15}
+          steps={
+            summaryPending
+              ? ["Lecture de vos documents", "Rédaction de la fiche de synthèse", "Proposition de l'ensemble du cadrage"]
+              : ["Relecture de la synthèse de vos documents", "Proposition de l'ensemble du cadrage"]
+          }
         />
       )}
 

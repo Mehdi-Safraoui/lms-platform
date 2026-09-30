@@ -49,7 +49,7 @@ function answeredSoFarBlock(context: CadrageContext): string {
   return lines.length ? lines.join("\n") : "(aucune réponse donnée pour l'instant)";
 }
 
-const SYSTEM_PROMPT = `Tu es un assistant pédagogique qui aide un Formateur pressé à cadrer une formation avant sa génération par IA. Il a cliqué sur "Décider pour moi" pour un champ du cadrage : à partir de la fiche de synthèse des documents source qu'il a fournis et des réponses déjà données pour les autres champs, propose une réponse plausible et cohérente pour CE champ précis.
+const SYSTEM_PROMPT = `Tu es un assistant pédagogique qui aide un Formateur pressé à cadrer une formation avant sa génération par IA. Il a cliqué sur "Décider pour moi" : à partir de la fiche de synthèse des documents source qu'il a fournis et des réponses qu'il a déjà données, propose des réponses plausibles et cohérentes pour les champs du cadrage.
 Règles impératives :
 1. Ancre ta proposition dans le contenu réel décrit par la synthèse — ne propose jamais un objectif, un public ou des notions qui ne sont pas soutenus par les documents.
 2. Reste cohérent avec les réponses déjà données pour les autres champs.
@@ -73,75 +73,59 @@ const FIELD_INSTRUCTIONS: Record<CadrageField, string> = {
     "Propose une liste de notions périphériques ou hors-sujet qu'il est raisonnable d'exclure explicitement pour rester focalisé sur l'objectif. Liste vide si rien ne s'y prête distinctement — ne force jamais une exclusion artificielle.",
 };
 
-const openFieldResult = z.object({ value: z.string().min(1), reply: z.string().min(1) });
-const listFieldResult = z.object({ items: z.array(z.string().min(1)), reply: z.string().min(1) });
-const niveauResult = z.object({ value: z.enum(["debutant", "intermediaire", "avance"]) });
-const nbModulesResult = z.object({ value: z.number().int().min(1).max(20) });
+const openField = z.object({ value: z.string().min(1), reply: z.string().min(1) });
+const listField = z.object({ items: z.array(z.string().min(1)), reply: z.string().min(1) });
+
 // Multiple de 30, borné à la plage du sélecteur (30 min à 8h) — voir
 // DURATION_OPTIONS dans CadrageClient.tsx.
-const dureeMinutesResult = z.object({ value: z.number().int().min(30).max(480) });
+const fullCadrageResult = z.object({
+  objectif: openField,
+  public_vise: openField,
+  niveau: z.enum(["debutant", "intermediaire", "avance"]),
+  nb_modules_souhaite: z.number().int().min(1).max(20),
+  duree_minutes: z.number().int().min(30).max(480),
+  notions_a_inclure: listField,
+  notions_a_exclure: listField,
+});
 
-async function callModel<T extends z.ZodTypeAny>(
-  field: CadrageField,
-  documentContext: string,
-  context: CadrageContext,
-  schema: T,
-  schemaName: string
-): Promise<z.infer<T>> {
+export type FullCadrageSuggestion = z.infer<typeof fullCadrageResult>;
+
+const FIELD_ORDER: CadrageField[] = [
+  "objectif",
+  "public_vise",
+  "niveau",
+  "nb_modules_souhaite",
+  "duree_estimee",
+  "notions_a_inclure",
+  "notions_a_exclure",
+];
+
+/**
+ * Propose TOUT le cadrage en un seul appel (au lieu d'un appel par champ) : le
+ * stepper préremplit ensuite chaque étape instantanément. Les champs déjà
+ * répondus dans `context` sont repris tels quels, les autres sont proposés en
+ * cohérence avec eux — c'est ce qui permet de relancer une proposition pour
+ * les étapes restantes quand le Formateur modifie une réponse.
+ */
+export async function suggestFullCadrage(documentContext: string, context: CadrageContext): Promise<FullCadrageSuggestion> {
+  const instructions = FIELD_ORDER.map((field) => `- ${field === "duree_estimee" ? "duree_minutes" : field} : ${FIELD_INSTRUCTIONS[field]}`).join("\n");
+
   const response = await openai.responses.create({
     model: OPENAI_GENERATION_MODEL,
     input: [
       { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
-        content: `Champ à proposer : ${field}\nConsigne : ${FIELD_INSTRUCTIONS[field]}\n\nRéponses déjà données pour les autres champs :\n${answeredSoFarBlock(context)}\n\n--- Synthèse des documents source ---\n${truncate(documentContext)}`,
+        content: `Propose une valeur pour CHACUN des champs du cadrage ci-dessous, cohérents entre eux. Pour un champ déjà répondu par le Formateur, reprends sa réponse telle quelle. Pour les champs texte et liste, "reply" est une phrase courte adressée au Formateur qui présente la proposition.\n\nChamps :\n${instructions}\n\nRéponses déjà données :\n${answeredSoFarBlock(context)}\n\n--- Synthèse des documents source ---\n${truncate(documentContext)}`,
       },
     ],
-    text: { format: zodTextFormat(schema, schemaName) },
-    max_output_tokens: 500,
+    text: { format: zodTextFormat(fullCadrageResult, "cadrage_suggest_full") },
+    max_output_tokens: 2_000,
   });
 
   if (!response.output_text) throw new Error("Le modèle n'a renvoyé aucun contenu.");
-  return schema.parse(JSON.parse(response.output_text));
-}
-
-export async function suggestOpenField(
-  field: "objectif" | "public_vise",
-  documentContext: string,
-  context: CadrageContext
-): Promise<{ value: string; reply: string }> {
-  return callModel(field, documentContext, context, openFieldResult, "cadrage_suggest_open");
-}
-
-export async function suggestListField(
-  field: "notions_a_inclure" | "notions_a_exclure",
-  documentContext: string,
-  context: CadrageContext
-): Promise<{ items: string[]; reply: string }> {
-  return callModel(field, documentContext, context, listFieldResult, "cadrage_suggest_list");
-}
-
-export async function suggestNiveau(
-  documentContext: string,
-  context: CadrageContext
-): Promise<{ value: "debutant" | "intermediaire" | "avance" }> {
-  return callModel("niveau", documentContext, context, niveauResult, "cadrage_suggest_niveau");
-}
-
-export async function suggestNbModules(
-  documentContext: string,
-  context: CadrageContext
-): Promise<{ value: number }> {
-  return callModel("nb_modules_souhaite", documentContext, context, nbModulesResult, "cadrage_suggest_nb_modules");
-}
-
-export async function suggestDureeMinutes(
-  documentContext: string,
-  context: CadrageContext
-): Promise<{ value: number }> {
-  const result = await callModel("duree_estimee", documentContext, context, dureeMinutesResult, "cadrage_suggest_duree");
+  const result = fullCadrageResult.parse(JSON.parse(response.output_text));
   // Le modèle respecte généralement la consigne "multiple de 30", mais on
   // arrondit quand même au cas où — le sélecteur ne connaît que ces valeurs.
-  const rounded = Math.min(480, Math.max(30, Math.round(result.value / 30) * 30));
-  return { value: rounded };
+  return { ...result, duree_minutes: Math.min(480, Math.max(30, Math.round(result.duree_minutes / 30) * 30)) };
 }
