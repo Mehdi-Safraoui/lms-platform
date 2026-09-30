@@ -32,7 +32,7 @@ const STATUS_LABEL: Record<KnowledgeSource["ingestion_status"], string> = {
   erreur: "Erreur",
 };
 
-export default function SourcesClient({ formationId }: { formationId: string }) {
+export default function SourcesClient({ formationId, basePath }: { formationId: string; basePath: string }) {
   const router = useRouter();
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,7 +187,7 @@ export default function SourcesClient({ formationId }: { formationId: string }) 
           type="button"
           className={styles.continueBtn}
           disabled={!canContinue}
-          onClick={() => router.push(`/org/formations/${formationId}/cadrage`)}
+          onClick={() => router.push(`${basePath}/${formationId}/cadrage`)}
         >
           Continuer vers le cadrage
           <ArrowRight size={16} />

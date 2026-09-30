@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/lib/ai/suggestCadrage";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -30,7 +30,7 @@ const LIST_FIELDS: CadrageField[] = ["notions_a_inclure", "notions_a_exclure"];
 // Ne compte PAS dans ai_generation_quota — décision produit (aide à la saisie,
 // pas une génération de formation), voir échange avec l'encadrant.
 export async function POST(req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;

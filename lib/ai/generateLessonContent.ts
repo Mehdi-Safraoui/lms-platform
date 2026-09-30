@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
-import { openai, OPENAI_MODEL } from "@/lib/openai";
+import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
 import { contentBlockSchema, quizQuestionSchema, type ContentBlock, type QuizQuestion } from "./contentBlocks";
 import type { CadrageInput } from "./generateStructureProposal";
 
-// Même ordre de grandeur que la génération V1 (lib/ai/generateFormation.ts) —
-// ici la source est le contexte RAG déjà filtré pour cette leçon (topK chunks),
-// pas un document entier, donc un plafond plus bas suffit largement.
+// La source est le contexte RAG déjà filtré pour cette leçon (topK chunks),
+// pas un document entier, donc un plafond modeste suffit largement.
 const MAX_CONTEXT_CHARS = 40_000;
 
 export interface LessonGenerationInput {
@@ -31,9 +30,8 @@ function cadrageBlock(cadrage: CadrageInput): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Contenu (leçon de type "lesson") — mêmes règles de blocs que la génération
-// V1 (lib/ai/generateFormation.ts), reprises telles quelles pour garder la
-// même qualité/style de rendu, adaptées à une seule leçon à la fois.
+// Contenu (leçon de type "lesson") — règles de blocs héritées de l'ancienne
+// génération en un coup (retirée), adaptées à une seule leçon à la fois.
 // ─────────────────────────────────────────────────────────────────────────
 
 const lessonContentSchema = z.object({
@@ -79,7 +77,7 @@ export async function generateLessonContent(input: LessonGenerationInput): Promi
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const response = await openai.responses.create({
-      model: OPENAI_MODEL,
+      model: OPENAI_GENERATION_MODEL,
       input: [
         { role: "system", content: LESSON_SYSTEM_PROMPT(input) },
         {
@@ -153,7 +151,7 @@ export async function generateLessonQuiz(input: LessonGenerationInput): Promise<
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const response = await openai.responses.create({
-      model: OPENAI_MODEL,
+      model: OPENAI_GENERATION_MODEL,
       input: [
         { role: "system", content: QUIZ_SYSTEM_PROMPT(input) },
         {

@@ -24,10 +24,17 @@ export interface ChunkSearchResult {
  * voir app/api/agent/[formationId]/route.ts), avant même l'appel à cette
  * fonction.
  */
+/**
+ * Origine des chunks à chercher (voir match_chunks) : "document" pour les
+ * extraits des documents source, "lesson" pour le contenu validé des leçons.
+ */
+export type ChunkSource = "document" | "lesson";
+
 export async function searchChunks(
   query: string,
   formationId: string,
-  topK: number = 5
+  topK: number,
+  source: ChunkSource
 ): Promise<ChunkSearchResult[]> {
   const queryEmbedding = await generateEmbedding(query, "query");
 
@@ -36,6 +43,7 @@ export async function searchChunks(
     query_embedding: queryEmbedding,
     match_formation_id: formationId,
     match_count: topK,
+    match_source: source,
   });
 
   if (error) {

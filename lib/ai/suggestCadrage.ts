@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
-import { openai, OPENAI_MODEL } from "@/lib/openai";
+import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
 
 /**
  * Bouton "Décider pour moi" du stepper de cadrage : contrairement à
@@ -87,7 +87,7 @@ async function callModel<T extends z.ZodTypeAny>(
   schemaName: string
 ): Promise<z.infer<T>> {
   const response = await openai.responses.create({
-    model: OPENAI_MODEL,
+    model: OPENAI_GENERATION_MODEL,
     input: [
       { role: "system", content: SYSTEM_PROMPT },
       {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
-import { openai, OPENAI_MODEL } from "@/lib/openai";
+import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
 
 /**
  * Champs du cadrage reformulés par l'IA : réponse libre du Formateur → valeur
@@ -46,7 +46,7 @@ async function callModel<T extends z.ZodTypeAny>(
   schemaName: string
 ): Promise<z.infer<T>> {
   const response = await openai.responses.create({
-    model: OPENAI_MODEL,
+    model: OPENAI_GENERATION_MODEL,
     input: [
       { role: "system", content: SYSTEM_PROMPT },
       {

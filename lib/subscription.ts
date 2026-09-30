@@ -27,3 +27,13 @@ export async function canCreateFormationByAi(tenantId: string): Promise<boolean>
   const eligiblePlan = tenant?.subscription_plan === "creation" || tenant?.subscription_plan === "entreprise";
   return activeStatus && eligiblePlan;
 }
+
+/**
+ * Éligibilité au flow de création par IA pour un FormationAuthorGuard :
+ * tenantId null = super_admin sur le catalogue global Ahead, jamais soumis à
+ * un abonnement.
+ */
+export async function canAuthorFormationByAi(tenantId: string | null): Promise<boolean> {
+  if (tenantId === null) return true;
+  return canCreateFormationByAi(tenantId);
+}

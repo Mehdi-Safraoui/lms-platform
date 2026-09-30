@@ -15,7 +15,10 @@ export interface QuotaResult {
  * déjà 3 fois en interne avant d'abandonner) consomme quand même 1 unité,
  * puisque de vrais appels au modèle ont réellement eu lieu.
  */
-export async function consumeAiGenerationQuota(tenantId: string): Promise<QuotaResult> {
+export async function consumeAiGenerationQuota(tenantId: string | null): Promise<QuotaResult> {
+  // Catalogue global (super_admin) : pas de quota.
+  if (tenantId === null) return { allowed: true, used: 0, quota: null };
+
   const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase.rpc("consume_ai_generation_quota", { p_tenant_id: tenantId }).single();
 
@@ -26,7 +29,9 @@ export async function consumeAiGenerationQuota(tenantId: string): Promise<QuotaR
 }
 
 /** Lecture seule, pour l'affichage du quota restant côté UI. */
-export async function getAiGenerationQuota(tenantId: string): Promise<QuotaResult> {
+export async function getAiGenerationQuota(tenantId: string | null): Promise<QuotaResult> {
+  if (tenantId === null) return { allowed: true, used: 0, quota: null };
+
   const supabase = createServiceRoleSupabaseClient();
   const { data } = await supabase.from("tenants").select("ai_generation_quota, ai_generation_used").eq("id", tenantId).single();
   return { allowed: true, used: data?.ai_generation_used ?? 0, quota: data?.ai_generation_quota ?? null };

@@ -15,6 +15,8 @@ interface Formation {
   created_at: string;
   tenant_id: string | null;
   niveau: "debutant" | "intermediaire" | "avance" | null;
+  /** Brouillon issu du flow IA : étape où reprendre (voir GET /api/formations). */
+  ai_stage: "cadrage" | "structure" | "generation" | null;
 }
 
 const NIVEAU_LABEL: Record<string, string> = {
@@ -24,6 +26,12 @@ const NIVEAU_LABEL: Record<string, string> = {
 };
 
 type Filter = "all" | "published" | "draft";
+
+const AI_STAGE_LABEL: Record<NonNullable<Formation["ai_stage"]>, string> = {
+  cadrage: "IA — documents / cadrage",
+  structure: "IA — structure",
+  generation: "IA — génération",
+};
 
 function ConfirmDeleteModal({
   title,
@@ -192,7 +200,7 @@ export default function CatalogPage() {
                   <tr
                     key={f.id}
                     className={styles.tableRow}
-                    onClick={() => router.push(`/admin/catalog/${f.id}/edit`)}
+                    onClick={() => router.push(`/admin/catalog/${f.id}/${f.ai_stage ?? "edit"}`)}
                   >
                     <td>
                       <div className={styles.formationCell}>
@@ -213,7 +221,7 @@ export default function CatalogPage() {
                     <td className={styles.cellMuted}>—</td>
                     <td>
                       <span className={`${styles.badge} ${f.is_published ? styles.badgePublished : styles.badgeDraft}`}>
-                        {f.is_published ? "Publié" : "Brouillon"}
+                        {f.is_published ? "Publié" : f.ai_stage ? AI_STAGE_LABEL[f.ai_stage] : "Brouillon"}
                       </span>
                     </td>
                     <td className={styles.cellActions}>

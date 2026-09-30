@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
@@ -19,7 +19,7 @@ async function assertOwnLecon(supabase: Supabase, leconId: string, moduleId: str
 // Interdit sur une formation publiée, même raison que modules/[moduleId] —
 // n'était bloqué que côté bouton, pas côté serveur.
 export async function PUT(req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId, moduleId, leconId } = await params;
@@ -45,7 +45,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 // DELETE — supprime la leçon (quiz/chunks associés cascadent au niveau base).
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId, moduleId, leconId } = await params;

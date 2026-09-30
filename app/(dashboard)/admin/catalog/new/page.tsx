@@ -3,11 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, PenLine, Sparkles, UploadCloud, FileText, X } from "lucide-react";
-import VideoStep from "@/components/lessons/VideoStep";
+import { ArrowLeft, PenLine, Sparkles } from "lucide-react";
 import styles from "./new.module.css";
 
-type Mode = "choice" | "manual" | "ai";
+type Mode = "choice" | "manual";
 
 export default function NewFormationPage() {
   const [mode, setMode] = useState<Mode>("choice");
@@ -23,7 +22,6 @@ export default function NewFormationPage() {
 
       {mode === "choice" && <ChoiceStep onSelect={setMode} />}
       {mode === "manual" && <ManualForm onBack={() => setMode("choice")} />}
-      {mode === "ai" && <AiGenerateForm onBack={() => setMode("choice")} />}
     </div>
   );
 }
@@ -42,15 +40,16 @@ function ChoiceStep({ onSelect }: { onSelect: (mode: Mode) => void }) {
         </span>
       </button>
 
-      <button className={`${styles.choiceCard} ${styles.choiceCardAi}`} onClick={() => onSelect("ai")}>
+      <Link href="/admin/catalog/new/ai" className={`${styles.choiceCard} ${styles.choiceCardAi}`}>
         <span className={`${styles.choiceIcon} ${styles.choiceIconAi}`}>
           <Sparkles size={22} strokeWidth={1.75} />
         </span>
         <span className={styles.choiceTitle}>Générer avec l&apos;IA</span>
         <span className={styles.choiceDesc}>
-          Uploadez un PDF ou un Word — l&apos;IA génère automatiquement les modules, les leçons et les quiz.
+          Ajoutez vos documents source — l&apos;IA vous guide : cadrage, structure, puis chaque leçon et quiz,
+          que vous relisez et validez un par un.
         </span>
-      </button>
+      </Link>
     </div>
   );
 }
@@ -151,105 +150,5 @@ function ManualForm({ onBack }: { onBack: () => void }) {
         </button>
       </div>
     </form>
-  );
-}
-
-// ── Étape 2b : génération par IA ─────────────────────────
-function AiGenerateForm({ onBack }: { onBack: () => void }) {
-  const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Une fois la formation générée, on propose une vidéo d'accompagnement avant de
-  // rediriger vers l'éditeur — voir components/lessons/VideoStep.tsx.
-  const [generated, setGenerated] = useState<{ id: string; title: string } | null>(null);
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setError(null);
-    setFile(e.target.files?.[0] ?? null);
-  }
-
-  async function handleGenerate() {
-    if (!file) return;
-    setGenerating(true);
-    setError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await fetch("/api/formations/generate", { method: "POST", body: formData });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Erreur lors de la génération.");
-        setGenerating(false);
-        return;
-      }
-      setGenerated({ id: json.data.id, title: json.data.title });
-    } catch {
-      setError("Erreur réseau — réessayez.");
-      setGenerating(false);
-    }
-  }
-
-  if (generated) {
-    return (
-      <VideoStep
-        formationId={generated.id}
-        suggestedQuery={generated.title}
-        onDone={() => router.push(`/admin/catalog/${generated.id}/edit`)}
-      />
-    );
-  }
-
-  return (
-    <div className={styles.form}>
-      <div className={styles.field}>
-        <label className={styles.label}>Document source (PDF ou Word)</label>
-
-        {!file ? (
-          <label className={styles.dropzone}>
-            <UploadCloud size={24} strokeWidth={1.5} />
-            <span>Cliquez pour choisir un fichier</span>
-            <span className={styles.hint}>.pdf ou .docx</span>
-            <input
-              type="file"
-              accept=".pdf,.docx"
-              onChange={handleFileChange}
-              className={styles.hiddenInput}
-              disabled={generating}
-            />
-          </label>
-        ) : (
-          <div className={styles.filePreview}>
-            <FileText size={18} className={styles.filePreviewIcon} />
-            <span className={styles.filePreviewName}>{file.name}</span>
-            {!generating && (
-              <button type="button" className={styles.filePreviewRemove} onClick={() => setFile(null)}>
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {generating && (
-        <div className={styles.generatingNotice}>
-          <Sparkles size={16} className={styles.generatingIcon} />
-          Analyse du document et génération de la formation en cours… cela peut prendre jusqu&apos;à une minute.
-        </div>
-      )}
-
-      {error && <p className={styles.error}>{error}</p>}
-
-      <div className={styles.actions}>
-        <button type="button" className={styles.btnSecondary} onClick={onBack} disabled={generating}>
-          Retour
-        </button>
-        <button type="button" className={styles.btnPrimary} onClick={handleGenerate} disabled={!file || generating}>
-          {generating ? "Génération…" : "Générer la formation"}
-        </button>
-      </div>
-    </div>
   );
 }

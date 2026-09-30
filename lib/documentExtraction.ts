@@ -3,15 +3,6 @@ import mammoth from "mammoth";
 import JSZip from "jszip";
 import * as cheerio from "cheerio";
 
-export type SupportedDocumentType = "pdf" | "docx";
-
-export function detectDocumentType(filename: string): SupportedDocumentType | null {
-  const ext = filename.toLowerCase().split(".").pop();
-  if (ext === "pdf") return "pdf";
-  if (ext === "docx") return "docx";
-  return null;
-}
-
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   // unpdf embarque une build de PDF.js dépourvue de toute référence navigateur
   // (DOMMatrix, canvas...) et sans fichier worker externe à résoudre — contrairement
@@ -27,22 +18,10 @@ async function extractTextFromDocx(buffer: Buffer): Promise<string> {
   return result.value;
 }
 
-/**
- * Extrait le texte brut d'un document PDF ou Word (.docx) pour l'envoyer au LLM.
- * Lève une erreur explicite si le format n'est pas supporté (ex : .doc, .txt).
- */
-export async function extractTextFromDocument(buffer: Buffer, filename: string): Promise<string> {
-  const type = detectDocumentType(filename);
-  if (type === "pdf") return extractTextFromPdf(buffer);
-  if (type === "docx") return extractTextFromDocx(buffer);
-  throw new Error(`Format de fichier non supporté : "${filename}". Utilisez un PDF ou un .docx.`);
-}
-
 // =====================================================
-// V2 — Pipeline RAG (knowledge_sources) : formats élargis.
+// Pipeline RAG (knowledge_sources).
 // Vocabulaire aligné sur la colonne knowledge_sources.format en base
-// ('pdf' | 'word' | 'ppt' | 'texte' | 'web'), distinct du vocabulaire V1
-// ci-dessus ('pdf' | 'docx') volontairement laissé inchangé.
+// ('pdf' | 'word' | 'ppt' | 'texte' | 'web').
 // =====================================================
 
 export type KnowledgeSourceFormat = "pdf" | "word" | "ppt" | "texte" | "web";

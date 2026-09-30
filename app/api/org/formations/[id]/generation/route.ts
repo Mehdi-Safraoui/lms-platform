@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getAiGenerationQuota } from "@/lib/aiGenerationQuota";
@@ -23,7 +23,7 @@ interface RawLeconRow {
 // formation avec leur état de génération (contenu présent, validé ou non),
 // pour piloter la progression côté UI (carte "afficher le contenu généré").
 export async function GET(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId } = await params;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
@@ -20,7 +20,7 @@ async function assertOwnModule(supabase: Supabase, moduleId: string, formationId
 // client, mais rien n'empêchait un appel API direct de renommer/supprimer un
 // module d'une formation déjà vue par des apprenants.
 export async function PUT(req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId, moduleId } = await params;
@@ -47,7 +47,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 // DELETE /api/org/formations/[id]/generation/modules/[moduleId] — supprime le
 // module et tout ce qu'il contient (leçons, quiz, chunks — cascade base).
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId, moduleId } = await params;

@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminTenant } from "@/lib/api/require-admin-tenant";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { canCreateFormationByAi } from "@/lib/subscription";
+import { canAuthorFormationByAi } from "@/lib/subscription";
 import { searchChunks } from "@/lib/searchChunks";
 import { generateLessonContent, generateLessonQuiz, type LessonGenerationInput } from "@/lib/ai/generateLessonContent";
 import type { CadrageInput } from "@/lib/ai/generateStructureProposal";
 import { consumeAiGenerationQuota } from "@/lib/aiGenerationQuota";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Génération par le modèle le plus capable (OPENAI_GENERATION_MODEL) : mesuré
+// à ~30-40 s par appel, et jusqu'à 3 tentatives en cas de sortie invalide.
+export const maxDuration = 180;
 
 type Params = { params: Promise<{ id: string; leconId: string }> };
 
@@ -24,7 +26,7 @@ const RAG_TOP_K_QUIZ = 12;
 // précédente — la structure, elle, reste intacte, seule la matérialisation en
 // modules/lecons pourrait la perdre, ce que cette route ne touche jamais).
 export async function POST(_req: NextRequest, { params }: Params) {
-  const guard = await requireAdminTenant();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const { id: formationId, leconId } = await params;
@@ -33,7 +35,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (!(await assertOwnFormation(supabase, formationId, guard.tenantId))) {
     return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
   }
-  if (!(await canCreateFormationByAi(guard.tenantId))) {
+  if (!(await canAuthorFormationByAi(guard.tenantId))) {
     return NextResponse.json(
       { error: "La génération de formation par IA nécessite l'offre Création ou Entreprise.", code: "plan_upgrade_required" },
       { status: 403 }
@@ -92,7 +94,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
         .eq("content_type", "rich");
       const query = (siblings ?? []).map((s) => `${s.title}. ${s.generation_brief ?? ""}`).join(" ") || lecon.title;
 
-      const chunks = await searchChunks(query, formationId, RAG_TOP_K_QUIZ);
+      const chunks = await searchChunks(query, formationId, RAG_TOP_K_QUIZ, "document");
       const input: LessonGenerationInput = {
         leconTitle: lecon.title,
         leconDescription: lecon.generation_brief ?? "",
@@ -125,7 +127,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     }
 
     const query = `${lecon.title}. ${lecon.generation_brief ?? ""}`;
-    const chunks = await searchChunks(query, formationId, RAG_TOP_K_LESSON);
+    const chunks = await searchChunks(query, formationId, RAG_TOP_K_LESSON, "document");
     const input: LessonGenerationInput = {
       leconTitle: lecon.title,
       leconDescription: lecon.generation_brief ?? "",

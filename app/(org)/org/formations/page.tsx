@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Sparkles, ClipboardList, Layers, PenSquare, CheckCircle2, Plus } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { canCreateFormationByAi, hasActiveSubscription } from "@/lib/subscription";
-import UpgradeNotice from "./UpgradeNotice";
+import UpgradeNotice from "@/components/authoring/UpgradeNotice";
 import FormationsListClient, { type FormationListItem } from "./FormationsListClient";
 import styles from "./formations.module.css";
 

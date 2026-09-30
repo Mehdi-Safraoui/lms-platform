@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, type AuthGuard } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { searchChunks, type ChunkSearchResult } from "@/lib/searchChunks";
-import { openai, OPENAI_MODEL } from "@/lib/openai";
+import { openai, OPENAI_CHAT_MODEL } from "@/lib/openai";
 
 type Params = { params: Promise<{ formationId: string }> };
 type Supabase = ReturnType<typeof createServiceRoleSupabaseClient>;
@@ -171,7 +171,7 @@ export async function POST(req: Request, { params }: Params) {
   // l'accès à cette formation précise vient d'être vérifié ci-dessus.
   let chunks: ChunkSearchResult[];
   try {
-    chunks = await searchChunks(question, formationId, TOP_K);
+    chunks = await searchChunks(question, formationId, TOP_K, "lesson");
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
     return NextResponse.json({ error: `Échec de la recherche de contexte : ${message}` }, { status: 500 });
@@ -191,7 +191,7 @@ export async function POST(req: Request, { params }: Params) {
   let answer: string;
   try {
     const response = await openai.responses.create({
-      model: OPENAI_MODEL,
+      model: OPENAI_CHAT_MODEL,
       input: [
         { role: "system", content: SYSTEM_PROMPT },
         {

@@ -23,6 +23,19 @@ export async function POST(req: Request) {
   const supabase = createServiceRoleSupabaseClient();
 
   if (enabled) {
+    // Seule une formation publiée du catalogue global peut être activée — pas
+    // un brouillon en cours de création par le super_admin, ni la formation
+    // privée d'un autre tenant.
+    const { data: formation } = await supabase
+      .from("formations")
+      .select("tenant_id, is_published")
+      .eq("id", formationId)
+      .maybeSingle();
+    if (!formation || formation.tenant_id !== null || !formation.is_published) {
+      return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
+    }
+
+
     const { error } = await supabase.from("tenant_formations").insert({
       tenant_id: guard.tenantId,
       formation_id: formationId,

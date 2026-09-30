@@ -49,9 +49,11 @@ function move<T>(arr: T[], index: number, direction: -1 | 1): T[] {
 
 export default function StructureClient({
   formationId,
+  basePath,
   initialStructure,
 }: {
   formationId: string;
+  basePath: string;
   initialStructure: ExistingStructure | null;
 }) {
   const router = useRouter();
@@ -176,7 +178,7 @@ export default function StructureClient({
         <button
           type="button"
           className={styles.primaryBtn}
-          onClick={() => router.push(`/org/formations/${formationId}/generation`)}
+          onClick={() => router.push(`${basePath}/${formationId}/generation`)}
         >
           Générer le contenu des leçons
           <ArrowRight size={16} />
