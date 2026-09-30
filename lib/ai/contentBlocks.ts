@@ -82,6 +82,43 @@ const exerciseBlock = z.object({
   answer: z.string().min(1),
 });
 
+// Image + texte. L'IA ne fournit JAMAIS l'image elle-même (image_url forcé à
+// null après génération, voir generateLessonContent) : elle place un
+// emplacement quand un visuel aiderait vraiment (capture d'écran d'un outil,
+// schéma) et décrit précisément l'image attendue dans image_description, qui
+// sert ensuite de consigne au Formateur puis de texte alternatif. Tant que
+// l'image n'est pas ajoutée, l'apprenant ne voit que le texte.
+const imageTextBlock = z.object({
+  type: z.literal("image_text"),
+  layout: z.enum(["image_left", "image_right", "image_full"]),
+  image_url: z.string().nullable(),
+  image_description: z.string().min(1),
+  caption: z.string().nullable(),
+  // Peut contenir du markdown inline simple, comme "paragraph".
+  text: z.string().min(1),
+});
+
+// Vidéo YouTube dans la leçon. Même règle que le reste du projet : jamais
+// d'URL proposée par le LLM (url forcé à null après génération) — il propose
+// une recherche (search_query), le Formateur choisit parmi de vrais résultats
+// YouTube ou colle un lien. Sans lien, le bloc n'est pas affiché à l'apprenant.
+const videoBlock = z.object({
+  type: z.literal("video"),
+  url: z.string().nullable(),
+  title: z.string().min(1),
+  search_query: z.string().min(1),
+  caption: z.string().nullable(),
+});
+
+// Prompt prêt à copier-coller par l'apprenant dans un outil d'IA.
+const promptBlock = z.object({
+  type: z.literal("prompt"),
+  title: z.string().min(1),
+  prompt: z.string().min(1),
+  // Conseil d'utilisation ou résultat attendu (optionnel).
+  tip: z.string().nullable(),
+});
+
 export const contentBlockSchema = z.discriminatedUnion("type", [
   headingBlock,
   paragraphBlock,
@@ -91,6 +128,9 @@ export const contentBlockSchema = z.discriminatedUnion("type", [
   featureGridBlock,
   highlightBlock,
   exerciseBlock,
+  imageTextBlock,
+  videoBlock,
+  promptBlock,
 ]);
 
 export type ContentBlock = z.infer<typeof contentBlockSchema>;
@@ -102,53 +142,3 @@ export const quizQuestionSchema = z.object({
 });
 
 export type QuizQuestion = z.infer<typeof quizQuestionSchema>;
-
-const lessonSchema = z.object({
-  title: z.string().min(1),
-  contentType: z.enum(["lesson", "quiz"]),
-  // Présent seulement si contentType === "lesson".
-  blocks: z.array(contentBlockSchema).nullable(),
-  // Présent seulement si contentType === "quiz".
-  quiz: z.array(quizQuestionSchema).nullable(),
-});
-
-export type GeneratedLesson = z.infer<typeof lessonSchema>;
-
-const moduleSchema = z
-  .object({
-    title: z.string().min(1),
-    lessons: z.array(lessonSchema).min(2).max(8),
-  })
-  .superRefine((mod, ctx) => {
-    // Règle métier (pas représentable en JSON Schema strict côté OpenAI) :
-    // exactement une leçon quiz par module, obligatoirement en dernière position.
-    // Sert de garde-fou après coup — si le modèle duplique ou déplace un quiz,
-    // la validation échoue et déclenche la tentative de correction.
-    const quizIndices = mod.lessons.reduce<number[]>((acc, l, i) => {
-      if (l.contentType === "quiz") acc.push(i);
-      return acc;
-    }, []);
-    if (quizIndices.length !== 1) {
-      ctx.addIssue({
-        code: "custom",
-        message: `Le module "${mod.title}" doit contenir exactement une leçon de type "quiz" (trouvé : ${quizIndices.length}).`,
-        path: ["lessons"],
-      });
-    } else if (quizIndices[0] !== mod.lessons.length - 1) {
-      ctx.addIssue({
-        code: "custom",
-        message: `Le module "${mod.title}" doit se terminer par sa leçon de type "quiz".`,
-        path: ["lessons"],
-      });
-    }
-  });
-
-export const generatedFormationSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().min(1),
-  niveau: z.enum(["debutant", "intermediaire", "avance"]),
-  estimatedDurationMinutes: z.number().int().positive(),
-  modules: z.array(moduleSchema).min(2).max(10),
-});
-
-export type GeneratedFormation = z.infer<typeof generatedFormationSchema>;

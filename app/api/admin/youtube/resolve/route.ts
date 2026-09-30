@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdmin } from "@/lib/api/require-super-admin";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { extractYoutubeVideoId, resolveYoutubeVideoById } from "@/lib/youtube";
 
 /**
@@ -8,7 +8,7 @@ import { extractYoutubeVideoId, resolveYoutubeVideoById } from "@/lib/youtube";
  * vidéo, en s'assurant que la vidéo existe réellement avant de la sauvegarder.
  */
 export async function POST(req: NextRequest) {
-  const guard = await requireSuperAdmin();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const body = await req.json().catch(() => null);

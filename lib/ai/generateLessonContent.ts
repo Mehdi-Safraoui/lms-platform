@@ -60,11 +60,27 @@ Règles impératives :
    - "feature_grid" UNIQUEMENT si les extraits énumèrent plusieurs outils/fonctionnalités/cas d'usage distincts (2 à 6).
    - "highlight" pour LA conclusion ou recommandation la plus importante de la leçon (à utiliser avec parcimonie, 0 ou 1 par leçon).
    - "exercise" UNIQUEMENT si un exercice pratique a du sens pour ce que la leçon vient d'enseigner. Le champ "prompt" contient la consigne, le champ "answer" contient la correction — les deux dérivés des extraits, jamais l'un sans l'autre. À utiliser avec parcimonie (0 ou 1 par leçon).
-   Ne force jamais un "comparison", "feature_grid" ou "exercise" si le contenu ne s'y prête pas — une leçon peut très bien n'avoir que heading/paragraph/callout.
+   - "prompt" quand la leçon apprend à formuler une demande à une IA et qu'un exemple concret de prompt, dérivé des extraits, peut être copié-collé tel quel par l'apprenant : "prompt" contient le texte exact à copier (écrit à la première personne, prêt à l'emploi, avec des [crochets] pour les éléments à personnaliser), "title" dit à quoi il sert, "tip" (ou null) un conseil d'utilisation ou le résultat attendu. 0 à 3 par leçon.
+   - "image_text" UNIQUEMENT quand un visuel aiderait vraiment l'apprenant (capture d'écran de l'interface d'un outil présenté dans les extraits, schéma décrit par les extraits). Tu ne fournis jamais l'image : "image_url" vaut toujours null, et "image_description" décrit précisément l'image que le Formateur devra ajouter (ex. "Capture d'écran de l'écran Projets de Claude, bouton « Nouveau projet » en haut à droite"). "text" explique ce que montre l'image ; "layout" vaut "image_left" ou "image_right" pour une capture accompagnée d'une explication, "image_full" pour un visuel large (schéma, tableau de bord) ; "caption" (ou null) est une courte légende. 0 à 2 par leçon.
+   - "video" UNIQUEMENT si une démonstration vidéo d'une manipulation (tutoriel, démo d'un outil) aiderait vraiment. Tu ne fournis jamais de lien : "url" vaut toujours null, "search_query" est une requête YouTube précise pour trouver une vraie vidéo pertinente, "title" le sujet de la vidéo attendue, "caption" (ou null) ce que l'apprenant doit y observer. 0 ou 1 par leçon.
+   Ne force jamais un "comparison", "feature_grid", "exercise", "image_text" ou "video" si le contenu ne s'y prête pas — une leçon peut très bien n'avoir que heading/paragraph/callout.
 5. Pour "feature_grid", choisis l'icône la plus pertinente dans la liste autorisée (fournie par le schéma) pour chaque item.
 6. Réponds uniquement avec les données structurées demandées — pas de texte hors schéma.`;
 
 const MAX_ATTEMPTS = 3;
+
+/**
+ * Images et vidéos ne viennent jamais du modèle (un lien inventé pointerait
+ * vers un contenu inexistant ou inapproprié) : même si le schéma lui laisse
+ * un champ, il est vidé ici — seul le Formateur les ajoute, dans l'éditeur.
+ */
+function withoutGeneratedMedia(blocks: ContentBlock[]): ContentBlock[] {
+  return blocks.map((block) => {
+    if (block.type === "image_text") return { ...block, image_url: null };
+    if (block.type === "video") return { ...block, url: null };
+    return block;
+  });
+}
 
 export async function generateLessonContent(input: LessonGenerationInput): Promise<ContentBlock[]> {
   const context = truncate(input.ragContext.trim());
@@ -107,7 +123,7 @@ export async function generateLessonContent(input: LessonGenerationInput): Promi
     }
 
     const parsed = lessonContentSchema.safeParse(json);
-    if (parsed.success) return parsed.data.blocks;
+    if (parsed.success) return withoutGeneratedMedia(parsed.data.blocks);
 
     lastMessage = parsed.error.message;
     console.warn(`[generateLessonContent] Sortie invalide (tentative ${attempt}/${MAX_ATTEMPTS}) :`, lastMessage);

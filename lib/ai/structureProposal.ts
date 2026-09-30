@@ -1,10 +1,9 @@
 import { z } from "zod";
 
 /**
- * Structure légère (titres + courtes descriptions), volontairement distincte de
- * `generatedFormationSchema` (lib/ai/contentBlocks.ts) qui embarque le contenu
- * complet des leçons (blocks/quiz) — ici on ne veut qu'un plan à valider par le
- * Formateur avant toute génération de contenu réel (carte 44).
+ * Structure légère (titres + courtes descriptions), sans contenu de leçon :
+ * un plan à valider par le Formateur avant toute génération de contenu réel
+ * (carte 44).
  */
 const structureLessonSchema = z.object({
   title: z.string().min(1),

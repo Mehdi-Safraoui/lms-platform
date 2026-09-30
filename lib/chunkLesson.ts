@@ -59,6 +59,18 @@ function blockToText(block: Record<string, unknown>): string {
     case "exercise":
       return strings(block.prompt, block.answer);
 
+    // image_description est une consigne pour le Formateur tant que l'image
+    // manque : seuls le texte et la légende, vus par l'apprenant, sont indexés.
+    case "image_text":
+      return strings(block.text, block.caption);
+
+    // Une vidéo sans lien n'est pas affichée à l'apprenant : rien à indexer.
+    case "video":
+      return typeof block.url === "string" && block.url ? strings(block.title, block.caption) : "";
+
+    case "prompt":
+      return strings(block.title, block.prompt, block.tip);
+
     default:
       return "";
   }

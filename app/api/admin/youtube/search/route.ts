@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSuperAdmin } from "@/lib/api/require-super-admin";
+import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { searchYoutubeVideos } from "@/lib/youtube";
 
 /**
@@ -8,7 +8,7 @@ import { searchYoutubeVideos } from "@/lib/youtube";
  * d'API que l'admin choisit ensuite manuellement.
  */
 export async function POST(req: NextRequest) {
-  const guard = await requireSuperAdmin();
+  const guard = await requireFormationAuthor();
   if (guard instanceof NextResponse) return guard;
 
   const body = await req.json().catch(() => null);

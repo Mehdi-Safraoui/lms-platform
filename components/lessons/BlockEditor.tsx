@@ -7,6 +7,7 @@ import {
   Trash2, ChevronUp, ChevronDown, Plus,
 } from "lucide-react";
 import { ICON_KEYS, type ContentBlock } from "@/lib/ai/contentBlocks";
+import { ImageTextEditor, VideoEditor, PromptEditor } from "./MediaBlockEditors";
 import editorStyles from "./blockEditor.module.css";
 import blockStyles from "./blocks.module.css";
 
@@ -26,6 +27,9 @@ const BLOCK_TYPE_LABELS: Record<ContentBlock["type"], string> = {
   feature_grid: "Grille de fonctionnalités",
   highlight: "Mise en avant",
   exercise: "Exercice (consigne + correction)",
+  prompt: "Prompt à copier",
+  image_text: "Image + texte",
+  video: "Vidéo YouTube",
 };
 
 function defaultBlockFor(type: ContentBlock["type"]): ContentBlock {
@@ -50,15 +54,20 @@ function defaultBlockFor(type: ContentBlock["type"]): ContentBlock {
     };
     case "highlight": return { type: "highlight", title: "À retenir", text: "" };
     case "exercise": return { type: "exercise", prompt: "", answer: "" };
+    case "prompt": return { type: "prompt", title: "Prompt", prompt: "", tip: null };
+    case "image_text": return { type: "image_text", layout: "image_left", image_url: null, image_description: "", caption: null, text: "" };
+    case "video": return { type: "video", url: null, title: "", search_query: "", caption: null };
   }
 }
 
 interface Props {
   blocks: ContentBlock[];
   onChange: (blocks: ContentBlock[]) => void;
+  /** Formation de la leçon éditée — nécessaire pour uploader les images. */
+  formationId?: string;
 }
 
-export default function BlockEditor({ blocks, onChange }: Props) {
+export default function BlockEditor({ blocks, onChange, formationId }: Props) {
   function update(index: number, block: ContentBlock) {
     onChange(blocks.map((b, i) => (i === index ? block : b)));
   }
@@ -202,6 +211,14 @@ export default function BlockEditor({ blocks, onChange }: Props) {
               />
             </>
           )}
+
+          {block.type === "image_text" && (
+            <ImageTextEditor block={block} formationId={formationId} onChange={(b) => update(i, b)} />
+          )}
+
+          {block.type === "video" && <VideoEditor block={block} onChange={(b) => update(i, b)} />}
+
+          {block.type === "prompt" && <PromptEditor block={block} onChange={(b) => update(i, b)} />}
 
           {block.type === "comparison" && (
             <>
