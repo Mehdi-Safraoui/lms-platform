@@ -48,8 +48,24 @@ function truncateSourceText(text: string): string {
   return text.slice(0, MAX_SOURCE_CHARS);
 }
 
-async function callModel(cadrage: CadrageInput, sourceText: string, repairNote?: string): Promise<string> {
-  const response = await openai.responses.create({
+/**
+ * Suivi en direct de la génération (route en streaming, voir
+ * app/api/org/formations/[id]/structure/generate/route.ts) : onDelta reçoit
+ * chaque morceau du JSON au fil de son écriture par le modèle, onRetry signale
+ * qu'une sortie invalide va être régénérée (le texte déjà reçu est à jeter).
+ */
+export interface StructureGenerationHooks {
+  onDelta?: (text: string) => void;
+  onRetry?: (attempt: number, reason: string) => void;
+}
+
+async function callModel(
+  cadrage: CadrageInput,
+  sourceText: string,
+  repairNote: string | undefined,
+  onDelta: ((text: string) => void) | undefined
+): Promise<string> {
+  const stream = await openai.responses.create({
     model: OPENAI_GENERATION_MODEL,
     input: [
       { role: "system", content: buildSystemPrompt(cadrage) },
@@ -64,19 +80,36 @@ async function callModel(cadrage: CadrageInput, sourceText: string, repairNote?:
     // Jusqu'à 20 modules × plusieurs leçons avec leur description : marge large
     // pour ne jamais tronquer le JSON.
     max_output_tokens: 16_000,
+    stream: true,
   });
 
-  if (!response.output_text) {
+  let output = "";
+  for await (const event of stream) {
+    if (event.type === "response.output_text.delta") {
+      output += event.delta;
+      onDelta?.(event.delta);
+    } else if (event.type === "response.failed") {
+      throw new Error(event.response.error?.message ?? "La génération a échoué côté modèle.");
+    } else if (event.type === "error") {
+      throw new Error(event.message);
+    }
+  }
+
+  if (!output) {
     throw new Error("Le modèle n'a renvoyé aucun contenu.");
   }
-  return response.output_text;
+  return output;
 }
 
 // Budget de tentatives : la contrainte "un seul quiz, en dernière position" par module
 // peut faire échouer une sortie par ailleurs correcte 1 à 2 fois de suite.
 const MAX_GENERATION_ATTEMPTS = 3;
 
-export async function generateStructureProposal(cadrage: CadrageInput, rawSourceText: string): Promise<StructureProposal> {
+export async function generateStructureProposal(
+  cadrage: CadrageInput,
+  rawSourceText: string,
+  hooks: StructureGenerationHooks = {}
+): Promise<StructureProposal> {
   const sourceText = truncateSourceText(rawSourceText.trim());
   if (!sourceText) {
     throw new Error("Aucun contenu exploitable trouvé dans les documents source.");
@@ -87,7 +120,8 @@ export async function generateStructureProposal(cadrage: CadrageInput, rawSource
   let lastMessage = "";
 
   for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
-    const output = await callModel(cadrage, sourceText, repairNote);
+    if (attempt > 1) hooks.onRetry?.(attempt, lastMessage);
+    const output = await callModel(cadrage, sourceText, repairNote, hooks.onDelta);
     let json: unknown;
     try {
       json = JSON.parse(output);

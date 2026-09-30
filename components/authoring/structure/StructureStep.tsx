@@ -15,7 +15,7 @@ export default async function StructureStep({ space, formationId }: { space: Aut
   const supabase = createServiceRoleSupabaseClient();
   const { data: cadrage } = await supabase
     .from("formation_cadrage")
-    .select("completed_at")
+    .select("completed_at, nb_modules_souhaite")
     .eq("formation_id", formationId)
     .maybeSingle();
 
@@ -47,7 +47,12 @@ export default async function StructureStep({ space, formationId }: { space: Aut
       </p>
 
       {eligible ? (
-        <StructureClient formationId={formationId} basePath={basePath} initialStructure={existingStructure} />
+        <StructureClient
+          formationId={formationId}
+          basePath={basePath}
+          initialStructure={existingStructure}
+          expectedModules={cadrage?.nb_modules_souhaite ?? null}
+        />
       ) : (
         <UpgradeNotice />
       )}

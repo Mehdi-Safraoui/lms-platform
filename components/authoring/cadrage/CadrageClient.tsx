@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckCircle2, ArrowRight, Sparkles, Pencil, Wand2 } from "lucide-react";
+import WaitingPanel from "../WaitingPanel";
 import styles from "./cadrage.module.css";
 
 type Niveau = "debutant" | "intermediaire" | "avance";
@@ -133,9 +134,15 @@ export default function CadrageClient({
   // lancée à l'ouverture : les suggestions l'attendent au lieu de la générer
   // une seconde fois en parallèle.
   const summaryReadyRef = React.useRef<Promise<unknown> | null>(null);
+  // Vrai tant que la fiche de synthèse est en préparation (~40 s la première
+  // fois pour un document de 60 pages, instantané ensuite) : un "Décider pour
+  // moi" cliqué pendant ce temps affiche l'attente détaillée.
+  const [summaryPending, setSummaryPending] = React.useState(true);
 
   React.useEffect(() => {
-    summaryReadyRef.current = fetch(`/api/org/formations/${formationId}/cadrage/summary`, { method: "POST" }).catch(() => null);
+    summaryReadyRef.current = fetch(`/api/org/formations/${formationId}/cadrage/summary`, { method: "POST" })
+      .catch(() => null)
+      .finally(() => setSummaryPending(false));
   }, [formationId]);
 
   const step = STEPS[stepIndex];
@@ -385,6 +392,14 @@ export default function CadrageClient({
             Désactiver
           </button>
         </p>
+      )}
+
+      {deciding && summaryPending && (
+        <WaitingPanel
+          formationId={formationId}
+          estimatedSeconds={45}
+          steps={["Lecture de vos documents", "Rédaction de la fiche de synthèse", "Proposition pour cette question"]}
+        />
       )}
 
       {step.kind === "select" && (

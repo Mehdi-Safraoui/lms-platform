@@ -7,6 +7,7 @@ import {
   UploadCloud, FileText, Link as LinkIcon,
   Clock, Loader2, CheckCircle2, AlertTriangle, ArrowRight,
 } from "lucide-react";
+import WaitingPanel from "../WaitingPanel";
 import styles from "./sources.module.css";
 
 interface KnowledgeSource {
@@ -37,6 +38,10 @@ export default function SourcesClient({ formationId, basePath }: { formationId: 
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  // Estimation de l'attente affichée pendant l'upload (voir WaitingPanel) —
+  // mesuré : ~3 s d'embeddings pour un PDF de 60 pages, le reste est l'envoi
+  // du fichier et l'enregistrement.
+  const [uploadEstimate, setUploadEstimate] = useState<{ kind: "file" | "url"; seconds: number } | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +59,7 @@ export default function SourcesClient({ formationId, basePath }: { formationId: 
 
   async function uploadFile(file: File) {
     setUploading(true);
+    setUploadEstimate({ kind: "file", seconds: Math.round(6 + (file.size / 1024 / 1024) * 3) });
     const formData = new FormData();
     formData.append("file", file);
     const res = await fetch(`/api/org/formations/${formationId}/knowledge-sources`, { method: "POST", body: formData });
@@ -65,11 +71,13 @@ export default function SourcesClient({ formationId, basePath }: { formationId: 
       setSources((prev) => [json.data, ...prev]);
     }
     setUploading(false);
+    setUploadEstimate(null);
   }
 
   async function addUrl() {
     if (!urlInput.trim()) return;
     setUploading(true);
+    setUploadEstimate({ kind: "url", seconds: 10 });
     const formData = new FormData();
     formData.append("url", urlInput.trim());
     const res = await fetch(`/api/org/formations/${formationId}/knowledge-sources`, { method: "POST", body: formData });
@@ -82,6 +90,7 @@ export default function SourcesClient({ formationId, basePath }: { formationId: 
       setUrlInput("");
     }
     setUploading(false);
+    setUploadEstimate(null);
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -146,6 +155,20 @@ export default function SourcesClient({ formationId, basePath }: { formationId: 
           Ajouter
         </button>
       </div>
+
+      {uploadEstimate && (
+        <WaitingPanel
+          key={`${uploadEstimate.kind}-${uploadEstimate.seconds}`}
+          formationId={formationId}
+          estimatedSeconds={uploadEstimate.seconds}
+          showExcerpts={readyCount > 0}
+          steps={
+            uploadEstimate.kind === "file"
+              ? ["Envoi du fichier", "Extraction du texte", "Découpage en passages", "Indexation pour la recherche (Voyage AI)"]
+              : ["Lecture de la page web", "Découpage en passages", "Indexation pour la recherche (Voyage AI)"]
+          }
+        />
+      )}
 
       <div className={styles.sourcesSection}>
         <span className={styles.sourcesSectionTitle}>

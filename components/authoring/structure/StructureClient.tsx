@@ -7,6 +7,7 @@ import {
   Sparkles, RefreshCw, Plus, Trash2, ChevronUp, ChevronDown,
   CheckCircle2, ClipboardList, GraduationCap, ArrowRight,
 } from "lucide-react";
+import StreamingStructurePreview from "./StreamingStructurePreview";
 import styles from "./structure.module.css";
 
 type ContentType = "lesson" | "quiz";
@@ -82,32 +83,100 @@ export default function StructureClient({
   formationId,
   basePath,
   initialStructure,
+  expectedModules,
 }: {
   formationId: string;
   basePath: string;
   initialStructure: ExistingStructure | null;
+  /** Nombre de modules demandé au cadrage — progression affichée pendant le streaming. */
+  expectedModules: number | null;
 }) {
   const router = useRouter();
   const [structure, setStructure] = React.useState<StructureProposal | null>(initialStructure?.proposal ?? null);
   const [validatedAt, setValidatedAt] = React.useState<string | null>(initialStructure?.validated_at ?? null);
   const [generating, setGenerating] = React.useState(false);
   const [validating, setValidating] = React.useState(false);
+  // JSON partiel reçu pendant la génération en streaming (voir
+  // StreamingStructurePreview) — rafraîchi au plus une fois par frame.
+  const [streamText, setStreamText] = React.useState("");
+  const [retrying, setRetrying] = React.useState(false);
+  const streamBufferRef = React.useRef("");
+  const frameRef = React.useRef<number | null>(null);
+
+  function pushStreamText(text: string) {
+    streamBufferRef.current = text;
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      setStreamText(streamBufferRef.current);
+    });
+  }
+
+  React.useEffect(() => () => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+  }, []);
 
   async function handleGenerate() {
     setGenerating(true);
+    setRetrying(false);
+    pushStreamText("");
     try {
       const res = await fetch(`/api/org/formations/${formationId}/structure/generate`, { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) {
-        toast.error("Erreur", { description: json.error });
+      // Erreurs de contrôle (cadrage absent, abonnement...) : réponse JSON classique.
+      if (!res.ok || !res.body) {
+        const json = await res.json().catch(() => null);
+        toast.error("Erreur", { description: json?.error ?? "La génération n'a pas pu démarrer." });
         return;
       }
-      setStructure(json.data.proposal);
-      toast.success("Structure proposée — relisez-la et ajustez-la avant de valider.");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = "";
+      let received = "";
+      let finished = false;
+
+      while (!finished) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        pending += decoder.decode(value, { stream: true });
+        const lines = pending.split("\n");
+        pending = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line) as
+            | { type: "delta"; text: string }
+            | { type: "retry"; attempt: number }
+            | { type: "done"; data: { proposal: StructureProposal } }
+            | { type: "error"; error: string };
+          if (event.type === "delta") {
+            received += event.text;
+            pushStreamText(received);
+          } else if (event.type === "retry") {
+            received = "";
+            pushStreamText("");
+            setRetrying(true);
+          } else if (event.type === "done") {
+            setStructure(event.data.proposal);
+            toast.success("Structure proposée — relisez-la et ajustez-la avant de valider.");
+            finished = true;
+          } else {
+            toast.error("Erreur", { description: event.error });
+            finished = true;
+          }
+        }
+      }
+
+      if (!finished) {
+        toast.error("La génération a été interrompue.", {
+          description: "Rechargez la page dans une minute : la structure a peut-être quand même été enregistrée.",
+        });
+      }
     } catch {
       toast.error("Erreur réseau. Réessayez.");
     } finally {
       setGenerating(false);
+      setRetrying(false);
+      pushStreamText("");
     }
   }
 
@@ -216,6 +285,10 @@ export default function StructureClient({
         </button>
       </div>
     );
+  }
+
+  if (generating) {
+    return <StreamingStructurePreview text={streamText} expectedModules={expectedModules} retrying={retrying} />;
   }
 
   if (!structure) {

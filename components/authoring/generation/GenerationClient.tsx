@@ -13,6 +13,7 @@ import { getVideoEmbedUrl } from "@/lib/video";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import Link from "next/link";
 import type { AuthoringSpace } from "../space";
+import WaitingPanel from "../WaitingPanel";
 import styles from "./generation.module.css";
 
 type ContentType = "rich" | "quiz" | "video";
@@ -659,7 +660,10 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
         </>
       ) : !lecon.hasContent ? (
         generating ? (
-          <SkeletonBlocks />
+          <>
+            <LessonWaitingPanel formationId={formationId} isQuiz={lecon.contentType === "quiz"} />
+            <SkeletonBlocks />
+          </>
         ) : (
           <div className={styles.emptyLesson}>
             <Sparkles size={26} className={styles.emptyLessonIcon} />
@@ -672,6 +676,7 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
         )
       ) : (
         <>
+          {generating && <LessonWaitingPanel formationId={formationId} isQuiz={lecon.contentType === "quiz"} />}
           {lecon.contentType === "rich" ? (
             <div className={styles.editorWrap}>
               <BlockEditor
@@ -779,6 +784,24 @@ function PreviewModal({ title, blocks, onClose }: { title: string; blocks: Conte
 // désactivé pendant potentiellement de longues secondes) — la régénération
 // d'un contenu déjà existant garde son propre indicateur (icône qui tourne),
 // l'ancien contenu restant visible pendant le remplacement.
+// Durées mesurées avec le modèle de génération sur un vrai document : ~28 s
+// pour une leçon, ~16 s pour un quiz.
+function LessonWaitingPanel({ formationId, isQuiz }: { formationId: string; isQuiz: boolean }) {
+  return isQuiz ? (
+    <WaitingPanel
+      formationId={formationId}
+      estimatedSeconds={18}
+      steps={["Recherche des passages du module dans vos documents", "Rédaction des questions", "Vérification des bonnes réponses"]}
+    />
+  ) : (
+    <WaitingPanel
+      formationId={formationId}
+      estimatedSeconds={30}
+      steps={["Recherche des passages pertinents dans vos documents", "Rédaction de la leçon", "Mise en forme des blocs"]}
+    />
+  );
+}
+
 function SkeletonBlocks() {
   return (
     <div className={styles.skeleton}>
