@@ -40,8 +40,8 @@
 .barFill {
   height: 100%;
   background: var(--coral);
-  border-radius: 3px;
-  transition: width 0.25s linear;
+  transform-origin: left center;
+  transition: transform 0.25s linear;
 }
 
 .remaining {
