@@ -11,6 +11,37 @@ import styles from "./structure.module.css";
 
 type ContentType = "lesson" | "quiz";
 
+/**
+ * Description de leçon affichée en entier : la hauteur suit le contenu au lieu
+ * d'un bloc de 2 lignes avec barre de défilement interne.
+ */
+function AutoGrowTextarea({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  className: string;
+}) {
+  const ref = React.useRef<HTMLTextAreaElement>(null);
+
+  const fit = React.useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  React.useLayoutEffect(fit, [value, fit]);
+  React.useEffect(() => {
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [fit]);
+
+  return <textarea ref={ref} className={className} value={value} rows={1} onChange={(e) => onChange(e.target.value)} />;
+}
+
 interface StructureLessonDraft {
   title: string;
   description: string;
@@ -248,11 +279,10 @@ export default function StructureClient({
                     value={lesson.title}
                     onChange={(e) => updateLesson(mi, li, { title: e.target.value })}
                   />
-                  <textarea
+                  <AutoGrowTextarea
                     className={styles.lessonDescInput}
                     value={lesson.description}
-                    onChange={(e) => updateLesson(mi, li, { description: e.target.value })}
-                    rows={2}
+                    onChange={(value) => updateLesson(mi, li, { description: value })}
                   />
                 </div>
                 <button
