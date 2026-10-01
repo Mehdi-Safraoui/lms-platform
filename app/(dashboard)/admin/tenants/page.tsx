@@ -5,6 +5,8 @@ import { Plus, Building2, X } from "lucide-react";
 import { toast } from "sonner";
 import styles from "./tenants.module.css";
 import TenantDetailModal from "./TenantDetailModal";
+import UsageMeter from "@/components/usage/UsageMeter";
+import type { TenantUsageSummary } from "@/lib/tenantUsage";
 
 interface Tenant {
   id: string;
@@ -15,6 +17,7 @@ interface Tenant {
   created_at: string;
   activeApprenantCount: number;
   followedFormationCount: number;
+  usage: TenantUsageSummary | null;
 }
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
@@ -167,7 +170,9 @@ export default function TenantsPage() {
                   <th>Entreprise</th>
                   <th>Offre</th>
                   <th>Statut</th>
-                  <th>Apprenants actifs</th>
+                  <th>Apprenants</th>
+                  <th>Formations IA ce mois</th>
+                  <th>Générations IA</th>
                   <th>Formations suivies</th>
                   <th>Créée le</th>
                 </tr>
@@ -203,7 +208,15 @@ export default function TenantsPage() {
                           <span className={`${styles.badge} ${styles.badgeNone}`}>Sans abonnement</span>
                         )}
                       </td>
-                      <td className={styles.cellMuted}>{t.activeApprenantCount}</td>
+                      <td title={`${t.activeApprenantCount} apprenant(s) actif(s)`}>
+                        <UsageMeter used={t.usage?.learners ?? 0} limit={t.usage?.learnerLimit ?? null} noPlan={!t.subscription_plan} />
+                      </td>
+                      <td>
+                        <UsageMeter used={t.usage?.aiFormationsThisMonth ?? 0} limit={t.usage?.aiQuota ?? null} noPlan={!t.subscription_plan} />
+                      </td>
+                      <td className={styles.cellMuted} title="Structures, leçons, quiz et régénérations, toutes formations confondues">
+                        {t.usage?.totalAiGenerations ?? 0}
+                      </td>
                       <td className={styles.cellMuted}>{t.followedFormationCount}</td>
                       <td className={styles.cellMuted}>
                         {new Date(t.created_at).toLocaleDateString("fr-FR")}

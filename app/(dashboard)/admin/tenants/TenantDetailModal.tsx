@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { X, Clock, BookOpen } from "lucide-react";
 import styles from "./tenants.module.css";
+import UsageMeter from "@/components/usage/UsageMeter";
+import type { TenantUsage } from "@/lib/tenantUsage";
 
 interface TenantDetail {
   id: string;
@@ -45,12 +47,19 @@ function roleLabelFromClerkRole(clerkRole: string): string {
   return clerkRole === "org:admin" ? "Administrateur" : "Membre";
 }
 
-export default function TenantDetailModal({ tenantId, onClose }: { tenantId: string; onClose: () => void }) {
+export default function TenantDetailModal({
+  tenantId,
+  onClose,
+}: {
+  tenantId: string;
+  onClose: () => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
   const [formationProgress, setFormationProgress] = useState<FormationProgress[]>([]);
+  const [usage, setUsage] = useState<TenantUsage | null>(null);
 
   useEffect(() => {
     fetch(`/api/admin/tenants/${tenantId}`)
@@ -60,6 +69,7 @@ export default function TenantDetailModal({ tenantId, onClose }: { tenantId: str
         setMembers(j.members ?? []);
         setPendingInvitations(j.pendingInvitations ?? []);
         setFormationProgress(j.formationProgress ?? []);
+        setUsage(j.usage ?? null);
       })
       .finally(() => setLoading(false));
   }, [tenantId]);
@@ -67,9 +77,26 @@ export default function TenantDetailModal({ tenantId, onClose }: { tenantId: str
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={`${styles.modal} ${styles.detailModal}`} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 8,
+          }}
+        >
           <p className={styles.modalTitle}>{tenant?.name ?? "Détail de l'entreprise"}</p>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 4, marginTop: -2 }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--text-muted)",
+              padding: 4,
+              marginTop: -2,
+            }}
+          >
             <X size={18} />
           </button>
         </div>
@@ -83,6 +110,99 @@ export default function TenantDetailModal({ tenantId, onClose }: { tenantId: str
             <p className={styles.detailMeta}>
               {tenant.slug} · Créé le {new Date(tenant.created_at).toLocaleDateString("fr-FR")}
             </p>
+
+            {usage && (
+              <div className={styles.detailSection}>
+                <span className={styles.detailSectionTitle}>Consommation</span>
+                <div className={styles.usageTiles}>
+                  <div className={styles.usageTile}>
+                    <span className={styles.usageTileLabel}>Apprenants</span>
+                    <UsageMeter
+                      used={usage.learners}
+                      limit={usage.learnerLimit}
+                      noPlan={!usage.plan}
+                    />
+                    {pendingInvitations.length > 0 && (
+                      <span className={styles.usageTileHint}>
+                        + {pendingInvitations.length} invitation
+                        {pendingInvitations.length > 1 ? "s" : ""} en attente
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.usageTile}>
+                    <span className={styles.usageTileLabel}>Formations IA ce mois-ci</span>
+                    <UsageMeter
+                      used={usage.aiFormationsThisMonth}
+                      limit={usage.aiQuota}
+                      noPlan={!usage.plan}
+                    />
+                  </div>
+                  <div className={styles.usageTile}>
+                    <span className={styles.usageTileLabel}>Générations IA (total)</span>
+                    <span className={styles.usageTileValue}>{usage.totalAiGenerations}</span>
+                    <span className={styles.usageTileHint}>
+                      structures, leçons, quiz, régénérations
+                    </span>
+                  </div>
+                </div>
+
+                {(() => {
+                  const max = Math.max(1, ...usage.history.map((h) => h.count));
+                  return (
+                    <>
+                      <span className={styles.usageChartTitle}>
+                        Formations IA démarrées par mois
+                      </span>
+                      <div
+                        className={styles.usageChart}
+                        role="img"
+                        aria-label={`Formations IA démarrées par mois : ${usage.history.map((h) => `${h.label} ${h.count}`).join(", ")}`}
+                      >
+                        {usage.history.map((h) => (
+                          <div
+                            key={h.month}
+                            className={styles.usageCol}
+                            title={`${h.label} : ${h.count} formation${h.count > 1 ? "s" : ""} IA démarrée${h.count > 1 ? "s" : ""}`}
+                          >
+                            <span className={styles.usageColValue}>{h.count}</span>
+                            <span className={styles.usageColTrack}>
+                              <span
+                                className={styles.usageColBar}
+                                style={{ height: `${(h.count / max) * 100}%` }}
+                              />
+                            </span>
+                            <span className={styles.usageColLabel}>{h.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
+
+                {usage.aiFormations.length === 0 ? (
+                  <p className={styles.detailEmpty}>
+                    Aucune formation créée par IA pour le moment.
+                  </p>
+                ) : (
+                  <div className={styles.memberList}>
+                    {usage.aiFormations.map((f) => (
+                      <div key={f.id} className={styles.memberRow}>
+                        <div className={styles.memberInfo}>
+                          <span className={styles.memberName}>{f.title}</span>
+                          <span className={styles.memberEmail}>
+                            Démarrée le {new Date(f.startedAt).toLocaleDateString("fr-FR")} ·{" "}
+                            {f.isPublished ? "publiée" : "brouillon"}
+                          </span>
+                        </div>
+                        <span className={styles.roleBadge}>
+                          {f.generationCount} génération{f.generationCount > 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className={styles.detailSection}>
               <span className={styles.detailSectionTitle}>Membres ({members.length})</span>
@@ -107,7 +227,9 @@ export default function TenantDetailModal({ tenantId, onClose }: { tenantId: str
             </div>
 
             <div className={styles.detailSection}>
-              <span className={styles.detailSectionTitle}>Formations suivies ({formationProgress.length})</span>
+              <span className={styles.detailSectionTitle}>
+                Formations suivies ({formationProgress.length})
+              </span>
               {formationProgress.length === 0 ? (
                 <p className={styles.detailEmpty}>Aucune formation activée par cette entreprise.</p>
               ) : (
@@ -120,10 +242,14 @@ export default function TenantDetailModal({ tenantId, onClose }: { tenantId: str
                       <div className={styles.memberInfo}>
                         <span className={styles.memberName}>{f.title}</span>
                         <span className={styles.memberEmail}>
-                          Complétion moyenne sur {f.apprenantCount} apprenant{f.apprenantCount > 1 ? "s" : ""}
+                          Complétion moyenne sur {f.apprenantCount} apprenant
+                          {f.apprenantCount > 1 ? "s" : ""}
                         </span>
                         <div className={styles.formationProgressBar}>
-                          <div className={styles.formationProgressFill} style={{ width: `${f.avgCompletionPct}%` }} />
+                          <div
+                            className={styles.formationProgressFill}
+                            style={{ width: `${f.avgCompletionPct}%` }}
+                          />
                         </div>
                       </div>
                       <span className={styles.formationPct}>{f.avgCompletionPct}%</span>
@@ -135,7 +261,9 @@ export default function TenantDetailModal({ tenantId, onClose }: { tenantId: str
 
             {pendingInvitations.length > 0 && (
               <div className={styles.detailSection}>
-                <span className={styles.detailSectionTitle}>Invitations en attente ({pendingInvitations.length})</span>
+                <span className={styles.detailSectionTitle}>
+                  Invitations en attente ({pendingInvitations.length})
+                </span>
                 <div className={styles.memberList}>
                   {pendingInvitations.map((inv) => (
                     <div key={inv.id} className={styles.memberRow}>
@@ -144,9 +272,13 @@ export default function TenantDetailModal({ tenantId, onClose }: { tenantId: str
                       </span>
                       <div className={styles.memberInfo}>
                         <span className={styles.memberName}>{inv.emailAddress}</span>
-                        <span className={styles.memberEmail}>{roleLabelFromClerkRole(inv.role)}</span>
+                        <span className={styles.memberEmail}>
+                          {roleLabelFromClerkRole(inv.role)}
+                        </span>
                       </div>
-                      <span className={`${styles.roleBadge} ${styles.roleBadgePending}`}>En attente</span>
+                      <span className={`${styles.roleBadge} ${styles.roleBadgePending}`}>
+                        En attente
+                      </span>
                     </div>
                   ))}
                 </div>

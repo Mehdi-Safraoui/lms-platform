@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CreditCard, FileText, Download } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { stripe, PLANS, type PlanKey } from "@/lib/stripe";
+import { getTenantUsage, nextQuotaResetLabel } from "@/lib/tenantUsage";
 import ManageBillingButton from "./ManageBillingButton";
 import styles from "./abonnement.module.css";
 
@@ -42,11 +43,7 @@ export default async function AbonnementPage() {
     .eq("id", currentUser.tenant_id)
     .single();
 
-  const { count: apprenantCount } = await supabase
-    .from("users")
-    .select("*", { count: "exact", head: true })
-    .eq("tenant_id", currentUser.tenant_id)
-    .eq("role", "apprenant");
+  const usage = await getTenantUsage(supabase, currentUser.tenant_id);
 
   const planKey = tenant?.subscription_plan as PlanKey | null;
   const plan = planKey && PLANS[planKey] ? PLANS[planKey] : null;
@@ -58,6 +55,8 @@ export default async function AbonnementPage() {
       : null;
 
   let renewalDate: Date | null = null;
+  // Prix réellement facturé par Stripe (le libellé de PLANS n'est qu'un repli).
+  let billedPrice: string | null = null;
   let card: { brand: string; last4: string; expMonth: number; expYear: number } | null = null;
   let invoices: { id: string; number: string | null; created: number; amountPaid: number; currency: string; status: string | null; url: string | null }[] = [];
 
@@ -67,7 +66,15 @@ export default async function AbonnementPage() {
         expand: ["default_payment_method"],
       });
       const item = subscription.items.data[0];
-      if (item) renewalDate = new Date(item.current_period_end * 1000);
+      if (item) {
+        renewalDate = new Date(item.current_period_end * 1000);
+        const price = item.price;
+        if (price?.unit_amount != null && price.currency) {
+          const amount = new Intl.NumberFormat("fr-FR", { style: "currency", currency: price.currency.toUpperCase(), maximumFractionDigits: price.unit_amount % 100 ? 2 : 0 }).format(price.unit_amount / 100);
+          const interval = price.recurring?.interval === "year" ? "an" : price.recurring?.interval === "month" ? "mois" : null;
+          billedPrice = interval ? `${amount} / ${interval}` : amount;
+        }
+      }
 
       const pm = subscription.default_payment_method;
       if (pm && typeof pm === "object" && pm.card) {
@@ -98,7 +105,7 @@ export default async function AbonnementPage() {
         Facturation
       </div>
       <h1 className={styles.title}>Abonnement</h1>
-      <p className={styles.subtitle}>Géré via Stripe · facturation en euros.</p>
+      <p className={styles.subtitle}>Géré via Stripe.</p>
 
       <div className={styles.topRow}>
         <div className={styles.planCard}>
@@ -109,7 +116,7 @@ export default async function AbonnementPage() {
           <h2 className={styles.planName}>{plan?.name ?? "Aucune offre active"}</h2>
           {plan && (
             <p className={styles.planPrice}>
-              {plan.price} {plan.period}
+              {billedPrice ?? `${plan.price} ${plan.period}`}
               {renewalDate &&
                 (cancelScheduled
                   ? ` · accès jusqu'au ${renewalDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}, non renouvelé`
@@ -124,12 +131,28 @@ export default async function AbonnementPage() {
           <div className={styles.planDivider} />
           <div className={styles.planStats}>
             <div className={styles.planStat}>
-              <span className={styles.planStatValue}>{apprenantCount ?? 0}</span>
-              <span className={styles.planStatLabel}>apprenants</span>
+              <span className={styles.planStatValue}>
+                {usage?.learners ?? 0}
+                {usage?.learnerLimit != null && <span className={styles.planStatLimit}> / {usage.learnerLimit}</span>}
+              </span>
+              <span className={styles.planStatLabel}>
+                apprenants{usage?.learnerLimit == null && plan ? " · illimité" : ""}
+              </span>
+            </div>
+            <div className={styles.planStat}>
+              <span className={styles.planStatValue}>
+                {usage?.aiQuota === 0 ? "—" : usage?.aiFormationsThisMonth ?? 0}
+                {usage?.aiQuota != null && usage.aiQuota > 0 && <span className={styles.planStatLimit}> / {usage.aiQuota}</span>}
+              </span>
+              <span className={styles.planStatLabel}>
+                {usage?.aiQuota === 0
+                  ? "création par IA non incluse"
+                  : `formations IA ce mois-ci · renouvelé le ${nextQuotaResetLabel()}`}
+              </span>
             </div>
             <div className={styles.planStat}>
               <span className={styles.planStatValue}>Illimité</span>
-              <span className={styles.planStatLabel}>formations</span>
+              <span className={styles.planStatLabel}>formations du catalogue Ahead</span>
             </div>
           </div>
         </div>
