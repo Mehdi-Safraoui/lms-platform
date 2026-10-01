@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Star, CheckCircle, Building2 } from "lucide-react";
+import { Star, CheckCircle, Building2, Flame } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { computeBadges, detectAndPersistNewBadges } from "@/lib/badges";
+import { computeGamification, detectAndPersistNewBadges } from "@/lib/badges";
 import { formationCover } from "@/lib/formationAccent";
 import BadgeUnlockToasts from "./BadgeUnlockToasts";
 import styles from "./apprenant.module.css";
@@ -54,8 +54,15 @@ export default async function ApprenantPage() {
   const enrolledIds = new Set((userEnrollments ?? []).map((e) => e.formation_id));
 
   // ── Badges : calculés en direct depuis la progression réelle ──
-  const badges = dbUser ? await computeBadges(dbUser.id, tenantFormationIds) : [];
-  const newlyUnlocked = dbUser ? await detectAndPersistNewBadges(dbUser.id, badges) : [];
+  const gamification = dbUser ? await computeGamification(dbUser.id, tenantFormationIds) : null;
+  const badges = gamification?.badges ?? [];
+  const streak = gamification?.streak ?? null;
+  const newlyUnlocked = dbUser && gamification
+    ? await detectAndPersistNewBadges(dbUser.id, [
+        ...badges,
+        ...gamification.competences.map((c) => ({ id: c.id, label: `Compétence · ${c.label}`, earned: c.earned })),
+      ])
+    : [];
 
   return (
     <div className={styles.page}>
@@ -66,9 +73,23 @@ export default async function ApprenantPage() {
       </div>
       <div className={styles.titleRow}>
         <h1 className={styles.title}>Mes formations</h1>
-        <div className={styles.pointsBadge}>
-          <Star size={13} />
-          <span>{totalPoints} points</span>
+        <div className={styles.titleChips}>
+          {streak && streak.current > 0 && (
+            <div
+              className={`${styles.streakBadge} ${streak.activeToday ? "" : styles.streakBadgeAtRisk}`}
+              title={streak.activeToday ? `Record : ${streak.best} jour${streak.best > 1 ? "s" : ""}` : "Suivez une leçon aujourd'hui pour garder votre série"}
+            >
+              <Flame size={13} />
+              <span>
+                Série de {streak.current} jour{streak.current > 1 ? "s" : ""}
+                {!streak.activeToday && " · à prolonger aujourd'hui"}
+              </span>
+            </div>
+          )}
+          <div className={styles.pointsBadge}>
+            <Star size={13} />
+            <span>{totalPoints} points</span>
+          </div>
         </div>
       </div>
 

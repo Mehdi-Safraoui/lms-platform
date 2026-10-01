@@ -2,7 +2,16 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/api/webhooks/(.*)", "/pricing(.*)"]);
+// /certificats et le PDF associé : vérification publique d'un certificat
+// partagé (LinkedIn, recruteur), sans compte.
+const isPublicRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/webhooks/(.*)",
+  "/pricing(.*)",
+  "/certificats/(.*)",
+  "/api/certificates/(.*)/pdf",
+]);
 
 const isRootRoute = createRouteMatcher(["/"]);
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);

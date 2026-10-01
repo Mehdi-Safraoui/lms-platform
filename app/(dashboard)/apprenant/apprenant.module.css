@@ -349,3 +349,22 @@
   border-radius: 999px;
   padding: 2px 8px;
 }
+
+.titleChips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* Série de jours consécutifs (lib/streaks.ts) */
+.streakBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--coral-light);
+  border: 1px solid #f6c3b2;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 700;
+}
+.streakBadge svg { color: var(--coral); }
+.streakBadgeAtRisk { background: var(--card); border-style: dashed; }

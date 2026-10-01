@@ -1,7 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
-import { Star, TrendingUp, BookOpen, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { Star, TrendingUp, BookOpen, CheckCircle2, Flame, Award, ChevronRight } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { computeBadges } from "@/lib/badges";
+import { computeGamification } from "@/lib/badges";
+import { getOrIssueCertificate, formatCertificateDate } from "@/lib/certificates";
 import styles from "./progression.module.css";
 
 const POINTS_PER_LEVEL = 500;
@@ -65,8 +67,22 @@ export default async function ProgressionPage() {
   const pointsToNextLevel = POINTS_PER_LEVEL - (totalPoints % POINTS_PER_LEVEL);
   const globalPct = allLeconIds.length > 0 ? Math.round((completedLeconIds.size / allLeconIds.length) * 100) : 0;
 
-  const badges = dbUser ? await computeBadges(dbUser.id, tenantFormationIds) : [];
-  const earnedCount = badges.filter((b) => b.earned).length;
+  const gamification = dbUser ? await computeGamification(dbUser.id, tenantFormationIds) : null;
+  const badges = gamification?.badges ?? [];
+  const competences = gamification?.competences ?? [];
+  const streak = gamification?.streak ?? { current: 0, best: 0, activeToday: false, activeDays: 0 };
+  const earnedCount = badges.filter((b) => b.earned).length + competences.filter((c) => c.earned).length;
+  const competencesByFormation = competences.reduce<Record<string, typeof competences>>((acc, c) => {
+    (acc[c.formationTitle] ??= []).push(c);
+    return acc;
+  }, {});
+
+  // Certificats : délivrance au passage si un seuil vient d'être atteint.
+  const certificates = dbUser
+    ? (await Promise.all(enrolledFormationIds.map((id) => getOrIssueCertificate(supabase, dbUser.id, id))))
+        .map((status) => status.certificate)
+        .filter((c): c is NonNullable<typeof c> => c !== null)
+    : [];
 
   return (
     <div className={styles.page}>
@@ -109,8 +125,22 @@ export default async function ProgressionPage() {
             <BookOpen size={18} />
           </div>
           <div className={styles.statBody}>
-            <span className={styles.statValue}>{earnedCount}/{badges.length}</span>
+            <span className={styles.statValue}>{earnedCount}/{badges.length + competences.length}</span>
             <span className={styles.statLabel}>Badges débloqués</span>
+          </div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={`${styles.statIcon} ${styles.statIconCoral}`}>
+            <Flame size={18} />
+          </div>
+          <div className={styles.statBody}>
+            <span className={styles.statValue}>
+              {streak.current} jour{streak.current > 1 ? "s" : ""}
+            </span>
+            <span className={styles.statLabel}>
+              Série en cours · record {streak.best} jour{streak.best > 1 ? "s" : ""}
+              {streak.current > 0 && !streak.activeToday && " · à prolonger aujourd'hui"}
+            </span>
           </div>
         </div>
       </div>
@@ -136,6 +166,52 @@ export default async function ProgressionPage() {
           </div>
         )}
       </section>
+
+      {certificates.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Mes certificats</h2>
+          <div className={styles.formationList}>
+            {certificates.map((c) => (
+              <Link key={c.id} href={`/certificats/${c.id}`} className={styles.certificateRow}>
+                <Award size={18} className={styles.certificateIcon} />
+                <span className={styles.certificateBody}>
+                  <span className={styles.formationTitle}>{c.formation_title}</span>
+                  <span className={styles.formationCaption}>Délivré le {formatCertificateDate(c.issued_at)}</span>
+                </span>
+                <ChevronRight size={16} className={styles.certificateChevron} />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {Object.keys(competencesByFormation).length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Compétences</h2>
+          <p className={styles.sectionHint}>Un badge par module terminé, quiz réussi compris.</p>
+          {Object.entries(competencesByFormation).map(([formationTitle, list]) => (
+            <div key={formationTitle} className={styles.competenceGroup}>
+              <span className={styles.competenceFormation}>{formationTitle}</span>
+              <div className={styles.badgesGrid}>
+                {list.map((c) => (
+                  <div key={c.id} className={`${styles.badgeCard} ${c.earned ? styles.badgeCardEarned : ""}`}>
+                    <span className={`${styles.badgeIcon} ${c.earned ? styles.badgeIconEarned : ""}`}>
+                      <Award size={20} />
+                    </span>
+                    <div className={styles.badgeCardBody}>
+                      <span className={styles.badgeCardLabel}>{c.label}</span>
+                      <span className={styles.badgeCardDesc}>{c.completed}/{c.total} leçons</span>
+                    </div>
+                    <span className={`${styles.badgeStatus} ${c.earned ? styles.badgeStatusEarned : ""}`}>
+                      {c.earned ? "Acquise" : `${c.total ? Math.round((c.completed / c.total) * 100) : 0} %`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Badges</h2>

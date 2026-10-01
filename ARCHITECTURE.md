@@ -124,7 +124,9 @@ Deux chemins possibles :
 - **Quiz corrigés côté serveur** (`POST /api/progress/quiz-passed`) : le navigateur n'envoie que les réponses choisies, les bonnes réponses ne sont plus envoyées à la page de leçon, et chaque réponse est enregistrée dans `quiz_results.answers` (analyse par question). Une leçon quiz n'est marquée terminée qu'une fois le quiz réussi.
 
 - `/apprenant/progression` — vue d'ensemble apprenant : complétion globale, progression par formation, badges
-- Badges calculés en direct depuis `progress`/`quiz_results` (pas de moteur de règles) : `lib/badges.ts` (`computeBadges`, `detectAndPersistNewBadges`)
+- Badges calculés en direct depuis `progress`/`quiz_results` (pas de moteur de règles) : `lib/badges.ts` (`computeGamification`, `detectAndPersistNewBadges`) — 8 badges généraux (dont séries de 3, 7 et 30 jours) et un **badge de compétence par module** terminé (quiz réussi compris), nommé d'après le module
+- **Séries** (`lib/streaks.ts`) : jours consécutifs avec une activité (leçon, quiz), en heure de Paris ; la série reste valable tant que l'apprenant a été actif aujourd'hui ou hier. Affichée sur le tableau de bord apprenant et la page Progression
+- **Certificats** (`lib/certificates.ts`, table `certificates`, migration `20261001000001_certificates.sql`) : délivrés automatiquement à l'ouverture de la formation ou de la page Progression dès que `attestation_threshold_pct` est atteint (libellés figés à la délivrance). PDF généré à la demande avec `pdf-lib` (`GET /api/certificates/[id]/pdf`), page publique de vérification `/certificats/[id]` (routes publiques dans `proxy.ts`), ajout au profil LinkedIn (« Licences et certifications »)
 - Table `user_badges` sert uniquement à détecter un déblocage "nouveau" pour déclencher un toast (`BadgeUnlockToasts.tsx`), pas de source de vérité pour l'état des badges
 - Points crédités via `total_points` sur `users`, niveau = `floor(points / 500) + 1`
 
