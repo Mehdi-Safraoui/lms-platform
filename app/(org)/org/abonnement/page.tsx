@@ -1,9 +1,9 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { CreditCard, FileText, Download } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { stripe, PLANS, type PlanKey } from "@/lib/stripe";
 import { getTenantUsage, nextQuotaResetLabel } from "@/lib/tenantUsage";
+import { getCurrentUser, getTenant } from "@/lib/currentUser";
 import ManageBillingButton from "./ManageBillingButton";
 import styles from "./abonnement.module.css";
 
@@ -23,27 +23,14 @@ const INVOICE_STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function AbonnementPage() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) redirect("/sign-in");
-
-  const supabase = createServiceRoleSupabaseClient();
-  const { data: currentUser } = await supabase
-    .from("users")
-    .select("role, tenant_id")
-    .eq("clerk_user_id", clerkUserId)
-    .single();
-
-  if (!currentUser?.tenant_id || currentUser.role !== "admin_tenant") {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/sign-in");
+  if (!currentUser.tenant_id || currentUser.role !== "admin_tenant") {
     redirect("/org");
   }
 
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("subscription_plan, subscription_status, stripe_customer_id, stripe_subscription_id, cancel_at_period_end")
-    .eq("id", currentUser.tenant_id)
-    .single();
-
-  const usage = await getTenantUsage(supabase, currentUser.tenant_id);
+  const supabase = createServiceRoleSupabaseClient();
+  const [tenant, usage] = await Promise.all([getTenant(currentUser.tenant_id), getTenantUsage(supabase, currentUser.tenant_id)]);
 
   const planKey = tenant?.subscription_plan as PlanKey | null;
   const plan = planKey && PLANS[planKey] ? PLANS[planKey] : null;
@@ -61,10 +48,15 @@ export default async function AbonnementPage() {
   let invoices: { id: string; number: string | null; created: number; amountPaid: number; currency: string; status: string | null; url: string | null }[] = [];
 
   try {
-    if (tenant?.stripe_subscription_id) {
-      const subscription = await stripe.subscriptions.retrieve(tenant.stripe_subscription_id, {
-        expand: ["default_payment_method"],
-      });
+    // Abonnement et factures demandés à Stripe en parallèle.
+    const [subscription, invoiceList] = await Promise.all([
+      tenant?.stripe_subscription_id
+        ? stripe.subscriptions.retrieve(tenant.stripe_subscription_id, { expand: ["default_payment_method"] })
+        : null,
+      tenant?.stripe_customer_id ? stripe.invoices.list({ customer: tenant.stripe_customer_id, limit: 5 }) : null,
+    ]);
+
+    if (subscription) {
       const item = subscription.items.data[0];
       if (item) {
         renewalDate = new Date(item.current_period_end * 1000);
@@ -82,8 +74,7 @@ export default async function AbonnementPage() {
       }
     }
 
-    if (tenant?.stripe_customer_id) {
-      const invoiceList = await stripe.invoices.list({ customer: tenant.stripe_customer_id, limit: 5 });
+    if (invoiceList) {
       invoices = invoiceList.data.map((inv, idx) => ({
         id: inv.id ?? inv.number ?? `invoice-${idx}`,
         number: inv.number,

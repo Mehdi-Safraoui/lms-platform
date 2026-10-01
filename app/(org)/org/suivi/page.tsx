@@ -1,19 +1,18 @@
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { BarChart3, ChevronRight } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { loadFormationsOverview } from "@/lib/formationAnalytics";
 import styles from "./suivi.module.css";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrgSuiviPage() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) redirect("/sign-in");
+  const user = await getCurrentUser();
+  if (!user) redirect("/sign-in");
 
   const supabase = createServiceRoleSupabaseClient();
-  const { data: user } = await supabase.from("users").select("role, tenant_id").eq("clerk_user_id", clerkUserId).single();
   if (!user?.tenant_id || !["admin_tenant", "tuteur"].includes(user.role)) redirect("/org");
 
   const rows = await loadFormationsOverview(supabase, user.tenant_id);

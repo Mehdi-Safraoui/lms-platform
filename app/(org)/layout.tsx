@@ -1,7 +1,8 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Toaster } from "sonner";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser, getTenant } from "@/lib/currentUser";
 import OrgShell from "./OrgShell";
 
 /**
@@ -12,13 +13,22 @@ import OrgShell from "./OrgShell";
  * logo_url est vide en base, on va vérifier une fois auprès de Clerk (source
  * de vérité) et on corrige Supabase à la volée si un logo existe réellement —
  * auto-guérison au prochain chargement du dashboard, sans intervention manuelle.
+ *
+ * Une entreprise sans logo n'est revérifiée qu'au plus toutes les 10 minutes
+ * (par instance serveur) : sinon chaque page ajoutait un appel à l'API Clerk.
  */
+const LOGO_RECHECK_MS = 10 * 60 * 1000;
+const logoCheckedAt = new Map<string, number>();
+
 async function resolveTenantLogoUrl(
   supabase: ReturnType<typeof createServiceRoleSupabaseClient>,
   tenant: { id: string; clerk_org_id: string | null; logo_url: string | null }
 ): Promise<string | null> {
   if (tenant.logo_url) return tenant.logo_url;
   if (!tenant.clerk_org_id) return null;
+  const lastCheck = logoCheckedAt.get(tenant.id);
+  if (lastCheck && Date.now() - lastCheck < LOGO_RECHECK_MS) return null;
+  logoCheckedAt.set(tenant.id, Date.now());
 
   try {
     const client = await clerkClient();
@@ -35,27 +45,13 @@ async function resolveTenantLogoUrl(
 }
 
 export default async function OrgLayout({ children }: { children: React.ReactNode }) {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) redirect("/sign-in");
+  const user = await getCurrentUser();
+  if (!user) redirect("/sign-in");
 
-  const supabase = createServiceRoleSupabaseClient();
-  const { data: user } = await supabase
-    .from("users")
-    .select("role, tenant_id")
-    .eq("clerk_user_id", clerkUserId)
-    .single();
+  const tenantId = user.tenant_id;
+  const tenant = tenantId ? await getTenant(tenantId) : null;
 
-  const tenantId = user?.tenant_id ?? null;
-  const { data: tenant } = tenantId
-    ? await supabase
-        .from("tenants")
-        .select("name, subscription_status, logo_url, clerk_org_id")
-        .eq("id", tenantId)
-        .single()
-    : { data: null };
-
-  const tenantLogoUrl =
-    tenant && tenantId ? await resolveTenantLogoUrl(supabase, { ...tenant, id: tenantId }) : null;
+  const tenantLogoUrl = tenant ? await resolveTenantLogoUrl(createServiceRoleSupabaseClient(), tenant) : null;
 
   const hasSubscription = tenant?.subscription_status === "active" || tenant?.subscription_status === "trialing";
 

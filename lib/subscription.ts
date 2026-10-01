@@ -1,12 +1,10 @@
-import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getTenant } from "@/lib/currentUser";
+
+// Ligne tenants lue via getTenant (React cache) : déjà chargée par le layout
+// org dans la même requête, pas de nouvelle lecture en base.
 
 export async function hasActiveSubscription(tenantId: string): Promise<boolean> {
-  const supabase = createServiceRoleSupabaseClient();
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("subscription_status")
-    .eq("id", tenantId)
-    .single();
+  const tenant = await getTenant(tenantId);
 
   return tenant?.subscription_status === "active" || tenant?.subscription_status === "trialing";
 }
@@ -16,12 +14,7 @@ export async function hasActiveSubscription(tenantId: string): Promise<boolean> 
  * Voir memory project_ai_formation_generation pour le détail des 3 offres.
  */
 export async function canCreateFormationByAi(tenantId: string): Promise<boolean> {
-  const supabase = createServiceRoleSupabaseClient();
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("subscription_status, subscription_plan")
-    .eq("id", tenantId)
-    .single();
+  const tenant = await getTenant(tenantId);
 
   const activeStatus = tenant?.subscription_status === "active" || tenant?.subscription_status === "trialing";
   const eligiblePlan = tenant?.subscription_plan === "creation" || tenant?.subscription_plan === "entreprise";
