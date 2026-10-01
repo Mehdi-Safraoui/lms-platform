@@ -1,5 +1,6 @@
 import { zodTextFormat } from "openai/helpers/zod";
 import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
+import { recordOpenAiUsage } from "@/lib/aiUsage";
 import { structureProposalSchema, type StructureProposal } from "./structureProposal";
 
 // La source, c'est le texte COMPLET des documents de la formation, reconstitué
@@ -88,7 +89,12 @@ async function callModel(
     if (event.type === "response.output_text.delta") {
       output += event.delta;
       onDelta?.(event.delta);
+    } else if (event.type === "response.completed" || event.type === "response.incomplete") {
+      // Seul l'événement final porte le décompte des tokens ; une réponse
+      // tronquée (incomplete) est facturée elle aussi.
+      await recordOpenAiUsage(event.response.model, event.response.usage);
     } else if (event.type === "response.failed") {
+      await recordOpenAiUsage(event.response.model, event.response.usage);
       throw new Error(event.response.error?.message ?? "La génération a échoué côté modèle.");
     } else if (event.type === "error") {
       throw new Error(event.message);

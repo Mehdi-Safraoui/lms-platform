@@ -8,6 +8,7 @@ import { searchChunks } from "@/lib/searchChunks";
 import { generateLessonContent, generateLessonQuiz, type LessonGenerationInput } from "@/lib/ai/generateLessonContent";
 import type { CadrageInput } from "@/lib/ai/generateStructureProposal";
 import { consumeFormationAi, quotaRefusalMessage } from "@/lib/aiGenerationQuota";
+import { withAiUsage, type AiUsageContext } from "@/lib/aiUsage";
 
 export const dynamic = "force-dynamic";
 // Génération par le modèle le plus capable (OPENAI_GENERATION_MODEL) : mesuré
@@ -83,6 +84,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
     notionsAExclure: cadrageRow.notions_a_exclure ?? [],
   };
 
+  const usage: AiUsageContext = { tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "lecons" };
+
   try {
     if (lecon.content_type === "quiz") {
       // Le quiz teste tout le module : la requête RAG couvre les leçons
@@ -94,14 +97,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
         .eq("content_type", "rich");
       const query = (siblings ?? []).map((s) => `${s.title}. ${s.generation_brief ?? ""}`).join(" ") || lecon.title;
 
-      const chunks = await searchChunks(query, formationId, RAG_TOP_K_QUIZ, "document");
+      const chunks = await withAiUsage(usage, () => searchChunks(query, formationId, RAG_TOP_K_QUIZ, "document"));
       const input: LessonGenerationInput = {
         leconTitle: lecon.title,
         leconDescription: lecon.generation_brief ?? "",
         cadrage,
         ragContext: chunks.map((c) => c.content).join("\n\n"),
       };
-      const questions = await generateLessonQuiz(input);
+      const questions = await withAiUsage(usage, () => generateLessonQuiz(input));
 
       await supabase.from("quizzes").delete().eq("lecon_id", leconId);
       const { data: quizRow, error: quizError } = await supabase
@@ -127,14 +130,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
     }
 
     const query = `${lecon.title}. ${lecon.generation_brief ?? ""}`;
-    const chunks = await searchChunks(query, formationId, RAG_TOP_K_LESSON, "document");
+    const chunks = await withAiUsage(usage, () => searchChunks(query, formationId, RAG_TOP_K_LESSON, "document"));
     const input: LessonGenerationInput = {
       leconTitle: lecon.title,
       leconDescription: lecon.generation_brief ?? "",
       cadrage,
       ragContext: chunks.map((c) => c.content).join("\n\n"),
     };
-    const blocks = await generateLessonContent(input);
+    const blocks = await withAiUsage(usage, () => generateLessonContent(input));
 
     const { error: updateError } = await supabase
       .from("lecons")

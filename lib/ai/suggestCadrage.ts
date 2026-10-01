@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
+import { recordOpenAiUsage } from "@/lib/aiUsage";
 
 /**
  * Bouton "Décider pour moi" du stepper de cadrage : contrairement à
@@ -122,6 +123,7 @@ export async function suggestFullCadrage(documentContext: string, context: Cadra
     text: { format: zodTextFormat(fullCadrageResult, "cadrage_suggest_full") },
     max_output_tokens: 2_000,
   });
+  await recordOpenAiUsage(response.model, response.usage);
 
   if (!response.output_text) throw new Error("Le modèle n'a renvoyé aucun contenu.");
   const result = fullCadrageResult.parse(JSON.parse(response.output_text));

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
+import { recordOpenAiUsage } from "@/lib/aiUsage";
 import { contentBlockSchema, quizQuestionSchema, type ContentBlock, type QuizQuestion } from "./contentBlocks";
 import type { CadrageInput } from "./generateStructureProposal";
 
@@ -106,6 +107,7 @@ export async function generateLessonContent(input: LessonGenerationInput): Promi
       text: { format: zodTextFormat(lessonContentSchema, "lesson_content") },
       max_output_tokens: 8_000,
     });
+    await recordOpenAiUsage(response.model, response.usage);
 
     if (!response.output_text) {
       lastMessage = "Le modèle n'a renvoyé aucun contenu.";
@@ -180,6 +182,7 @@ export async function generateLessonQuiz(input: LessonGenerationInput): Promise<
       text: { format: zodTextFormat(quizContentSchema, "quiz_content") },
       max_output_tokens: 3_000,
     });
+    await recordOpenAiUsage(response.model, response.usage);
 
     if (!response.output_text) {
       lastMessage = "Le modèle n'a renvoyé aucun contenu.";

@@ -5,6 +5,8 @@ import { X, Clock, BookOpen } from "lucide-react";
 import styles from "./tenants.module.css";
 import UsageMeter from "@/components/usage/UsageMeter";
 import type { TenantUsage } from "@/lib/tenantUsage";
+import type { TenantAiCosts } from "@/lib/aiCosts";
+import { formatUsd } from "@/lib/aiPricing";
 
 interface TenantDetail {
   id: string;
@@ -60,6 +62,7 @@ export default function TenantDetailModal({
   const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
   const [formationProgress, setFormationProgress] = useState<FormationProgress[]>([]);
   const [usage, setUsage] = useState<TenantUsage | null>(null);
+  const [aiCosts, setAiCosts] = useState<TenantAiCosts | null>(null);
 
   useEffect(() => {
     fetch(`/api/admin/tenants/${tenantId}`)
@@ -70,6 +73,7 @@ export default function TenantDetailModal({
         setPendingInvitations(j.pendingInvitations ?? []);
         setFormationProgress(j.formationProgress ?? []);
         setUsage(j.usage ?? null);
+        setAiCosts(j.aiCosts ?? null);
       })
       .finally(() => setLoading(false));
   }, [tenantId]);
@@ -196,11 +200,81 @@ export default function TenantDetailModal({
                         </div>
                         <span className={styles.roleBadge}>
                           {f.generationCount} génération{f.generationCount > 1 ? "s" : ""}
+                          {aiCosts?.byFormation[f.id] ? ` · ${formatUsd(aiCosts.byFormation[f.id])}` : ""}
                         </span>
                       </div>
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {aiCosts && (
+              <div className={styles.detailSection}>
+                <span className={styles.detailSectionTitle}>Coût IA</span>
+                <div className={`${styles.usageTiles} ${styles.usageTilesTwo}`}>
+                  <div className={styles.usageTile}>
+                    <span className={styles.usageTileLabel}>Ce mois-ci</span>
+                    <span className={styles.usageTileValue}>{formatUsd(aiCosts.thisMonthUsd)}</span>
+                  </div>
+                  <div className={styles.usageTile}>
+                    <span className={styles.usageTileLabel}>6 derniers mois</span>
+                    <span className={styles.usageTileValue}>{formatUsd(aiCosts.sixMonthsUsd)}</span>
+                  </div>
+                </div>
+
+                {(() => {
+                  const max = Math.max(0.000001, ...aiCosts.history.map((h) => h.usd));
+                  return (
+                    <>
+                      <span className={styles.usageChartTitle}>Coût IA par mois</span>
+                      <div
+                        className={styles.usageChart}
+                        role="img"
+                        aria-label={`Coût IA par mois : ${aiCosts.history.map((h) => `${h.label} ${formatUsd(h.usd)}`).join(", ")}`}
+                      >
+                        {aiCosts.history.map((h) => (
+                          <div key={h.month} className={styles.usageCol} title={`${h.label} : ${formatUsd(h.usd)}`}>
+                            <span className={styles.usageColValue}>{h.usd ? formatUsd(h.usd) : "—"}</span>
+                            <span className={styles.usageColTrack}>
+                              {h.usd > 0 && (
+                                <span className={styles.usageColBar} style={{ height: `${(h.usd / max) * 100}%` }} />
+                              )}
+                            </span>
+                            <span className={styles.usageColLabel}>{h.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
+
+                <span className={styles.usageChartTitle}>Détail du mois en cours</span>
+                {aiCosts.byFeature.length === 0 ? (
+                  <p className={styles.detailEmpty}>Aucun appel IA ce mois-ci.</p>
+                ) : (
+                  <div className={styles.memberList}>
+                    {aiCosts.byFeature.map((f) => (
+                      <div key={f.feature} className={styles.memberRow}>
+                        <div className={styles.memberInfo}>
+                          <span className={styles.memberName}>{f.label}</span>
+                          <span className={styles.memberEmail}>
+                            {f.calls.toLocaleString("fr-FR")} appel{f.calls > 1 ? "s" : ""} ·{" "}
+                            {f.tokens.toLocaleString("fr-FR")} tokens
+                          </span>
+                        </div>
+                        <span className={styles.roleBadge}>{formatUsd(f.usd)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className={styles.costNote}>
+                  Calculé à partir des tokens réellement facturés par OpenAI et Voyage AI à chaque appel,
+                  aux tarifs publics en dollars. Suivi depuis le 1er octobre 2026.
+                  {aiCosts.unpricedModels.length > 0 &&
+                    ` Modèle sans tarif connu, compté à 0 : ${aiCosts.unpricedModels.join(", ")}.`}
+                </p>
               </div>
             )}
 

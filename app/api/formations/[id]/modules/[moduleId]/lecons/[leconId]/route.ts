@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { embedAndInsertLessonChunks } from "@/lib/chunkLesson";
+import { withAiUsage } from "@/lib/aiUsage";
 import { assertGlobalCatalogueFormation } from "@/lib/api/assert-global-catalogue-formation";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +66,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (content_blocks !== undefined || content_type !== undefined) {
     try {
       const blocks = data.content_type === "rich" ? data.content_blocks : null;
-      await embedAndInsertLessonChunks(leconId, formationId, null, blocks);
+      await withAiUsage({ tenantId: null, formationId, userId: guard.userId, feature: "indexation_lecons" }, () =>
+        embedAndInsertLessonChunks(leconId, formationId, null, blocks)
+      );
     } catch (err) {
       console.error(`[lecons PUT] Indexation RAG échouée pour la leçon ${leconId}:`, err);
     }

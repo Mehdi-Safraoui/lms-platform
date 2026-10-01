@@ -6,6 +6,7 @@ import { canAuthorFormationByAi } from "@/lib/subscription";
 import { generateStructureProposal, type CadrageInput } from "@/lib/ai/generateStructureProposal";
 import { loadSourceDocumentsText } from "@/lib/sourceDocumentsText";
 import { consumeFormationAi, quotaRefusalMessage } from "@/lib/aiGenerationQuota";
+import { withAiUsage } from "@/lib/aiUsage";
 
 export const dynamic = "force-dynamic";
 // Génération par le modèle le plus capable (OPENAI_GENERATION_MODEL) sur le
@@ -102,10 +103,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
       };
 
       try {
-        const proposal = await generateStructureProposal(cadrageInput, sourceText, {
-          onDelta: (text) => send({ type: "delta", text }),
-          onRetry: (attempt) => send({ type: "retry", attempt }),
-        });
+        const proposal = await withAiUsage({ tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "structure" }, () =>
+          generateStructureProposal(cadrageInput, sourceText, {
+            onDelta: (text) => send({ type: "delta", text }),
+            onRetry: (attempt) => send({ type: "retry", attempt }),
+          })
+        );
 
         const { data, error } = await supabase
           .from("formation_structure")

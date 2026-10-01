@@ -3,6 +3,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getTenantUsage } from "@/lib/tenantUsage";
+import { getTenantAiCosts } from "@/lib/aiCosts";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -110,5 +111,6 @@ export async function GET(_req: Request, { params }: Props) {
     pendingInvitations,
     formationProgress,
     usage: await getTenantUsage(supabase, id),
+    aiCosts: await getTenantAiCosts(supabase, id),
   });
 }

@@ -5,6 +5,7 @@ import { canAuthorFormationByAi } from "@/lib/subscription";
 import { detectKnowledgeSourceFormat } from "@/lib/documentExtraction";
 import { processKnowledgeSource } from "@/lib/processKnowledgeSource";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
+import { withAiUsage, type AiUsageContext } from "@/lib/aiUsage";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,9 +25,9 @@ type SupabaseClient = ReturnType<typeof createServiceRoleSupabaseClient>;
  * propres statuts d'erreur en base ; si elle échoue, l'upload reste un succès
  * (la source existe, seule l'indexation a échoué — visible via le badge "erreur").
  */
-async function ingestAndReturn(supabase: SupabaseClient, knowledgeSourceId: string) {
+async function ingestAndReturn(supabase: SupabaseClient, knowledgeSourceId: string, usage: AiUsageContext) {
   try {
-    await processKnowledgeSource(knowledgeSourceId);
+    await withAiUsage(usage, () => processKnowledgeSource(knowledgeSourceId));
   } catch {
     // Déjà tracé dans knowledge_sources.error_message par processKnowledgeSource.
   }
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       .select()
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ data: await ingestAndReturn(supabase, data.id) }, { status: 201 });
+    return NextResponse.json({ data: await ingestAndReturn(supabase, data.id, { tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "sources" }) }, { status: 201 });
   }
 
   if (!(file instanceof File)) {
@@ -158,5 +159,5 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ data: await ingestAndReturn(supabase, data.id) }, { status: 201 });
+  return NextResponse.json({ data: await ingestAndReturn(supabase, data.id, { tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "sources" }) }, { status: 201 });
 }
