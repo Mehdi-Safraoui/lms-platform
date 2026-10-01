@@ -109,7 +109,7 @@
   transform: translateX(-50%);
   padding: 3px 9px 2px;
   border-radius: 6px;
-  background: var(--metro-coral);
+  background: var(--metro-coral-ink);
   color: #fff;
   font-family: var(--font-text), sans-serif;
   font-size: 13px;
@@ -123,7 +123,7 @@
   left: 50%;
   margin-left: -5px;
   border: 5px solid transparent;
-  border-top-color: var(--metro-coral);
+  border-top-color: var(--metro-coral-ink);
 }
 
 .stripTerminus {
