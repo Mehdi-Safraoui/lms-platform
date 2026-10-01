@@ -86,10 +86,19 @@ export default async function ApprenantLessonPage({ params }: Props) {
   if (lecon.content_type === "quiz") {
     const { data } = await supabase
       .from("quizzes")
-      .select("id, title, pass_score, quiz_questions(*)")
+      .select("id, title, pass_score, quiz_questions(id, question_text, options, order_index, points)")
       .eq("lecon_id", lessonId)
       .single();
-    quizData = data ?? null;
+    // Sans les bonnes réponses : la correction est faite et renvoyée par le
+    // serveur à la soumission (POST /api/progress/quiz-passed).
+    quizData = data
+      ? {
+          ...data,
+          quiz_questions: (data.quiz_questions as { id: string; question_text: string; options: { text: string }[]; order_index: number; points: number }[]).map(
+            (q) => ({ ...q, options: q.options.map((o) => ({ text: o.text })) })
+          ),
+        }
+      : null;
   }
 
   let completedInFormation = 0;

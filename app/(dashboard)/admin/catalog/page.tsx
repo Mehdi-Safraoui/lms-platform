@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, Search, BookOpen, ChevronRight, X } from "lucide-react";
+import { Plus, Trash2, Search, BookOpen, ChevronRight, X, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import styles from "./catalog.module.css";
 
@@ -225,6 +225,16 @@ export default function CatalogPage() {
                       </span>
                     </td>
                     <td className={styles.cellActions}>
+                      {f.is_published && (
+                        <button
+                          className={styles.btnIcon}
+                          onClick={(e) => { e.stopPropagation(); router.push(`/admin/catalog/${f.id}/suivi`); }}
+                          title="Suivi des apprenants"
+                          aria-label="Suivi des apprenants"
+                        >
+                          <BarChart3 size={14} strokeWidth={1.75} />
+                        </button>
+                      )}
                       <button
                         className={styles.btnDelete}
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget(f); }}

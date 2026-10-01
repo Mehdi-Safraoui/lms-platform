@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { LayoutDashboard, Users, CreditCard, Sparkles, Wand2 } from "lucide-react";
+import { LayoutDashboard, Users, CreditCard, Sparkles, Wand2, BarChart3 } from "lucide-react";
 import styles from "./layout.module.css";
 import SubscriptionModal from "./SubscriptionModal";
 import NotificationBell from "@/components/shared/NotificationBell";
@@ -11,6 +11,7 @@ import NotificationBell from "@/components/shared/NotificationBell";
 const baseNavItems = [
   { href: "/org", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
   { href: "/org/apprenants", label: "Apprenants", icon: Users, exact: false },
+  { href: "/org/suivi", label: "Suivi", icon: BarChart3, exact: false },
 ];
 
 // "Formations" fusionne le catalogue Ahead et les formations créées par le

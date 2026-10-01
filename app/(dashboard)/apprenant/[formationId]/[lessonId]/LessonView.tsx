@@ -26,7 +26,8 @@ const Markdown = dynamic(
   { ssr: false }
 );
 
-interface QuizOption { text: string; is_correct: boolean; }
+// Pas de is_correct : la correction vient du serveur à la soumission.
+interface QuizOption { text: string; }
 interface QuizQuestion { id: string; question_text: string; options: QuizOption[]; order_index: number; points: number; }
 interface QuizData { id: string; title: string; pass_score: number; quiz_questions: QuizQuestion[]; }
 
@@ -77,6 +78,10 @@ function estimateBlocksReadingMinutes(blocks: ContentBlock[] | null): number {
         return count + block.items.map((it) => `${it.title} ${it.description}`).join(" ").split(/\s+/).filter(Boolean).length;
       case "exercise":
         return count + `${block.prompt} ${block.answer}`.split(/\s+/).filter(Boolean).length;
+      case "image_text":
+        return count + block.text.split(/\s+/).filter(Boolean).length;
+      case "prompt":
+        return count + `${block.title} ${block.prompt}`.split(/\s+/).filter(Boolean).length;
       default:
         return count;
     }
@@ -90,6 +95,10 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
   const [scorePercent, setScorePercent] = useState(0);
+  const [passed, setPassed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  // question_id → index de la bonne réponse, renvoyé par le serveur.
+  const [correction, setCorrection] = useState<Record<string, number>>({});
 
   const allAnswered = questions.every((_, i) => answers[i] !== undefined);
 
@@ -99,32 +108,30 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
   }
 
   async function submit() {
-    let earned = 0;
-    let total = 0;
-    for (let qi = 0; qi < questions.length; qi++) {
-      const q = questions[qi];
-      total += q.points;
-      const oi = answers[qi] ?? -1;
-      if (oi >= 0 && q.options[oi]?.is_correct === true) earned += q.points;
-    }
-    const percent = total > 0 ? Math.round((earned / total) * 100) : 0;
-    const isPassed = percent >= quiz.pass_score;
-
-    setScorePercent(percent);
-    setSubmitted(true);
-
+    setSubmitting(true);
     try {
       const res = await fetch("/api/progress/quiz-passed", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quiz_id: quiz.id, score: earned, max_score: total, passed: isPassed }),
+        body: JSON.stringify({
+          quiz_id: quiz.id,
+          answers: questions.map((q, qi) => ({ question_id: q.id, option_index: answers[qi] ?? -1 })),
+        }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.points_awarded > 0) toast.success(`+${data.points_awarded} points remportés !`);
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error("Impossible d'enregistrer le quiz", { description: data.error });
+        return;
       }
+      setCorrection(Object.fromEntries((data.correction as { question_id: string; correct_index: number }[]).map((c) => [c.question_id, c.correct_index])));
+      setScorePercent(data.percent);
+      setPassed(data.passed);
+      setSubmitted(true);
+      if (data.points_awarded > 0) toast.success(`+${data.points_awarded} points remportés !`);
     } catch {
-      // Ne pas bloquer l'affichage du résultat si l'API échoue
+      toast.error("Erreur réseau — vos réponses n'ont pas été envoyées. Réessayez.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -132,9 +139,9 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
     setAnswers({});
     setSubmitted(false);
     setScorePercent(0);
+    setPassed(false);
+    setCorrection({});
   }
-
-  const passed = scorePercent >= quiz.pass_score;
 
   return (
     <div className={styles.quiz}>
@@ -162,7 +169,7 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
             <div className={styles.quizOptions}>
               {q.options.map((o, oi) => {
                 const selected = answers[qi] === oi;
-                const isCorrect = o.is_correct;
+                const isCorrect = correction[q.id] === oi;
                 let optClass = styles.quizOption;
                 if (submitted) {
                   if (selected && isCorrect) optClass = `${styles.quizOption} ${styles.quizOptionCorrect}`;
@@ -188,8 +195,8 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
       </div>
 
       {!submitted && (
-        <button className={styles.quizSubmitBtn} onClick={submit} disabled={!allAnswered}>
-          Soumettre le quiz
+        <button className={styles.quizSubmitBtn} onClick={submit} disabled={!allAnswered || submitting}>
+          {submitting ? "Correction…" : "Soumettre le quiz"}
         </button>
       )}
     </div>

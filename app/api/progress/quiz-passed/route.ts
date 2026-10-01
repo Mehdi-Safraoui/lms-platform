@@ -11,9 +11,20 @@ export async function POST(req: NextRequest) {
   const guard = await requireAuth();
   if (guard instanceof NextResponse) return guard;
 
-  const { quiz_id, score, max_score, passed } = await req.json();
-  if (!quiz_id || score === undefined || max_score === undefined || passed === undefined) {
-    return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+  // Le navigateur n'envoie que les réponses choisies : le score est calculé
+  // ici, à partir des bonnes réponses en base (avant, il était calculé côté
+  // client et accepté tel quel — un apprenant pouvait se déclarer "réussi").
+  const body = await req.json().catch(() => null);
+  const quiz_id: unknown = body?.quiz_id;
+  const rawAnswers: unknown = body?.answers;
+  if (typeof quiz_id !== "string" || !Array.isArray(rawAnswers)) {
+    return NextResponse.json({ error: "Réponses manquantes — rechargez la page et réessayez." }, { status: 400 });
+  }
+  const selected = new Map<string, number>();
+  for (const a of rawAnswers as { question_id?: unknown; option_index?: unknown }[]) {
+    if (typeof a?.question_id === "string" && Number.isInteger(a.option_index)) {
+      selected.set(a.question_id, a.option_index as number);
+    }
   }
 
   const supabase = createServiceRoleSupabaseClient();
@@ -22,6 +33,29 @@ export async function POST(req: NextRequest) {
   if (!(await isQuizAccessibleToTenant(supabase, tenantId, quiz_id))) {
     return NextResponse.json({ error: "Quiz introuvable" }, { status: 404 });
   }
+
+  const { data: quizRow } = await supabase
+    .from("quizzes")
+    .select("pass_score, quiz_questions(id, options, points)")
+    .eq("id", quiz_id)
+    .single();
+  const questions = (quizRow?.quiz_questions ?? []) as { id: string; options: { is_correct: boolean }[]; points: number }[];
+  if (!quizRow || questions.length === 0) {
+    return NextResponse.json({ error: "Quiz introuvable" }, { status: 404 });
+  }
+
+  let score = 0;
+  let max_score = 0;
+  const graded = questions.map((q) => {
+    const optionIndex = selected.get(q.id) ?? -1;
+    const correctIndex = q.options.findIndex((o) => o.is_correct === true);
+    const correct = optionIndex >= 0 && q.options[optionIndex]?.is_correct === true;
+    max_score += q.points;
+    if (correct) score += q.points;
+    return { question_id: q.id, option_index: optionIndex, correct_index: correctIndex, correct };
+  });
+  const percent = max_score > 0 ? Math.round((score / max_score) * 100) : 0;
+  const passed = percent >= quizRow.pass_score;
 
   // Vérifier si l'utilisateur a déjà réussi ce quiz
   const { data: previousPass } = await supabase
@@ -42,6 +76,8 @@ export async function POST(req: NextRequest) {
     score,
     max_score,
     passed,
+    // Réponse par question — alimente l'analyse des quiz du tableau de suivi.
+    answers: graded.map(({ question_id, option_index, correct }) => ({ question_id, option_index, correct })),
   });
 
   if (resultError) {
@@ -49,14 +85,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: resultError.message }, { status: 500 });
   }
 
-  // Marquer la leçon comme terminée (récupérer lecon_id depuis quizzes)
+  // La leçon quiz n'est terminée qu'une fois le quiz RÉUSSI : avant, une
+  // tentative ratée la marquait aussi terminée, si bien qu'on pouvait
+  // atteindre 100 % d'une formation sans réussir aucun quiz.
   const { data: quiz } = await supabase
     .from("quizzes")
     .select("lecon_id")
     .eq("id", quiz_id)
     .single();
 
-  if (quiz?.lecon_id) {
+  if (passed && quiz?.lecon_id) {
     await supabase.from("progress").upsert(
       {
         user_id: userId,
@@ -87,5 +125,13 @@ export async function POST(req: NextRequest) {
     pointsAwarded = POINTS_QUIZ;
   }
 
-  return NextResponse.json({ points_awarded: pointsAwarded, already_passed: alreadyPassed });
+  return NextResponse.json({
+    points_awarded: pointsAwarded,
+    already_passed: alreadyPassed,
+    score,
+    max_score,
+    percent,
+    passed,
+    correction: graded.map(({ question_id, correct_index }) => ({ question_id, correct_index })),
+  });
 }
