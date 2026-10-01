@@ -160,11 +160,11 @@ ol.list li::before {
 /* ── Comparaison ── */
 .comparisonBlock { display: flex; flex-direction: column; gap: 14px; }
 .comparisonTitle {
-  font-size: 13.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--metro-blue);
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--metro-navy);
 }
 .comparisonGrid { display: grid; gap: 14px; }
 .comparisonCol {
@@ -249,12 +249,12 @@ ol.list li::before {
   color: #fff;
 }
 .exerciseBody { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.exerciseBody > strong {
-  font-size: 13.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--metro-blue);
+.exerciseHeading {
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--metro-navy);
 }
 .exercisePrompt :global(.wmde-markdown) { font-size: 19px; }
 .exerciseToggle {
@@ -349,14 +349,7 @@ ol.list li::before {
 }
 .promptIcon { color: var(--metro-blue); padding-top: 2px; }
 .promptHeader { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.promptLabel {
-  font-size: 13.5px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--metro-blue);
-}
-.promptTitle { font-size: 18px; font-weight: 700; line-height: 1.3; }
+.promptTitle { font-family: var(--font-display), sans-serif; font-size: 22px; font-weight: 800; line-height: 1.2; color: var(--metro-navy); }
 .promptText {
   margin: 8px 0 0;
   font-family: var(--font-text), sans-serif;

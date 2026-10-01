@@ -50,8 +50,9 @@
   font-size: 50px;
   font-weight: 800;
   line-height: 1.12;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   text-align: center;
+  text-wrap: balance;
 }
 
 .content { margin-top: 32px; }

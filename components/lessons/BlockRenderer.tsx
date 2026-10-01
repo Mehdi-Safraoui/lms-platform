@@ -63,7 +63,7 @@ function ExerciseBlockView({ prompt, answer }: { prompt: string; answer: string 
         <PenTool size={22} />
       </span>
       <div className={styles.exerciseBody}>
-        <strong>Exercice</strong>
+        <strong className={styles.exerciseHeading}>Exercice</strong>
         <div className={styles.exercisePrompt}>
           <InlineMarkdown text={prompt} />
         </div>
@@ -103,7 +103,6 @@ function PromptBlockView({ title, prompt, tip }: { title: string; prompt: string
     <div className={styles.prompt}>
       <Terminal size={30} strokeWidth={1.8} className={styles.promptIcon} aria-hidden="true" />
       <div className={styles.promptHeader}>
-        <span className={styles.promptLabel}>Prompt à copier</span>
         <span className={styles.promptTitle}>{title}</span>
         <pre className={styles.promptText}>{prompt}</pre>
         {tip && <p className={styles.promptTip}>{md(tip)}</p>}

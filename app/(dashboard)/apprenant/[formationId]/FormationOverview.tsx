@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Award, Clock, Flag, MapPin, TrainFront } from "lucide-react";
+import { ArrowRight, Award, Clock, Flag, MapPin } from "lucide-react";
+import { TerminusPicto, TrainPicto } from "@/components/learner/MetroPictos";
 import { formatMinutes } from "@/lib/lessonDuration";
 import type { LessonLine } from "@/lib/lessonLine";
 import { certificateUrl, formatCertificateDate, linkedinAddToProfileUrl, type Certificate } from "@/lib/certificates";
@@ -117,7 +118,7 @@ export default function FormationOverview({
 
         <aside className={styles.terminus} aria-labelledby="terminus-title">
           <div className={styles.terminusHead}>
-            <Flag size={44} strokeWidth={1.8} aria-hidden="true" />
+            <TerminusPicto size={60} />
             <h2 id="terminus-title" className={styles.terminusTitle}>Terminus : certificat</h2>
           </div>
 
@@ -171,7 +172,7 @@ export default function FormationOverview({
       </div>
 
       <div className={styles.nextBar}>
-        <TrainFront size={40} strokeWidth={1.8} className={styles.nextIcon} aria-hidden="true" />
+        <TrainPicto size={40} className={styles.nextIcon} />
         <span className={styles.nextRule} aria-hidden="true" />
         {!isEnrolled ? (
           <>

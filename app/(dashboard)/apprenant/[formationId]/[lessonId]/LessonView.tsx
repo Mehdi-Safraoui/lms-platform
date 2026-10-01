@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowRight, CheckCircle, ClipboardList, TrainFront, Trophy, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle, ClipboardList, Trophy, XCircle } from "lucide-react";
+import { TrainPicto } from "@/components/learner/MetroPictos";
 import AccountMenu from "@/components/learner/AccountMenu";
 import { toast } from "sonner";
 import { getVideoEmbedUrl } from "@/lib/video";
@@ -320,7 +321,7 @@ export default function LessonView({
       </div>
 
       <div className={styles.nextBar} data-next-bar>
-        <TrainFront size={40} strokeWidth={1.8} className={styles.nextIcon} aria-hidden="true" />
+        <TrainPicto size={40} className={styles.nextIcon} />
         <span className={styles.nextRule} aria-hidden="true" />
         <p className={styles.nextText}>
           {next ? (
