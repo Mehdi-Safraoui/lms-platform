@@ -435,3 +435,19 @@
   transition: opacity 0.15s;
 }
 .btnDanger:hover { opacity: 0.88; }
+
+.btnIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-light);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.btnIcon:hover { color: var(--navy); background: var(--bg-alt); }

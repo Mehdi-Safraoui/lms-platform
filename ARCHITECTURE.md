@@ -116,6 +116,13 @@ Deux chemins possibles :
 
 ## Suivi de progression & gamification
 
+### Suivi par formation (entreprise et Ahead)
+
+- `/org/suivi` : vue d'ensemble des formations de l'entreprise (catalogue activé + formations privées publiées) — apprenants inscrits, progression moyenne, taux de complétion (`loadFormationsOverview`).
+- `/org/suivi/[formationId]` et `/admin/catalog/[id]/suivi` (toutes entreprises, pour une formation du catalogue) : indicateurs clés, progression leçon par leçon avec la plus forte baisse, analyse des quiz par question (taux de bonnes réponses, mauvaise réponse la plus choisie), tableau des apprenants triable — `lib/formationAnalytics.ts`, accès vérifié par `resolveAnalyticsScope`.
+- Export CSV (`GET /api/suivi/[formationId]/export`, séparateur `;` + BOM pour Excel) : une ligne par apprenant, une colonne par leçon (date de fin).
+- **Quiz corrigés côté serveur** (`POST /api/progress/quiz-passed`) : le navigateur n'envoie que les réponses choisies, les bonnes réponses ne sont plus envoyées à la page de leçon, et chaque réponse est enregistrée dans `quiz_results.answers` (analyse par question). Une leçon quiz n'est marquée terminée qu'une fois le quiz réussi.
+
 - `/apprenant/progression` — vue d'ensemble apprenant : complétion globale, progression par formation, badges
 - Badges calculés en direct depuis `progress`/`quiz_results` (pas de moteur de règles) : `lib/badges.ts` (`computeBadges`, `detectAndPersistNewBadges`)
 - Table `user_badges` sert uniquement à détecter un déblocage "nouveau" pour déclencher un toast (`BadgeUnlockToasts.tsx`), pas de source de vérité pour l'état des badges
