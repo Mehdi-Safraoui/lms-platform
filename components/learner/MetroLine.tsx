@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import type { LessonLine, StationStatus } from "@/lib/lessonLine";
+import AheadLogo from "./AheadLogo";
 import styles from "./metro.module.css";
 
 const STATUS_LABEL: Record<StationStatus, string> = { done: "terminée", current: "en cours", upcoming: "à venir" };
@@ -32,8 +33,8 @@ export default function MetroLine({ line }: { line: LessonLine }) {
 
   return (
     <nav className={styles.sidebar} aria-label="Parcours de la formation">
-      <Link href="/apprenant" className={styles.wordmark} aria-label="Mes formations">
-        ahead_digital
+      <Link href="/apprenant" className={styles.wordmark} aria-label="Ahead Digital, retour à mes formations">
+        <AheadLogo width={180} />
       </Link>
       <Link href={`/apprenant/${line.formationId}`} className={styles.formationTitle}>
         {line.formationTitle}

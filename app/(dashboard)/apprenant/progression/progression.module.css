@@ -1,18 +1,19 @@
 /* ══ Ma progression : relevé de parcours, grammaire « ligne de métro » ══ */
 .page {
-  padding: 34px 32px 64px 42px;
+  max-width: 1240px;
+  padding: 40px 40px 64px 44px;
   color: var(--metro-navy);
 }
 
 .title {
   margin: 0;
   font-family: var(--font-display), sans-serif;
-  font-size: 56px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.02em;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
 }
-.subtitle { margin: 10px 0 0; font-family: var(--font-text), sans-serif; font-size: 22px; }
+.subtitle { margin: 6px 0 0; font-family: var(--font-text), sans-serif; font-size: 17px; color: var(--metro-muted); }
 
 /* Relevé de parcours : une phrase sur une plaque marine, et la jauge du niveau. */
 .summary {
@@ -20,35 +21,35 @@
   grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
   gap: 32px;
   align-items: center;
-  margin-top: 30px;
-  padding: 28px 32px;
+  margin-top: 28px;
+  padding: 24px 28px;
+  border: 1px solid var(--metro-hair);
   border-radius: 14px;
-  background: var(--metro-navy);
-  color: #fff;
+  background: #f7f9fe;
+  color: var(--metro-navy);
 }
 .summaryText {
   margin: 0;
   font-family: var(--font-display), sans-serif;
-  font-size: 30px;
+  font-size: 23px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
   text-wrap: balance;
 }
-.summaryText strong { font-weight: 800; color: #9fb7ff; }
+.summaryText strong { font-weight: 700; color: var(--metro-blue); }
 .level { display: flex; flex-direction: column; gap: 10px; }
-.levelLabel { font-family: var(--font-display), sans-serif; font-size: 22px; font-weight: 800; }
-.levelGauge { height: 12px; border-radius: 6px; background: var(--metro-slate); overflow: hidden; }
-.levelGauge span { display: block; height: 100%; border-radius: 6px; background: #4a7ff8; }
-.levelHint { font-family: var(--font-text), sans-serif; font-size: 15px; line-height: 1.4; color: rgba(255, 255, 255, 0.85); }
+.levelLabel { font-family: var(--font-text), sans-serif; font-size: 16px; font-weight: 700; }
+.levelGauge { height: 8px; border-radius: 4px; background: #dfe6f7; overflow: hidden; }
+.levelGauge span { display: block; height: 100%; border-radius: 4px; background: var(--metro-blue); }
+.levelHint { font-family: var(--font-text), sans-serif; font-size: 14px; line-height: 1.4; color: var(--metro-muted); }
 
-.section { margin-top: 44px; }
+.section { margin-top: 40px; }
 .sectionTitle {
-  margin: 0 0 16px;
+  margin: 0 0 14px;
   font-family: var(--font-display), sans-serif;
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 .sectionHint { margin: -8px 0 16px; font-family: var(--font-text), sans-serif; font-size: 16px; color: #4a568f; }
 .empty { margin: 0; font-family: var(--font-text), sans-serif; font-size: 18px; color: var(--metro-muted); }
@@ -60,15 +61,15 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 20px 22px;
-  border: 1.5px solid var(--metro-hair);
+  padding: 18px 20px;
+  border: 1px solid var(--metro-hair);
   border-radius: 12px;
 }
 .formationRowHead { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.formationTitle { font-family: var(--font-display), sans-serif; font-size: 21px; font-weight: 800; line-height: 1.15; }
+.formationTitle { font-family: var(--font-display), sans-serif; font-size: 18px; font-weight: 700; line-height: 1.2; }
 .formationPct { font-family: var(--font-text), sans-serif; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--metro-blue); }
-.progressBar { height: 12px; border-radius: 6px; background: #dfe6f7; overflow: hidden; }
-.progressFill { height: 100%; border-radius: 6px; background: var(--metro-blue); }
+.progressBar { height: 8px; border-radius: 4px; background: #e4eaf8; overflow: hidden; }
+.progressFill { height: 100%; border-radius: 4px; background: var(--metro-blue); }
 .formationCaption { font-family: var(--font-text), sans-serif; font-size: 15px; color: #4a568f; }
 
 /* ── Certificats ── */
@@ -78,8 +79,9 @@
   align-items: center;
   column-gap: 18px;
   padding: 18px 22px;
+  border: 1px solid var(--metro-hair);
   border-radius: 12px;
-  background: var(--metro-tint);
+  background: #fff;
   color: var(--metro-navy);
   text-decoration: none;
 }
@@ -101,33 +103,32 @@
   display: block;
   margin-bottom: 12px;
   font-family: var(--font-display), sans-serif;
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 700;
 }
 .badgesGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 .badgeCard {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 16px;
-  padding: 14px 18px 14px 14px;
-  border: 1.5px solid var(--metro-hair);
+  column-gap: 14px;
+  padding: 12px 16px 12px 12px;
+  border: 1px solid var(--metro-hair);
   border-radius: 12px;
 }
 .badgeIcon {
   display: grid;
   place-items: center;
   box-sizing: border-box;
-  width: 56px;
-  height: 56px;
-  border: 3px solid #d6def4;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: #eef2fb;
-  color: #9aa6cf;
+  background: #f1f3f9;
+  color: #a3abc8;
 }
-.badgeIconEarned { border-color: var(--metro-blue); background: var(--metro-navy); color: #fff; box-shadow: inset 0 0 0 3px #fff; }
+.badgeIconEarned { background: var(--metro-navy); color: #fff; }
 .badgeCardBody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.badgeCardLabel { font-family: var(--font-display), sans-serif; font-size: 17px; font-weight: 700; line-height: 1.2; color: #8b94b8; }
+.badgeCardLabel { font-family: var(--font-text), sans-serif; font-size: 15px; font-weight: 700; line-height: 1.25; color: #8b94b8; }
 .badgeCardEarned .badgeCardLabel { color: var(--metro-navy); }
 .badgeCardDesc { font-family: var(--font-text), sans-serif; font-size: 14px; line-height: 1.4; color: #4a568f; }
 .badgeStatus {
@@ -140,7 +141,7 @@
   font-weight: 700;
   white-space: nowrap;
 }
-.badgeStatusEarned { background: var(--metro-blue); color: #fff; }
+.badgeStatusEarned { background: #eef2fc; color: var(--metro-blue); }
 
 @media (max-width: 1180px) {
   .summary { grid-template-columns: minmax(0, 1fr); }

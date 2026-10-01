@@ -281,3 +281,14 @@ One signature gesture: on load, the current station marker scales from 0.4 to 1 
 - **Don't** put drop shadows on panels at rest; shadows are for floating menus and the assistant launcher only.
 - **Don't** use the incumbent `--navy`/`--coral` tokens, Plus Jakarta Sans or Barlow in the learner area, and don't apply this world to `/org`, `/tuteur` or `/admin` without an explicit decision.
 - **Don't** treat the current breakpoints as a responsive design; phone layouts are a separate phase.
+
+## Calm register (dashboard, progression) — added 2026-10-01
+
+User feedback after the first release: the overview pages felt "too marked", less like a modern SaaS. The formation and lesson pages keep the full signage register; the overview pages use a calm register of the same world:
+
+- **Brand mark:** the real Ahead Digital logo (`components/learner/AheadLogo.tsx`, vector from aheaddigital.com; text in currentColor, underscore in the brand coral #EA565F — the one coral use outside "Vous êtes ici", as part of the mark).
+- **Navigation:** a plain icon list (GraduationCap, TrendingUp), Martel Sans 16px semibold, active item on a #eef2fc pill with a blue icon. No line in the menu (a two-stop line read as unfinished).
+- **Type:** page titles Winky Sans 38px/700, section titles 21px/700 in sentence case (no uppercase), meta in Martel Sans 14px muted.
+- **Formation cards:** cover image (or the generated cover) at 16:7, 14px corners, 1px hairline, soft hover shadow; the metro line survives as a thin track (2px, 9px stops, coral ring for the current module).
+- **Badges:** 60px medallions without rings; earned = navy disc, locked = #f1f3f9.
+- **Summaries:** light #f7f9fe panel with hairline instead of the navy plaque; wording says "leçons", not "stations".

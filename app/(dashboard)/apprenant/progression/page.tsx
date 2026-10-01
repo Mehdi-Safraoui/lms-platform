@@ -102,18 +102,18 @@ export default async function ProgressionPage() {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Ma progression</h1>
-      <p className={styles.subtitle}>Vos stations franchies, vos certificats et vos badges.</p>
+      <p className={styles.subtitle}>Vos leçons terminées, vos certificats et vos badges.</p>
 
       {/* Relevé de parcours : une phrase sur une plaque, pas un mur de chiffres. */}
       <section className={styles.summary} aria-label="Résumé de votre parcours">
         <p className={styles.summaryText}>
           {allLeconIds.size === 0 ? (
-            <>Votre parcours commence dès votre première station.</>
+            <>Votre parcours commence dès votre première leçon.</>
           ) : (
             <>
-              Vous avez franchi{" "}
+              Vous avez terminé{" "}
               <strong>
-                {completedLeconIds.size} station{completedLeconIds.size > 1 ? "s" : ""}
+                {completedLeconIds.size} leçon{completedLeconIds.size > 1 ? "s" : ""}
               </strong>{" "}
               sur {allLeconIds.size}
               {quizPassedCount ? (
@@ -162,7 +162,7 @@ export default async function ProgressionPage() {
         <h2 className={styles.sectionTitle}>Progression par formation</h2>
         {formationProgress.length === 0 ? (
           <p className={styles.empty}>
-            Vous ne suivez encore aucune ligne.{" "}
+            Vous ne suivez encore aucune formation.{" "}
             <Link href="/apprenant" className={styles.emptyLink}>
               Choisir une formation
             </Link>
