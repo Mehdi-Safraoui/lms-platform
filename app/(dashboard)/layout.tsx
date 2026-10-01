@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useUser } from "@clerk/nextjs";
-import { BookOpen, Building2, GraduationCap, TrendingUp, LayoutDashboard } from "lucide-react";
+import { BookOpen, Building2, LayoutDashboard } from "lucide-react";
 import { Toaster } from "sonner";
 import NotificationBell from "@/components/shared/NotificationBell";
+import LearnerShell from "@/components/learner/LearnerShell";
 import styles from "./layout.module.css";
 
 const adminNavItems = [
@@ -14,20 +15,13 @@ const adminNavItems = [
   { href: "/admin/tenants", label: "Tenants", icon: Building2, exact: false },
 ];
 
-const apprenantNavItems = [
-  { href: "/apprenant", label: "Mes formations", icon: GraduationCap, exact: true },
-  { href: "/apprenant/progression", label: "Ma progression", icon: TrendingUp, exact: false },
-];
-
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useUser();
   const isApprenant = pathname.startsWith("/apprenant");
   const displayName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.primaryEmailAddress?.emailAddress : null;
-  const navItems = isApprenant ? apprenantNavItems : adminNavItems;
-  const sectionLabel = isApprenant ? "Apprenant" : "Super-admin";
   // Page leçon (/apprenant/[formation]/[leçon]) : plein écran, la page dessine
-  // elle-même son menu (la ligne de la formation) et son tableau des départs.
+  // elle-même son menu (la ligne de la formation) et sa barre « Prochaine station ».
   const isLessonPage = /^\/apprenant\/[^/]+\/[^/]+\/?$/.test(pathname);
 
   const toaster = (
@@ -58,6 +52,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+  if (isApprenant) {
+    return (
+      <>
+        <LearnerShell>{children}</LearnerShell>
+        {toaster}
+      </>
+    );
+  }
+
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
@@ -73,8 +76,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav */}
         <nav className={styles.nav}>
-          <span className={styles.navSection}>{sectionLabel}</span>
-          {navItems.map((item) => {
+          <span className={styles.navSection}>Super-admin</span>
+          {adminNavItems.map((item) => {
             const isActive = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
@@ -103,7 +106,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className={styles.main}>
         <header className={styles.topbar}>
           <div className={styles.topbarLeft}>
-            <span className={styles.topbarBadge}>{isApprenant ? "Espace apprenant" : "Super-admin"}</span>
+            <span className={styles.topbarBadge}>Super-admin</span>
           </div>
           <div className={styles.topbarRight}>
             <NotificationBell />

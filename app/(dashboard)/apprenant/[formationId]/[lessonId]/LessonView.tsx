@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowRight, CheckCircle, ChevronDown, ClipboardList, TrainFront, Trophy, User, XCircle } from "lucide-react";
-import { useClerk } from "@clerk/nextjs";
+import { ArrowRight, CheckCircle, ClipboardList, TrainFront, Trophy, XCircle } from "lucide-react";
+import AccountMenu from "@/components/learner/AccountMenu";
 import { toast } from "sonner";
 import { getVideoEmbedUrl } from "@/lib/video";
 import { formatMinutes } from "@/lib/lessonDuration";
@@ -178,31 +177,6 @@ function QuizIntro({ quiz, onStart }: { quiz: QuizData; onStart: () => void }) {
   );
 }
 
-// ── Compte (en haut à droite) ────────────────────────────
-function AccountMenu({ name }: { name: string | null }) {
-  const clerk = useClerk();
-  const [open, setOpen] = useState(false);
-  return (
-    <div className={styles.account}>
-      <button type="button" className={styles.accountBtn} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu">
-        <span className={styles.avatar} aria-hidden="true">
-          <User size={18} strokeWidth={2.2} />
-        </span>
-        <span>{name ?? "Mon compte"}</span>
-        <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
-      </button>
-      {open && (
-        <div className={styles.accountMenu} role="menu">
-          <Link href="/apprenant" role="menuitem" className={styles.accountItem}>Mes formations</Link>
-          <Link href="/apprenant/progression" role="menuitem" className={styles.accountItem}>Ma progression</Link>
-          <button type="button" role="menuitem" className={styles.accountItem} onClick={() => clerk.openUserProfile()}>Mon compte</button>
-          <button type="button" role="menuitem" className={styles.accountItem} onClick={() => clerk.signOut({ redirectUrl: "/sign-in" })}>Se déconnecter</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Lesson View ──────────────────────────────────────────
 export default function LessonView({
   lessonId,
@@ -290,7 +264,9 @@ export default function LessonView({
 
   return (
     <div className={styles.main}>
-      <AccountMenu name={learnerName} />
+      <div className={styles.account}>
+        <AccountMenu name={learnerName} />
+      </div>
 
       <p className={styles.linePill}>
         <span>Ligne {lineName}</span>

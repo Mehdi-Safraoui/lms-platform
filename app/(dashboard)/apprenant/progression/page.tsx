@@ -78,11 +78,8 @@ export default async function ProgressionPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.eyebrow}>
-        <span className={styles.dot} />
-        Ma progression
-      </div>
-      <h1 className={styles.title}>Suivi de votre parcours</h1>
+      <h1 className={styles.title}>Ma progression</h1>
+      <p className={styles.subtitle}>Vos stations franchies, vos certificats et vos badges.</p>
 
       <div className={styles.statsRow}>
         <div className={styles.statCard}>
