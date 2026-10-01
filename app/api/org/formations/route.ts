@@ -3,6 +3,7 @@ import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { canAuthorFormationByAi } from "@/lib/subscription";
 import { slugify } from "@/lib/slug";
+import { getFormationQuota } from "@/lib/aiGenerationQuota";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,20 @@ export async function POST(req: NextRequest) {
   if (!(await canAuthorFormationByAi(guard.tenantId))) {
     return NextResponse.json(
       { error: "La génération de formation par IA nécessite l'offre Création ou Entreprise.", code: "plan_upgrade_required" },
+      { status: 403 }
+    );
+  }
+
+  // Quota du mois déjà atteint : inutile de créer un brouillon dont la
+  // structure ne pourra pas être générée (la consommation réelle a lieu à la
+  // première génération de structure, voir consume_formation_ai).
+  const quota = await getFormationQuota(guard.tenantId);
+  if (quota.total !== null && quota.used >= quota.total) {
+    return NextResponse.json(
+      {
+        error: `Quota de formations IA atteint ce mois-ci (${quota.used}/${quota.total}). Il se renouvelle le 1er du mois — contactez Ahead pour l'augmenter.`,
+        code: "quota_exceeded",
+      },
       { status: 403 }
     );
   }

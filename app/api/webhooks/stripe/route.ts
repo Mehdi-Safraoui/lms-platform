@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { notifySubscriptionActivated } from "@/lib/notifications";
+import { AI_FORMATIONS_PER_MONTH } from "@/lib/planLimits";
 
 const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.STRIPE_PRICE_DECOUVERTE ?? ""]: "decouverte",
@@ -9,14 +10,9 @@ const PRICE_TO_PLAN: Record<string, string> = {
   [process.env.STRIPE_PRICE_ENTREPRISE ?? ""]: "entreprise",
 };
 
-// Même valeurs que le backfill de la migration 20260823000004 — gardées en
-// phase ici pour qu'un tenant qui active/change d'offre reparte avec le bon
-// quota, pas seulement les tenants déjà existants au moment de la migration.
-const QUOTA_BY_PLAN: Record<string, number> = {
-  decouverte: 0,
-  creation: 30,
-  entreprise: 100,
-};
+// Formations IA par mois de chaque offre (lib/planLimits.ts) — écrit sur le
+// tenant à l'activation et à chaque changement d'offre.
+const QUOTA_BY_PLAN = AI_FORMATIONS_PER_MONTH as Record<string, number | null>;
 
 export async function POST(req: NextRequest) {
   const body = await req.text();

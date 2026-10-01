@@ -27,6 +27,7 @@ export const PLANS = {
     features: [
       "Jusqu'à 30 apprenants",
       "Accès complet à toutes les formations",
+      "3 formations créées par IA par mois",
       "Quiz et attestations",
       "Suivi de progression",
       "Support prioritaire",
@@ -40,6 +41,7 @@ export const PLANS = {
     description: "Pour les grandes organisations avec des besoins spécifiques.",
     features: [
       "Apprenants illimités",
+      "10 formations créées par IA par mois",
       "Analytics avancés",
       "SSO & intégrations",
       "SLA garanti",

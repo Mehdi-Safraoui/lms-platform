@@ -151,3 +151,14 @@
   transition: background 0.15s;
 }
 .btnSecondary:hover { background: var(--bg-alt); }
+
+.quotaInfo,
+.quotaReached {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.quotaInfo { background: var(--bg-alt); color: var(--text-muted); }
+.quotaReached { background: var(--coral-light); color: var(--text); }

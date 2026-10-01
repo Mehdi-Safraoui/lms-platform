@@ -5,6 +5,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { canAuthorFormationByAi } from "@/lib/subscription";
 import { generateStructureProposal, type CadrageInput } from "@/lib/ai/generateStructureProposal";
 import { loadSourceDocumentsText } from "@/lib/sourceDocumentsText";
+import { consumeFormationAi, quotaRefusalMessage } from "@/lib/aiGenerationQuota";
 
 export const dynamic = "force-dynamic";
 // Génération par le modèle le plus capable (OPENAI_GENERATION_MODEL) sur le
@@ -69,6 +70,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
     notionsAInclure: cadrage.notions_a_inclure ?? [],
     notionsAExclure: cadrage.notions_a_exclure ?? [],
   };
+
+  // Première génération de structure = la formation est comptée dans le quota
+  // mensuel de formations IA du tenant (ensuite, tout est inclus).
+  const quotaResult = await consumeFormationAi(guard.tenantId, formationId);
+  if (!quotaResult.allowed) {
+    return NextResponse.json({ error: quotaRefusalMessage(quotaResult), code: "quota_exceeded" }, { status: 403 });
+  }
 
   // Réponse en streaming (NDJSON, une ligne JSON par événement) pour afficher
   // le plan au fil de son écriture — la génération complète prend ~1 min 30
