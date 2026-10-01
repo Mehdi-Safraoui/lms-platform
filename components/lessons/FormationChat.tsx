@@ -100,7 +100,7 @@ export default function FormationChat({ formationId, formationTitle }: Props) {
   const showEmptyState = historyState === "loaded" && messages.length === 0 && !sending;
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} data-formation-chat>
       {open && (
         <div className={styles.panel}>
           <div className={styles.header}>

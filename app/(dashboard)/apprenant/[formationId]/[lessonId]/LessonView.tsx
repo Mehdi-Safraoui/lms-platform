@@ -2,21 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import {
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle,
-  XCircle,
-  Trophy,
-  ClipboardList,
-  Check,
-  Clock,
-  PlayCircle,
-  FileText,
-} from "lucide-react";
+import { ArrowRight, CheckCircle, ChevronDown, ClipboardList, TrainFront, Trophy, User, XCircle } from "lucide-react";
+import { useClerk } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { getVideoEmbedUrl } from "@/lib/video";
+import { formatMinutes } from "@/lib/lessonDuration";
+import type { LessonLine } from "@/lib/lessonLine";
 import BlockRenderer from "@/components/lessons/BlockRenderer";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import styles from "./lesson.module.css";
@@ -31,65 +24,26 @@ interface QuizOption { text: string; }
 interface QuizQuestion { id: string; question_text: string; options: QuizOption[]; order_index: number; points: number; }
 interface QuizData { id: string; title: string; pass_score: number; quiz_questions: QuizQuestion[]; }
 
-interface AdjacentLesson { id: string; title: string; }
-
 interface Props {
   lessonId: string;
-  formationId: string;
-  formationTitle: string;
   lessonTitle: string;
   contentType: string;
   contentMarkdown: string | null;
   contentBlocks: ContentBlock[] | null;
   videoUrl: string | null;
   quizData: QuizData | null;
-  prevLesson: AdjacentLesson | null;
-  nextLesson: AdjacentLesson | null;
-  moduleTitle: string;
-  moduleNumber: number;
-  lessonIndexInModule: number;
-  lessonsInModule: number;
-  totalInFormation: number;
-  completedInFormation: number;
+  line: LessonLine;
+  initiallyCompleted: boolean;
+  learnerName: string | null;
 }
 
-function estimateReadingMinutes(markdown: string | null): number {
-  if (!markdown) return 1;
-  const words = markdown.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(1, Math.round(words / 200));
+function normalize(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 
-function estimateBlocksReadingMinutes(blocks: ContentBlock[] | null): number {
-  if (!blocks) return 1;
-  const words = blocks.reduce((count, block) => {
-    switch (block.type) {
-      case "heading":
-        return count + block.text.split(/\s+/).filter(Boolean).length;
-      case "paragraph":
-        return count + block.text.split(/\s+/).filter(Boolean).length;
-      case "list":
-        return count + block.items.join(" ").split(/\s+/).filter(Boolean).length;
-      case "callout":
-      case "highlight":
-        return count + `${block.title} ${block.text}`.split(/\s+/).filter(Boolean).length;
-      case "comparison":
-        return count + block.columns.flatMap((c) => c.items).join(" ").split(/\s+/).filter(Boolean).length;
-      case "feature_grid":
-        return count + block.items.map((it) => `${it.title} ${it.description}`).join(" ").split(/\s+/).filter(Boolean).length;
-      case "exercise":
-        return count + `${block.prompt} ${block.answer}`.split(/\s+/).filter(Boolean).length;
-      case "image_text":
-        return count + block.text.split(/\s+/).filter(Boolean).length;
-      case "prompt":
-        return count + `${block.title} ${block.prompt}`.split(/\s+/).filter(Boolean).length;
-      default:
-        return count;
-    }
-  }, 0);
-  return Math.max(1, Math.round(words / 200));
-}
-
-// ── Quiz Player ──────────────────────────────────────────
+// ── Quiz ─────────────────────────────────────────────────
+// Toutes les réponses restent visibles ; la réponse choisie passe au premier
+// plan (plaque marine), les autres s'effacent d'un cran.
 function QuizPlayer({ quiz }: { quiz: QuizData }) {
   const questions = [...(quiz.quiz_questions ?? [])].sort((a, b) => a.order_index - b.order_index);
   const [answers, setAnswers] = useState<Record<number, number>>({});
@@ -129,7 +83,7 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
       setSubmitted(true);
       if (data.points_awarded > 0) toast.success(`+${data.points_awarded} points remportés !`);
     } catch {
-      toast.error("Erreur réseau — vos réponses n'ont pas été envoyées. Réessayez.");
+      toast.error("Erreur réseau : vos réponses n'ont pas été envoyées. Réessayez.");
     } finally {
       setSubmitting(false);
     }
@@ -145,79 +99,77 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
 
   return (
     <div className={styles.quiz}>
-      <div className={styles.quizHeader}>
-        <h2 className={styles.quizTitle}>{quiz.title}</h2>
-        <span className={styles.quizThreshold}>Seuil de réussite : {quiz.pass_score}%</span>
-      </div>
-
       {submitted && (
-        <div className={`${styles.quizResult} ${passed ? styles.quizResultPass : styles.quizResultFail}`}>
-          <Trophy size={22} />
+        <div className={`${styles.quizResult} ${passed ? styles.quizResultPass : styles.quizResultFail}`} role="status">
+          <Trophy size={24} />
           <div>
-            <p className={styles.quizResultScore}>{scorePercent}%</p>
-            <p className={styles.quizResultLabel}>{passed ? "Quiz validé ✓" : `Non validé — score minimum : ${quiz.pass_score}%`}</p>
+            <p className={styles.quizResultScore}>{scorePercent} %</p>
+            <p className={styles.quizResultLabel}>{passed ? "Quiz validé, la station est franchie." : `Pas encore validé : il faut ${quiz.pass_score} %.`}</p>
           </div>
           <button className={styles.quizRetryBtn} onClick={retry}>Réessayer</button>
         </div>
       )}
 
-      <div className={styles.quizQuestions}>
+      <ol className={styles.quizQuestions}>
         {questions.map((q, qi) => (
-          <div key={q.id} className={styles.quizQuestion}>
-            <p className={styles.quizQuestionIndex}>Question {qi + 1}</p>
-            <p className={styles.quizQuestionText}>{q.question_text}</p>
-            <div className={styles.quizOptions}>
+          <li key={q.id} className={styles.quizQuestion}>
+            <p className={styles.quizQuestionText}>
+              <span className={styles.quizQuestionIndex}>{qi + 1}</span>
+              {q.question_text}
+            </p>
+            <div className={styles.quizOptions} role="radiogroup" aria-label={`Question ${qi + 1}`} data-answered={answers[qi] !== undefined || undefined}>
               {q.options.map((o, oi) => {
                 const selected = answers[qi] === oi;
                 const isCorrect = correction[q.id] === oi;
-                let optClass = styles.quizOption;
-                if (submitted) {
-                  if (selected && isCorrect) optClass = `${styles.quizOption} ${styles.quizOptionCorrect}`;
-                  else if (selected && !isCorrect) optClass = `${styles.quizOption} ${styles.quizOptionWrong}`;
-                  else if (!selected && isCorrect) optClass = `${styles.quizOption} ${styles.quizOptionCorrectMissed}`;
-                } else if (selected) {
-                  optClass = `${styles.quizOption} ${styles.quizOptionSelected}`;
-                }
+                const state = submitted
+                  ? selected && isCorrect ? "correct" : selected ? "wrong" : isCorrect ? "missed" : "idle"
+                  : selected ? "selected" : "idle";
                 return (
-                  <button key={oi} className={optClass} onClick={() => select(qi, oi)} disabled={submitted}>
-                    <span className={`${styles.quizOptionDot} ${selected ? styles.quizOptionDotSelected : ""}`}>
-                      {selected && <span className={styles.quizOptionDotInner} />}
-                    </span>
+                  <button
+                    key={oi}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    className={styles.quizOption}
+                    data-state={state}
+                    onClick={() => select(qi, oi)}
+                    disabled={submitted}
+                  >
+                    <span className={styles.quizOptionLetter}>{String.fromCharCode(65 + oi)}</span>
                     <span>{o.text}</span>
-                    {submitted && isCorrect && <CheckCircle size={15} className={styles.quizOptionIcon} />}
-                    {submitted && selected && !isCorrect && <XCircle size={15} className={styles.quizOptionIcon} />}
+                    {state === "correct" || state === "missed" ? <CheckCircle size={17} className={styles.quizOptionIcon} aria-label="Bonne réponse" /> : null}
+                    {state === "wrong" ? <XCircle size={17} className={styles.quizOptionIcon} aria-label="Mauvaise réponse" /> : null}
                   </button>
                 );
               })}
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ol>
 
       {!submitted && (
         <button className={styles.quizSubmitBtn} onClick={submit} disabled={!allAnswered || submitting}>
-          {submitting ? "Correction…" : "Soumettre le quiz"}
+          {submitting ? "Correction…" : "Valider mes réponses"}
         </button>
       )}
     </div>
   );
 }
 
-// ── Quiz Intro ───────────────────────────────────────────
 function QuizIntro({ quiz, onStart }: { quiz: QuizData; onStart: () => void }) {
+  const count = quiz.quiz_questions.length;
   return (
     <div className={styles.quizIntro}>
-      <div className={styles.quizIntroIcon}>
-        <ClipboardList size={28} strokeWidth={1.5} />
-      </div>
-      <p className={styles.quizIntroText}>
-        Ce quiz a pour objectif de vérifier votre compréhension des leçons de ce module.
-        Lisez bien chaque question avant de répondre.
-      </p>
-      <div className={styles.quizIntroMeta}>
-        <span>{quiz.quiz_questions.length} question{quiz.quiz_questions.length > 1 ? "s" : ""}</span>
-        <span className={styles.quizIntroMetaDot} />
-        <span>Seuil de réussite : {quiz.pass_score}%</span>
+      <span className={styles.quizIntroIcon}>
+        <ClipboardList size={26} strokeWidth={1.75} />
+      </span>
+      <div>
+        <p className={styles.quizIntroText}>
+          Ce quiz vérifie votre compréhension des leçons du module. Lisez bien chaque question avant de répondre.
+        </p>
+        <p className={styles.quizIntroMeta}>
+          {count} question{count > 1 ? "s" : ""} · réussite à partir de {quiz.pass_score} %
+        </p>
       </div>
       <button className={styles.quizStartBtn} onClick={onStart}>
         Commencer le quiz
@@ -226,32 +178,60 @@ function QuizIntro({ quiz, onStart }: { quiz: QuizData; onStart: () => void }) {
   );
 }
 
+// ── Compte (en haut à droite) ────────────────────────────
+function AccountMenu({ name }: { name: string | null }) {
+  const clerk = useClerk();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={styles.account}>
+      <button type="button" className={styles.accountBtn} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="menu">
+        <span className={styles.avatar} aria-hidden="true">
+          <User size={18} strokeWidth={2.2} />
+        </span>
+        <span>{name ?? "Mon compte"}</span>
+        <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className={styles.accountMenu} role="menu">
+          <Link href="/apprenant" role="menuitem" className={styles.accountItem}>Mes formations</Link>
+          <Link href="/apprenant/progression" role="menuitem" className={styles.accountItem}>Ma progression</Link>
+          <button type="button" role="menuitem" className={styles.accountItem} onClick={() => clerk.openUserProfile()}>Mon compte</button>
+          <button type="button" role="menuitem" className={styles.accountItem} onClick={() => clerk.signOut({ redirectUrl: "/sign-in" })}>Se déconnecter</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Lesson View ──────────────────────────────────────────
 export default function LessonView({
   lessonId,
-  formationId,
-  formationTitle,
   lessonTitle,
   contentType,
   contentMarkdown,
   contentBlocks,
   videoUrl,
   quizData,
-  prevLesson,
-  nextLesson,
-  moduleTitle,
-  moduleNumber,
-  lessonIndexInModule,
-  lessonsInModule,
-  totalInFormation,
-  completedInFormation,
+  line,
+  initiallyCompleted,
+  learnerName,
 }: Props) {
+  const router = useRouter();
   const embedUrl = videoUrl ? getVideoEmbedUrl(videoUrl) : null;
-  const progressPct = totalInFormation > 0 ? Math.round((completedInFormation / totalInFormation) * 100) : 0;
   const [quizStarted, setQuizStarted] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const startTimeRef = useRef<number>(Date.now());
+  const [completed, setCompleted] = useState(initiallyCompleted);
+  const [continuing, setContinuing] = useState(false);
+  const startTimeRef = useRef<number>(0);
+
+  const next = line.next[0] ?? null;
+  const nextHref = next ? `/apprenant/${line.formationId}/${next.id}` : `/apprenant/${line.formationId}`;
+  const lineName = line.formationTitle.replace(/^formation\s+/i, "");
+
+  // Le premier bloc répète souvent le titre de la leçon : déjà affiché en plaque.
+  const blocks =
+    contentBlocks && contentBlocks[0]?.type === "heading" && normalize(contentBlocks[0].text) === normalize(lessonTitle)
+      ? contentBlocks.slice(1)
+      : contentBlocks;
 
   useEffect(() => {
     startTimeRef.current = Date.now();
@@ -276,172 +256,110 @@ export default function LessonView({
     };
   }, [lessonId]);
 
-  async function completeLesson() {
-    setCompleting(true);
+  /**
+   * « Continuer » termine la leçon (sauf un quiz, validé à sa réussite côté
+   * serveur) puis emmène à la station suivante, ou à la page de la formation
+   * en fin de ligne.
+   */
+  async function continueJourney() {
+    setContinuing(true);
     try {
-      const res = await fetch("/api/progress/complete-lesson", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lecon_id: lessonId }),
-      });
-      if (res.ok) {
+      if (contentType !== "quiz" && !completed) {
+        const res = await fetch("/api/progress/complete-lesson", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lecon_id: lessonId }),
+        });
+        if (!res.ok) {
+          toast.error("La leçon n'a pas pu être enregistrée comme terminée. Réessayez.");
+          setContinuing(false);
+          return;
+        }
         const data = await res.json();
         setCompleted(true);
         if (data.points_awarded > 0) toast.success(`+${data.points_awarded} points remportés !`);
-        else toast.success("Leçon marquée comme terminée ✓");
       }
+      router.push(nextHref);
     } catch {
-      toast.error("Erreur lors de la mise à jour.");
-    } finally {
-      setCompleting(false);
+      toast.error("Erreur réseau : réessayez dans un instant.");
+      setContinuing(false);
     }
   }
 
+  const continueLabel = continuing ? "Enregistrement…" : next ? "Continuer" : "Terminus";
+
   return (
-    <div className={styles.page}>
-      <nav className={styles.breadcrumb}>
-        <Link href="/apprenant">Mes formations</Link>
-        <ChevronRight size={13} />
-        <Link href={`/apprenant/${formationId}`}>{formationTitle}</Link>
-        <ChevronRight size={13} />
-        <span>{lessonTitle}</span>
-      </nav>
+    <div className={styles.main}>
+      <AccountMenu name={learnerName} />
 
-      <div className={styles.layout}>
-        <div className={styles.main}>
-          <div className={styles.eyebrow}>
-            MODULE {String(moduleNumber).padStart(2, "0")} · LEÇON {lessonIndexInModule}/{lessonsInModule}
+      <p className={styles.linePill}>
+        <span>Ligne {lineName}</span>
+        <span>
+          Station {line.position} sur {line.total}
+          {line.current?.minutes ? ` · ${formatMinutes(line.current.minutes)}` : ""}
+        </span>
+      </p>
+      <h1 className={styles.plaque}>
+        {line.currentModule && <span className="srOnly">Module {line.currentModule.number}, {line.currentModule.title} : </span>}
+        {lessonTitle}
+      </h1>
+
+      <div className={styles.content}>
+        {embedUrl && (
+          <div className={styles.videoWrapper}>
+            <iframe
+              src={embedUrl}
+              title={lessonTitle}
+              allowFullScreen
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              className={styles.videoIframe}
+            />
           </div>
-          <h1 className={styles.title}>{lessonTitle}</h1>
+        )}
 
-          <div className={styles.metaRow}>
-            {contentType === "markdown" && (
-              <span className={styles.metaItem}>
-                <Clock size={14} />
-                {estimateReadingMinutes(contentMarkdown)} min de lecture
-              </span>
-            )}
-            {contentType === "rich" && (
-              <span className={styles.metaItem}>
-                <Clock size={14} />
-                {estimateBlocksReadingMinutes(contentBlocks)} min de lecture
-              </span>
-            )}
-            {contentType === "video" && (
-              <span className={styles.metaItem}>
-                <PlayCircle size={14} />
-                Format vidéo
-              </span>
-            )}
-            {contentType === "quiz" && (
-              <span className={styles.metaItem}>
-                <ClipboardList size={14} />
-                {quizData?.quiz_questions?.length ?? 0} questions
-              </span>
-            )}
-            <span className={styles.metaItem}>
-              <FileText size={14} />
-              {moduleTitle}
-            </span>
+        {contentType === "markdown" && contentMarkdown && (
+          <div className={styles.markdownWrapper} data-color-mode="light">
+            <Markdown source={contentMarkdown} />
           </div>
+        )}
 
-          {embedUrl && (
-            <div className={styles.videoWrapper}>
-              <iframe
-                src={embedUrl}
-                allowFullScreen
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                className={styles.videoIframe}
-              />
-            </div>
+        {contentType === "rich" && blocks && blocks.length > 0 && <BlockRenderer blocks={blocks} />}
+
+        {contentType === "video" && !embedUrl && videoUrl && (
+          <p className={styles.fallback}>
+            Vidéo non disponible.{" "}
+            <a href={videoUrl} target="_blank" rel="noopener noreferrer">Ouvrir le lien</a>
+          </p>
+        )}
+
+        {contentType === "quiz" && quizData && quizData.quiz_questions?.length > 0 && (
+          quizStarted
+            ? <QuizPlayer quiz={quizData} />
+            : <QuizIntro quiz={quizData} onStart={() => setQuizStarted(true)} />
+        )}
+
+        {contentType === "quiz" && (!quizData || !quizData.quiz_questions?.length) && (
+          <p className={styles.fallback}>Ce quiz n&apos;a pas encore été configuré.</p>
+        )}
+      </div>
+
+      <div className={styles.nextBar} data-next-bar>
+        <TrainFront size={40} strokeWidth={1.8} className={styles.nextIcon} aria-hidden="true" />
+        <span className={styles.nextRule} aria-hidden="true" />
+        <p className={styles.nextText}>
+          {next ? (
+            <>
+              Prochaine station : {next.title}
+              {next.minutes ? <span className={styles.nextTime}> · {formatMinutes(next.minutes)}</span> : null}
+            </>
+          ) : (
+            <>Terminus : certificat, {line.terminusSubtitle.toLowerCase()}</>
           )}
-
-          {contentType === "markdown" && contentMarkdown && (
-            <div className={styles.markdownWrapper} data-color-mode="light">
-              <Markdown source={contentMarkdown} />
-            </div>
-          )}
-
-          {contentType === "rich" && contentBlocks && contentBlocks.length > 0 && (
-            <BlockRenderer blocks={contentBlocks} />
-          )}
-
-          {contentType === "video" && !embedUrl && videoUrl && (
-            <p className={styles.videoFallback}>
-              Vidéo non disponible.{" "}
-              <a href={videoUrl} target="_blank" rel="noopener noreferrer">Ouvrir le lien</a>
-            </p>
-          )}
-
-          {contentType === "quiz" && quizData && quizData.quiz_questions?.length > 0 && (
-            quizStarted
-              ? <QuizPlayer quiz={quizData} />
-              : <QuizIntro quiz={quizData} onStart={() => setQuizStarted(true)} />
-          )}
-
-          {contentType === "quiz" && (!quizData || !quizData.quiz_questions?.length) && (
-            <p className={styles.videoFallback}>Ce quiz n&apos;a pas encore été configuré.</p>
-          )}
-
-          {contentType !== "quiz" && (
-            <div className={styles.completeRow}>
-              <button
-                className={`${styles.completeBtn} ${completed ? styles.completeBtnDone : ""}`}
-                onClick={completeLesson}
-                disabled={completed || completing}
-              >
-                <Check size={15} />
-                {completed ? "Leçon terminée" : completing ? "Enregistrement…" : "Marquer comme terminé"}
-              </button>
-            </div>
-          )}
-
-          {(prevLesson || nextLesson) && (
-            <div className={styles.lessonNav}>
-              <div className={styles.lessonNavSlot}>
-                {prevLesson && (
-                  <Link href={`/apprenant/${formationId}/${prevLesson.id}`} className={styles.lessonNavBtn}>
-                    <ChevronLeft size={16} />
-                    <span className={styles.lessonNavLabel}>
-                      <em>Précédent</em>
-                      <span>{prevLesson.title}</span>
-                    </span>
-                  </Link>
-                )}
-              </div>
-              <div className={`${styles.lessonNavSlot} ${styles.lessonNavSlotRight}`}>
-                {nextLesson && (
-                  <Link href={`/apprenant/${formationId}/${nextLesson.id}`} className={`${styles.lessonNavBtn} ${styles.lessonNavBtnNext}`}>
-                    <span className={styles.lessonNavLabel}>
-                      <em>Suivant</em>
-                      <span>{nextLesson.title}</span>
-                    </span>
-                    <ChevronRight size={16} />
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <aside className={styles.sidebar}>
-          <div className={styles.sidebarCard}>
-            <span className={styles.sidebarLabel}>Progression du parcours</span>
-            <div className={styles.sidebarProgressValue}>{completedInFormation}/{totalInFormation}</div>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${progressPct}%` }} />
-            </div>
-            <span className={styles.sidebarCaption}>{progressPct}% de la formation terminée</span>
-          </div>
-
-          <div className={styles.sidebarCard}>
-            <span className={styles.sidebarLabel}>Ce module</span>
-            <span className={styles.sidebarModuleTitle}>{moduleTitle}</span>
-            <span className={styles.sidebarCaption}>
-              Leçon {lessonIndexInModule} sur {lessonsInModule}
-            </span>
-          </div>
-        </aside>
+        </p>
+        <button type="button" className={styles.continueBtn} onClick={continueJourney} disabled={continuing}>
+          {continueLabel}
+          <ArrowRight size={22} strokeWidth={2.4} aria-hidden="true" />
+        </button>
       </div>
     </div>
   );

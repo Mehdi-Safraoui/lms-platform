@@ -5,6 +5,9 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/currentUser";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
+import { buildLessonLine, type LineSourceModule } from "@/lib/lessonLine";
+import type { ContentBlock } from "@/lib/ai/contentBlocks";
+import MetroLine from "@/components/learner/MetroLine";
 import LessonView from "./LessonView";
 import NotifyAdminButton from "./NotifyAdminButton";
 import styles from "./lesson.module.css";
@@ -13,47 +16,53 @@ type Props = { params: Promise<{ formationId: string; lessonId: string }> };
 
 const FREE_PREVIEW_LESSON_COUNT = 2;
 
+interface SourceLesson {
+  id: string;
+  title: string;
+  order_index: number;
+  content_type: string;
+  content_blocks: ContentBlock[] | null;
+  content_markdown: string | null;
+  // Un seul quiz par leçon : PostgREST le renvoie en objet (clé unique) ou en tableau.
+  quizzes: { quiz_questions: { id: string }[] } | { quiz_questions: { id: string }[] }[] | null;
+}
+
 export default async function ApprenantLessonPage({ params }: Props) {
   const { formationId, lessonId } = await params;
   const supabase = createServiceRoleSupabaseClient();
 
+  // Toute la ligne en une requête : leçons de chaque module, avec de quoi
+  // estimer leur durée (blocs, nombre de questions des quiz).
   const [{ data: formation }, { data: lecon }, { data: allModules }, dbUser] = await Promise.all([
-    supabase.from("formations").select("id, title, is_published, tenant_id").eq("id", formationId).single(),
+    supabase.from("formations").select("id, title, is_published, tenant_id, attestation_threshold_pct").eq("id", formationId).single(),
     supabase.from("lecons").select("id, title, content_type, content_markdown, content_blocks, video_url").eq("id", lessonId).single(),
-    supabase.from("modules").select("id, title, order_index, lecons(id, title, order_index)").eq("formation_id", formationId).order("order_index"),
+    supabase
+      .from("modules")
+      .select("id, title, order_index, lecons(id, title, order_index, content_type, content_blocks, content_markdown, quizzes(quiz_questions(id)))")
+      .eq("formation_id", formationId)
+      .order("order_index"),
     getCurrentUser(),
   ]);
 
   if (!formation || !formation.is_published || !lecon) notFound();
 
-  const sortedModules = (allModules ?? []).sort((a, b) => a.order_index - b.order_index);
-  const allLessons = sortedModules.flatMap((m) =>
-    [...((m.lecons as { id: string; title: string; order_index: number }[]) ?? [])].sort((a, b) => a.order_index - b.order_index)
-  );
+  const sourceModules: LineSourceModule[] = (allModules ?? []).map((m) => ({
+    id: m.id,
+    title: m.title,
+    order_index: m.order_index,
+    lecons: ((m.lecons ?? []) as unknown as SourceLesson[]).map((l) => ({
+      ...l,
+      quiz_question_count: (Array.isArray(l.quizzes) ? l.quizzes[0] : l.quizzes)?.quiz_questions?.length ?? 0,
+    })),
+  }));
+  const orderedLessonIds = [...sourceModules]
+    .sort((a, b) => a.order_index - b.order_index)
+    .flatMap((m) => [...m.lecons].sort((a, b) => a.order_index - b.order_index).map((l) => l.id));
 
-  const currentIdx = allLessons.findIndex((l) => l.id === lessonId);
+  const currentIdx = orderedLessonIds.indexOf(lessonId);
   // La leçon doit appartenir à la formation de l'URL (sinon une leçon d'une
   // autre formation serait lisible via une formation accessible).
   if (currentIdx === -1) notFound();
-  const prevLesson = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
-  const nextLesson = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
-
-  let currentModuleTitle = "";
-  let moduleNumber = 1;
-  let lessonIndexInModule = 1;
-  let lessonsInModule = 1;
-  sortedModules.forEach((m, moduleIdx) => {
-    const lecons = [...((m.lecons as { id: string; title: string; order_index: number }[]) ?? [])].sort(
-      (a, b) => a.order_index - b.order_index
-    );
-    const posInModule = lecons.findIndex((l) => l.id === lessonId);
-    if (posInModule !== -1) {
-      currentModuleTitle = m.title;
-      moduleNumber = moduleIdx + 1;
-      lessonIndexInModule = posInModule + 1;
-      lessonsInModule = lecons.length;
-    }
-  });
 
   // Accès, abonnement, quiz et progression : lectures indépendantes, en parallèle.
   const [accessible, tenantHasSubscription, quizResult, progressResult] = await Promise.all([
@@ -67,35 +76,45 @@ export default async function ApprenantLessonPage({ params }: Props) {
           .single()
       : { data: null },
     dbUser?.id
-      ? supabase
-          .from("progress")
-          .select("lecon_id")
-          .eq("user_id", dbUser.id)
-          .eq("status", "completed")
-          .in("lecon_id", allLessons.map((l) => l.id))
-      : { data: [] as { lecon_id: string }[] },
+      ? supabase.from("progress").select("lecon_id, status").eq("user_id", dbUser.id)
+      : { data: [] as { lecon_id: string; status: string }[] },
   ]);
   if (!accessible) notFound();
 
+  const progressRows = progressResult.data ?? [];
+  const completedLessonIds = new Set(progressRows.filter((p) => p.status === "completed").map((p) => p.lecon_id));
+
+  const line = buildLessonLine({
+    formationId,
+    formationTitle: formation.title,
+    thresholdPct: formation.attestation_threshold_pct ?? 80,
+    modules: sourceModules,
+    currentLessonId: lessonId,
+    completedLessonIds,
+  });
+
   if (!tenantHasSubscription && currentIdx >= FREE_PREVIEW_LESSON_COUNT) {
     return (
-      <div className={styles.page}>
-        <Link href={`/apprenant/${formationId}`} className={styles.back}>
-          <ChevronLeft size={15} />
-          {formation.title}
-        </Link>
-        <div className={styles.lockedWall}>
-          <div className={styles.lockedIcon}>
-            <Lock size={22} strokeWidth={1.75} />
+      <div className={styles.shell}>
+        <MetroLine line={line} />
+        <div className={styles.page}>
+          <Link href={`/apprenant/${formationId}`} className={styles.back}>
+            <ChevronLeft size={16} />
+            {formation.title}
+          </Link>
+          <div className={styles.lockedWall}>
+            <div className={styles.lockedIcon}>
+              <Lock size={22} strokeWidth={1.75} />
+            </div>
+            <h2 className={styles.lockedTitle}>Accès limité</h2>
+            <p className={styles.lockedText}>
+              Vous visualisez un aperçu gratuit de cette formation.
+              <br />
+              Pour accéder au contenu complet, votre entreprise doit souscrire à un abonnement.
+            </p>
+            <p className={styles.lockedContact}>Contactez votre administrateur.</p>
+            <NotifyAdminButton />
           </div>
-          <h2 className={styles.lockedTitle}>Accès limité</h2>
-          <p className={styles.lockedText}>
-            Vous visualisez un aperçu gratuit de cette formation.
-            <br />
-            Pour accéder au contenu complet, votre entreprise doit souscrire à un abonnement.
-          </p>
-          <p className={styles.lockedContact}>Contactez votre administrateur.</p>
-          <NotifyAdminButton />
         </div>
       </div>
     );
@@ -116,27 +135,21 @@ export default async function ApprenantLessonPage({ params }: Props) {
       : null;
   }
 
-  const completedInFormation = progressResult.data?.length ?? 0;
-
   return (
-    <LessonView
-      lessonId={lessonId}
-      formationId={formationId}
-      formationTitle={formation.title}
-      lessonTitle={lecon.title}
-      contentType={lecon.content_type}
-      contentMarkdown={lecon.content_markdown}
-      contentBlocks={lecon.content_blocks}
-      videoUrl={lecon.video_url}
-      quizData={quizData}
-      prevLesson={prevLesson}
-      nextLesson={nextLesson}
-      moduleTitle={currentModuleTitle}
-      moduleNumber={moduleNumber}
-      lessonIndexInModule={lessonIndexInModule}
-      lessonsInModule={lessonsInModule}
-      totalInFormation={allLessons.length}
-      completedInFormation={completedInFormation}
-    />
+    <div className={styles.shell}>
+      <MetroLine line={line} />
+      <LessonView
+        lessonId={lessonId}
+        lessonTitle={lecon.title}
+        contentType={lecon.content_type}
+        contentMarkdown={lecon.content_markdown}
+        contentBlocks={lecon.content_blocks}
+        videoUrl={lecon.video_url}
+        quizData={quizData}
+        line={line}
+        initiallyCompleted={completedLessonIds.has(lessonId)}
+        learnerName={dbUser?.full_name || dbUser?.email || null}
+      />
+    </div>
   );
 }

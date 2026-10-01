@@ -14,13 +14,13 @@
   height: 52px;
   border-radius: 50%;
   border: none;
-  background: var(--coral);
+  background: var(--metro-blue);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 28px rgba(232, 96, 58, 0.35);
+  box-shadow: 0 10px 28px rgba(29, 70, 229, 0.32);
   transition: transform 0.15s, opacity 0.15s;
 }
 .launcher:hover { opacity: 0.9; transform: scale(1.04); }
@@ -198,7 +198,7 @@
   height: 38px;
   border-radius: 10px;
   border: none;
-  background: var(--coral);
+  background: var(--metro-blue);
   color: #fff;
   display: flex;
   align-items: center;
