@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock, BookOpen, Layers, Clock, Building2 } from "lucide-react";
+import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock, BookOpen, Layers, Clock, Building2, Award } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
 import { formatDuration } from "@/lib/utils";
+import { getOrIssueCertificate, certificateUrl, formatCertificateDate, linkedinAddToProfileUrl } from "@/lib/certificates";
+import CertificateActions from "@/components/certificates/CertificateActions";
+import certStyles from "@/components/certificates/certificate.module.css";
 import EnrollButton from "./EnrollButton";
 import styles from "./formation.module.css";
 
@@ -149,6 +152,9 @@ export default async function FormationDetailPage({ params }: Props) {
   const totalLessons = allLeconIds.length;
   const completionRate = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
+  // Certificat : délivré automatiquement dès le seuil de complétion atteint.
+  const certificateStatus = dbUser && isEnrolled ? await getOrIssueCertificate(supabase, dbUser.id, formationId) : null;
+
   return (
     <div className={styles.page}>
       <nav className={styles.breadcrumb}>
@@ -212,10 +218,49 @@ export default async function FormationDetailPage({ params }: Props) {
             <div className={styles.progressFill} style={{ width: `${completionRate}%` }} />
           </div>
           <span className={styles.progressCaption}>
-            {completedCount}/{totalLessons} leçons terminées · Attestation à {formation.attestation_threshold_pct}% de complétion
-            {completionRate >= formation.attestation_threshold_pct ? " ✓" : ""}
+            {completedCount}/{totalLessons} leçons terminées · Certificat à {formation.attestation_threshold_pct}% de complétion
           </span>
         </div>
+      )}
+
+      {certificateStatus?.certificate ? (
+        <div className={certStyles.card}>
+          <div className={certStyles.cardHead}>
+            <span className={certStyles.cardIcon}>
+              <Award size={20} />
+            </span>
+            <div>
+              <p className={certStyles.cardTitle}>Certificat obtenu</p>
+              <p className={certStyles.cardText}>
+                Délivré le {formatCertificateDate(certificateStatus.certificate.issued_at)} — téléchargez-le ou ajoutez-le à votre profil LinkedIn.
+              </p>
+            </div>
+          </div>
+          <CertificateActions
+            pdfHref={`/api/certificates/${certificateStatus.certificate.id}/pdf`}
+            linkedinHref={linkedinAddToProfileUrl(certificateStatus.certificate)}
+            shareUrl={certificateUrl(certificateStatus.certificate.id)}
+          />
+        </div>
+      ) : (
+        certificateStatus && certificateStatus.total > 0 && (
+          <div className={`${certStyles.card} ${certStyles.cardLocked}`}>
+            <div className={certStyles.cardHead}>
+              <span className={`${certStyles.cardIcon} ${certStyles.cardIconLocked}`}>
+                <Award size={20} />
+              </span>
+              <div>
+                <p className={certStyles.cardTitle}>Certificat de réussite</p>
+                <p className={certStyles.cardText}>
+                  {(() => {
+                    const needed = Math.max(0, Math.ceil((certificateStatus.thresholdPct / 100) * certificateStatus.total) - certificateStatus.completed);
+                    return `Encore ${needed} leçon${needed > 1 ? "s" : ""} à terminer (quiz réussis compris) pour obtenir votre certificat, délivré à ${certificateStatus.thresholdPct} % de complétion.`;
+                  })()}
+                </p>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       <div className={styles.modules}>

@@ -35,7 +35,7 @@
 
 .statsRow {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
   margin-bottom: 40px;
 }
@@ -233,4 +233,35 @@
 
 .badgeStatusEarned {
   color: var(--coral);
+}
+
+/* ── Certificats ── */
+.certificateRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 16px 20px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+.certificateRow:hover { border-color: var(--coral); }
+.certificateIcon { color: var(--coral); flex-shrink: 0; }
+.certificateBody { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.certificateChevron { color: var(--text-light); flex-shrink: 0; }
+
+/* ── Compétences ── */
+.sectionHint { font-size: 13px; color: var(--text-muted); margin: -6px 0 14px; }
+.competenceGroup { margin-bottom: 18px; }
+.competenceFormation {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
 }
