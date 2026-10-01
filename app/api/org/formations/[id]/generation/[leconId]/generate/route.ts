@@ -7,7 +7,7 @@ import { canAuthorFormationByAi } from "@/lib/subscription";
 import { searchChunks } from "@/lib/searchChunks";
 import { generateLessonContent, generateLessonQuiz, type LessonGenerationInput } from "@/lib/ai/generateLessonContent";
 import type { CadrageInput } from "@/lib/ai/generateStructureProposal";
-import { consumeAiGenerationQuota } from "@/lib/aiGenerationQuota";
+import { consumeFormationAi, quotaRefusalMessage } from "@/lib/aiGenerationQuota";
 
 export const dynamic = "force-dynamic";
 // Génération par le modèle le plus capable (OPENAI_GENERATION_MODEL) : mesuré
@@ -58,11 +58,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Les leçons vidéo ne se génèrent pas par IA — ajoutez directement un lien." }, { status: 400 });
   }
 
-  const quotaResult = await consumeAiGenerationQuota(guard.tenantId);
+  const quotaResult = await consumeFormationAi(guard.tenantId, formationId);
   if (!quotaResult.allowed) {
     return NextResponse.json(
       {
-        error: `Quota de générations IA atteint (${quotaResult.used}/${quotaResult.quota} utilisées). Contactez Ahead pour l'augmenter.`,
+        error: quotaRefusalMessage(quotaResult),
         code: "quota_exceeded",
       },
       { status: 403 }
@@ -123,7 +123,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
       await supabase.from("lecons").update({ content_validated_at: null }).eq("id", leconId);
       await touchFormation(supabase, formationId);
-      return NextResponse.json({ data: { quiz: questions, quota: { used: quotaResult.used, total: quotaResult.quota } } });
+      return NextResponse.json({ data: { quiz: questions, quota: { used: quotaResult.used, total: quotaResult.total, formationCounted: true } } });
     }
 
     const query = `${lecon.title}. ${lecon.generation_brief ?? ""}`;
@@ -151,7 +151,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     await supabase.from("chunks").delete().eq("lesson_id", leconId);
     await touchFormation(supabase, formationId);
 
-    return NextResponse.json({ data: { blocks, quota: { used: quotaResult.used, total: quotaResult.quota } } });
+    return NextResponse.json({ data: { blocks, quota: { used: quotaResult.used, total: quotaResult.total, formationCounted: true } } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue lors de la génération.";
     return NextResponse.json({ error: message }, { status: 500 });

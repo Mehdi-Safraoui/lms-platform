@@ -48,9 +48,12 @@ interface ModuleGroup {
   lecons: Lesson[];
 }
 
+// Quota de formations IA du mois (lib/aiGenerationQuota.ts) : une fois la
+// formation comptée, toutes ses générations sont incluses.
 interface Quota {
   used: number;
   total: number | null; // null = illimité
+  formationCounted: boolean;
 }
 
 function flatten(modules: ModuleGroup[]): Lesson[] {
@@ -192,7 +195,7 @@ export default function GenerationClient({
       });
   }, [formationId]);
 
-  const quotaExhausted = quota !== null && quota.total !== null && quota.used >= quota.total;
+  const quotaExhausted = quota !== null && !quota.formationCounted && quota.total !== null && quota.used >= quota.total;
 
   const allLecons = modules ? flatten(modules) : [];
   const selectedLecon = allLecons.find((l) => l.id === selectedLeconId) ?? null;
@@ -259,7 +262,7 @@ export default function GenerationClient({
         const result = await generateForAutopilot(current);
         if (result === "stop") {
           autopilotStopRef.current = true;
-          stoppedReason = "Quota de générations IA atteint — contactez Ahead pour l'augmenter.";
+          stoppedReason = "Quota de formations IA atteint — contactez Ahead pour l'augmenter.";
         }
         setAutopilot((a) => ({
           ...a,
@@ -619,8 +622,9 @@ export default function GenerationClient({
           <div className={`${styles.quotaBox} ${quotaExhausted ? styles.quotaBoxExhausted : ""}`}>
             <Gauge size={13} />
             {quota.total === null
-              ? `${quota.used} génération${quota.used > 1 ? "s" : ""} IA (illimité)`
-              : `${quota.used} / ${quota.total} générations IA utilisées`}
+              ? `${quota.used} formation${quota.used > 1 ? "s" : ""} IA ce mois-ci (illimité)`
+              : `${quota.used} / ${quota.total} formations IA ce mois-ci`}
+            {quota.formationCounted && " · générations de cette formation incluses"}
           </div>
         )}
 
@@ -702,7 +706,7 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
 
   async function handleGenerate() {
     if (quotaExhausted) {
-      toast.error("Quota de générations IA atteint. Contactez Ahead pour l'augmenter.");
+      toast.error("Quota de formations IA atteint ce mois-ci. Contactez Ahead pour l'augmenter.");
       return;
     }
     setGenerating(true);
@@ -877,7 +881,7 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
           <div className={styles.emptyLesson}>
             <Sparkles size={26} className={styles.emptyLessonIcon} />
             <p className={styles.emptyLessonText}>Aucun contenu généré pour cette leçon pour l&apos;instant.</p>
-            {quotaExhausted && <p className={styles.quotaWarning}>Quota de générations IA atteint — contactez Ahead pour l&apos;augmenter.</p>}
+            {quotaExhausted && <p className={styles.quotaWarning}>Quota de formations IA atteint ce mois-ci — contactez Ahead pour l&apos;augmenter.</p>}
             <button type="button" className={styles.primaryBtn} disabled={generating || quotaExhausted} onClick={handleGenerate}>
               {generating ? "Génération en cours…" : "Générer le contenu"}
             </button>
@@ -922,7 +926,7 @@ const LessonPanel = React.forwardRef<LessonPanelHandle, {
               type="button"
               className={styles.secondaryBtn}
               disabled={generating || quotaExhausted}
-              title={quotaExhausted ? "Quota de générations IA atteint" : undefined}
+              title={quotaExhausted ? "Quota de formations IA atteint ce mois-ci" : undefined}
               onClick={handleGenerate}
             >
               <RefreshCw size={14} className={generating ? styles.spin : undefined} />

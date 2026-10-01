@@ -70,6 +70,8 @@ Deux clients selon le contexte :
 
 ## Abonnements & Stripe
 
+Limites par offre centralisées dans `lib/planLimits.ts` : formations IA par mois (`AI_FORMATIONS_PER_MONTH`, écrit sur le tenant par le webhook Stripe) et nombre d'apprenants (`LEARNER_LIMIT`, vérifié à l'invitation — inscrits + invitations Clerk en attente, `app/api/org/apprenants/invite/route.ts`).
+
 L'état d'abonnement vit directement sur `tenants` : `subscription_status`, `subscription_plan`, `stripe_customer_id`, `stripe_subscription_id`.
 
 - **Checkout** — `POST /api/stripe/checkout` crée une Stripe Checkout Session (mode `subscription`), avec `metadata.tenant_id` pour retrouver le tenant dans le webhook.
@@ -133,7 +135,7 @@ Point technique notable (extraction PDF) : `pdf-parse` (basé sur `pdfjs-dist`) 
 
 Le même flow (documents source → cadrage → structure → génération leçon par leçon → publication) sert deux espaces :
 
-- **`admin_tenant`** (`/org/formations/...`) — formation privée de son entreprise (`formations.tenant_id` = son tenant), soumise à l'offre Création/Entreprise et au quota `ai_generation_quota`.
+- **`admin_tenant`** (`/org/formations/...`) — formation privée de son entreprise (`formations.tenant_id` = son tenant), soumise à l'offre Création/Entreprise et à un quota de **formations IA par mois** (`tenants.ai_generation_quota`, valeurs dans `lib/planLimits.ts`). Une formation est comptée une seule fois, à la première génération de sa structure (`consume_formation_ai`, migration `20261001000000_formation_ai_quota.sql`, `formations.ai_started_at`) ; ses leçons et régénérations sont ensuite incluses, dans la limite de `MAX_GENERATIONS_PER_FORMATION` (`formations.ai_generation_count`).
 - **`super_admin`** (`/admin/catalog/...`) — formation du catalogue global Ahead (`tenant_id IS NULL`), sans abonnement ni quota. Une fois publiée, elle devient activable par chaque tenant ; une dernière étape propose une vidéo d'accompagnement (`/admin/catalog/[id]/video`) puis l'éditeur admin pour compléter description/niveau/durée.
 
 Les écrans vivent une seule fois dans `components/authoring/` (paramètre `space: "org" | "admin"`, voir `components/authoring/space.ts`) ; les pages de `app/(org)/org/formations/[id]/*` et `app/(dashboard)/admin/catalog/[id]/*` ne font que les instancier. Les routes API sont communes (`/api/org/formations/[id]/...`, nom historique) : `requireFormationAuthor()` (`lib/api/require-formation-author.ts`) accepte les deux rôles et renvoie `tenantId` (null pour le super_admin), puis `assertOwnFormation(supabase, formationId, guard.tenantId)` compare `formations.tenant_id` à cette valeur — un super_admin n'atteint donc jamais la formation privée d'un tenant, et inversement. Les documents du catalogue sont stockés sous `catalogue/{knowledge_source_id}/{file_name}` (`knowledge_sources.tenant_id` null).

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { getAiGenerationQuota } from "@/lib/aiGenerationQuota";
+import { getFormationQuota } from "@/lib/aiGenerationQuota";
 
 export const dynamic = "force-dynamic";
 
@@ -80,9 +80,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
         }),
     }));
 
-  const quotaResult = await getAiGenerationQuota(guard.tenantId);
+  const quota = await getFormationQuota(guard.tenantId, formationId);
 
   return NextResponse.json({
-    data: { modules: data, quota: { used: quotaResult.used, total: quotaResult.quota } },
+    data: { modules: data, quota },
   });
 }

@@ -3,6 +3,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { requireAuth } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { learnerLimitFor } from "@/lib/planLimits";
 
 /**
  * Invite des apprenants dans l'Organization Clerk du tenant de l'appelant.
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("clerk_org_id")
+    .select("clerk_org_id, subscription_plan")
     .eq("id", guard.tenantId)
     .single();
 
@@ -59,6 +60,30 @@ export async function POST(req: NextRequest) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const client = await clerkClient();
+
+  // Limite d'apprenants de l'offre (lib/planLimits.ts) : apprenants inscrits
+  // + invitations encore en attente + nouvelles invitations.
+  const limit = learnerLimitFor(tenant.subscription_plan);
+  if (limit !== null) {
+    const [{ count: learners }, pending] = await Promise.all([
+      supabase.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", guard.tenantId).eq("role", "apprenant"),
+      client.organizations.getOrganizationInvitationList({ organizationId: tenant.clerk_org_id, status: ["pending"], limit: 1 }),
+    ]);
+    const used = (learners ?? 0) + pending.totalCount;
+    if (used + emailAddresses.length > limit) {
+      const remaining = Math.max(0, limit - used);
+      return NextResponse.json(
+        {
+          error:
+            remaining === 0
+              ? `Votre offre est limitée à ${limit} apprenants (invitations en attente comprises) et la limite est atteinte. Passez à l'offre supérieure pour en inviter davantage.`
+              : `Votre offre est limitée à ${limit} apprenants : vous pouvez encore en inviter ${remaining} (invitations en attente comprises).`,
+          code: "learner_limit",
+        },
+        { status: 403 }
+      );
+    }
+  }
 
   try {
     await client.organizations.createOrganizationInvitationBulk(

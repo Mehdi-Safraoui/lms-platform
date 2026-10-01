@@ -1,7 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { learnerLimitFor } from "@/lib/planLimits";
 import ApprenantTable from "./ApprenantTable";
 
 export default async function ApprenantPage() {
@@ -22,6 +23,17 @@ export default async function ApprenantPage() {
   const tenantId = currentUser.tenant_id;
 
   if (!(await hasActiveSubscription(tenantId))) redirect("/pricing");
+
+  // Limite de l'offre et invitations en attente (comptées dans la limite, voir
+  // app/api/org/apprenants/invite/route.ts).
+  const { data: tenant } = await supabase.from("tenants").select("clerk_org_id, subscription_plan").eq("id", tenantId).single();
+  const learnerLimit = learnerLimitFor(tenant?.subscription_plan);
+  const pendingInvitations = tenant?.clerk_org_id
+    ? await clerkClient()
+        .then((client) => client.organizations.getOrganizationInvitationList({ organizationId: tenant.clerk_org_id, status: ["pending"], limit: 1 }))
+        .then((res) => res.totalCount)
+        .catch(() => 0)
+    : 0;
 
   // Tous les apprenants du tenant
   const { data: apprenants } = await supabase
@@ -56,6 +68,8 @@ export default async function ApprenantPage() {
       apprenants={apprenants ?? []}
       formations={formationsWithLessons}
       progressRecords={progressRecords ?? []}
+      learnerLimit={learnerLimit}
+      pendingInvitations={pendingInvitations}
     />
   );
 }
