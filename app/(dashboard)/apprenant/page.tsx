@@ -37,11 +37,11 @@ export default async function ApprenantPage() {
     tenantFormationIds.length > 0
       ? supabase
           .from("formations")
-          .select("id, title, estimated_duration_minutes, attestation_threshold_pct")
+          .select("id, title, description, thumbnail_url, estimated_duration_minutes, attestation_threshold_pct")
           .eq("is_published", true)
           .in("id", tenantFormationIds)
           .order("created_at", { ascending: false })
-      : { data: [] as { id: string; title: string; estimated_duration_minutes: number | null; attestation_threshold_pct: number | null }[] },
+      : { data: [] as { id: string; title: string; description: string | null; thumbnail_url: string | null; estimated_duration_minutes: number | null; attestation_threshold_pct: number | null }[] },
     tenantFormationIds.length > 0
       ? supabase
           .from("modules")
@@ -76,13 +76,14 @@ export default async function ApprenantPage() {
       const minutes = buildLessonLine({
         formationId: f.id, formationTitle: f.title, thresholdPct: 80, modules: sourceModules, currentLessonId: "", completedLessonIds: new Set(),
       }).modules.reduce((sum, m) => sum + m.stations.reduce((s, st) => s + (st.minutes ?? 0), 0), 0);
-      newLines.push({ formationId: f.id, title: f.title, moduleCount: sourceModules.length, minutes: minutes || f.estimated_duration_minutes });
+      newLines.push({ formationId: f.id, title: f.title, description: f.description, thumbnailUrl: f.thumbnail_url, moduleCount: sourceModules.length, minutes: minutes || f.estimated_duration_minutes });
       continue;
     }
 
     const resume = ordered.find((l) => !completedLessonIds.has(l.id)) ?? null;
     lines.push({
       formationId: f.id,
+      thumbnailUrl: f.thumbnail_url,
       line: buildLessonLine({
         formationId: f.id,
         formationTitle: f.title,
