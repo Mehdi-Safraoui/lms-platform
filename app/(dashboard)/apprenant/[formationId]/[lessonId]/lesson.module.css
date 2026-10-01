@@ -20,55 +20,6 @@
 }
 
 .account { position: absolute; top: 16px; right: 24px; z-index: 5; }
-.accountBtn {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  height: 36px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--metro-navy);
-  font-family: var(--font-text), sans-serif;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.avatar {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--metro-navy);
-  color: #fff;
-}
-.accountMenu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  min-width: 200px;
-  padding: 6px;
-  border: 1px solid var(--metro-hair);
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 12px 32px rgba(23, 24, 59, 0.14);
-}
-.accountItem {
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--metro-navy);
-  font-family: var(--font-text), sans-serif;
-  font-size: 15px;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-.accountItem:hover { background: var(--metro-tint); }
 
 .linePill {
   display: inline-flex;
@@ -99,8 +50,9 @@
   font-size: 50px;
   font-weight: 800;
   line-height: 1.12;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   text-align: center;
+  text-wrap: balance;
 }
 
 .content { margin-top: 32px; }
@@ -332,7 +284,6 @@
 .continueBtn:disabled { opacity: 0.7; cursor: progress; }
 
 .continueBtn:focus-visible,
-.accountBtn:focus-visible,
 .quizOption:focus-visible,
 .quizStartBtn:focus-visible,
 .quizSubmitBtn:focus-visible {

@@ -1,59 +1,101 @@
-import Link from "next/link";
-import { Star, CheckCircle, Building2, Flame } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/currentUser";
 import { computeGamification, detectAndPersistNewBadges } from "@/lib/badges";
-import { formationCover } from "@/lib/formationAccent";
+import { buildLessonLine, type LineSourceModule } from "@/lib/lessonLine";
+import type { ContentBlock } from "@/lib/ai/contentBlocks";
+import LearnerDashboard, { type DashboardLine, type NewLine } from "./LearnerDashboard";
 import BadgeUnlockToasts from "./BadgeUnlockToasts";
-import styles from "./apprenant.module.css";
 
 const POINTS_PER_LEVEL = 500;
 
-const NIVEAU_LABEL: Record<string, string> = {
-  debutant: "Débutant",
-  intermediaire: "Intermédiaire",
-  avance: "Avancé",
-};
+interface SourceLesson {
+  id: string;
+  title: string;
+  order_index: number;
+  content_type: string;
+  content_blocks: ContentBlock[] | null;
+  content_markdown: string | null;
+  quizzes: { quiz_questions: { id: string }[] } | { quiz_questions: { id: string }[] }[] | null;
+}
 
 export default async function ApprenantPage() {
   const dbUser = await getCurrentUser();
   const supabase = createServiceRoleSupabaseClient();
 
-  // Formations activées par le tenant de l'apprenant, et ses inscriptions.
-  const [{ data: tenantEnrollments }, { data: userEnrollments }] = await Promise.all([
+  // Formations activées par le tenant de l'apprenant, ses inscriptions et sa progression.
+  const [{ data: tenantEnrollments }, { data: userEnrollments }, { data: progressRows }] = await Promise.all([
     dbUser?.tenant_id
       ? supabase.from("tenant_formations").select("formation_id").eq("tenant_id", dbUser.tenant_id)
       : { data: [] as { formation_id: string }[] },
-    dbUser
-      ? supabase.from("user_enrollments").select("formation_id").eq("user_id", dbUser.id)
-      : { data: null },
+    dbUser ? supabase.from("user_enrollments").select("formation_id").eq("user_id", dbUser.id) : { data: null },
+    dbUser ? supabase.from("progress").select("lecon_id, status").eq("user_id", dbUser.id) : { data: [] as { lecon_id: string; status: string }[] },
   ]);
   const tenantFormationIds = (tenantEnrollments ?? []).map((e) => e.formation_id);
 
-  // ── Formations et badges (calculés en direct depuis la progression réelle) ──
-  const [{ data: formations }, gamification] = await Promise.all([
+  // Formations publiées avec leur ligne complète, et badges (calculés en direct).
+  const [{ data: formations }, { data: modules }, gamification] = await Promise.all([
     tenantFormationIds.length > 0
       ? supabase
           .from("formations")
-          .select("id, title, description, niveau, thumbnail_url, tenant_id")
+          .select("id, title, estimated_duration_minutes, attestation_threshold_pct")
           .eq("is_published", true)
           .in("id", tenantFormationIds)
           .order("created_at", { ascending: false })
-      : {
-          data: [] as {
-            id: string; title: string; description: string | null; niveau: string | null;
-            thumbnail_url: string | null; tenant_id: string | null;
-          }[],
-        },
+      : { data: [] as { id: string; title: string; estimated_duration_minutes: number | null; attestation_threshold_pct: number | null }[] },
+    tenantFormationIds.length > 0
+      ? supabase
+          .from("modules")
+          .select("id, formation_id, title, order_index, lecons(id, title, order_index, content_type, content_blocks, content_markdown, quizzes(quiz_questions(id)))")
+          .in("formation_id", tenantFormationIds)
+      : { data: [] as { id: string; formation_id: string; title: string; order_index: number; lecons: unknown }[] },
     dbUser ? computeGamification(dbUser.id, tenantFormationIds) : null,
   ]);
 
-  const totalPoints = dbUser?.total_points ?? 0;
-  const niveau = Math.floor(totalPoints / POINTS_PER_LEVEL) + 1;
   const enrolledIds = new Set((userEnrollments ?? []).map((e) => e.formation_id));
+  const completedLessonIds = new Set((progressRows ?? []).filter((p) => p.status === "completed").map((p) => p.lecon_id));
 
+  const lines: DashboardLine[] = [];
+  const newLines: NewLine[] = [];
+  for (const f of formations ?? []) {
+    const sourceModules: LineSourceModule[] = (modules ?? [])
+      .filter((m) => m.formation_id === f.id)
+      .map((m) => ({
+        id: m.id,
+        title: m.title,
+        order_index: m.order_index,
+        lecons: ((m.lecons ?? []) as unknown as SourceLesson[]).map((l) => ({
+          ...l,
+          quiz_question_count: (Array.isArray(l.quizzes) ? l.quizzes[0] : l.quizzes)?.quiz_questions?.length ?? 0,
+        })),
+      }));
+    const ordered = [...sourceModules]
+      .sort((a, b) => a.order_index - b.order_index)
+      .flatMap((m) => [...m.lecons].sort((a, b) => a.order_index - b.order_index));
+
+    if (!enrolledIds.has(f.id)) {
+      const minutes = buildLessonLine({
+        formationId: f.id, formationTitle: f.title, thresholdPct: 80, modules: sourceModules, currentLessonId: "", completedLessonIds: new Set(),
+      }).modules.reduce((sum, m) => sum + m.stations.reduce((s, st) => s + (st.minutes ?? 0), 0), 0);
+      newLines.push({ formationId: f.id, title: f.title, moduleCount: sourceModules.length, minutes: minutes || f.estimated_duration_minutes });
+      continue;
+    }
+
+    const resume = ordered.find((l) => !completedLessonIds.has(l.id)) ?? null;
+    lines.push({
+      formationId: f.id,
+      line: buildLessonLine({
+        formationId: f.id,
+        formationTitle: f.title,
+        thresholdPct: f.attestation_threshold_pct ?? 80,
+        modules: sourceModules,
+        currentLessonId: resume?.id ?? "",
+        completedLessonIds,
+      }),
+    });
+  }
+
+  const totalPoints = dbUser?.total_points ?? 0;
   const badges = gamification?.badges ?? [];
-  const streak = gamification?.streak ?? null;
   const newlyUnlocked = dbUser && gamification
     ? await detectAndPersistNewBadges(dbUser.id, [
         ...badges,
@@ -62,108 +104,17 @@ export default async function ApprenantPage() {
     : [];
 
   return (
-    <div className={styles.page}>
+    <>
       <BadgeUnlockToasts newlyUnlocked={newlyUnlocked} />
-      <div className={styles.eyebrow}>
-        <span className={styles.dot} />
-        Espace apprenant
-      </div>
-      <div className={styles.titleRow}>
-        <h1 className={styles.title}>Mes formations</h1>
-        <div className={styles.titleChips}>
-          {streak && streak.current > 0 && (
-            <div
-              className={`${styles.streakBadge} ${streak.activeToday ? "" : styles.streakBadgeAtRisk}`}
-              title={streak.activeToday ? `Record : ${streak.best} jour${streak.best > 1 ? "s" : ""}` : "Suivez une leçon aujourd'hui pour garder votre série"}
-            >
-              <Flame size={13} />
-              <span>
-                Série de {streak.current} jour{streak.current > 1 ? "s" : ""}
-                {!streak.activeToday && " · à prolonger aujourd'hui"}
-              </span>
-            </div>
-          )}
-          <div className={styles.pointsBadge}>
-            <Star size={13} />
-            <span>{totalPoints} points</span>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.layout}>
-        <div className={styles.main}>
-          {!formations?.length ? (
-            <p className={styles.empty}>Aucune formation disponible pour le moment.</p>
-          ) : (
-            <div className={styles.grid}>
-              {formations.map((f) => {
-                const enrolled = enrolledIds.has(f.id);
-                const cover = formationCover(f.id);
-                return (
-                  <Link key={f.id} href={`/apprenant/${f.id}`} className={`${styles.card} ${enrolled ? styles.cardEnrolled : ""}`}>
-                    {f.thumbnail_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={f.thumbnail_url} alt="" className={styles.cardCover} />
-                    ) : (
-                      <div className={styles.cardCoverGenerated} style={{ background: cover.gradient }}>
-                        <cover.icon size={34} color="#fff" strokeWidth={1.5} />
-                      </div>
-                    )}
-                    <div className={styles.cardBody}>
-                      <h2 className={styles.cardTitle}>{f.title}</h2>
-                      {f.description && <p className={styles.cardDesc}>{f.description}</p>}
-                      <div className={styles.cardFooter}>
-                        {f.niveau && (
-                          <span className={styles.badge}>{NIVEAU_LABEL[f.niveau] ?? f.niveau}</span>
-                        )}
-                        {f.tenant_id && (
-                          <span className={styles.companyBadge}>
-                            <Building2 size={11} />
-                            Créée par votre entreprise
-                          </span>
-                        )}
-                        {enrolled && (
-                          <span className={styles.enrolledBadge}>
-                            <CheckCircle size={11} />
-                            Inscrit
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <aside className={styles.sidebar}>
-          <div className={styles.badgesCard}>
-            <span className={styles.badgesCardTitle}>Progression & badges</span>
-            <div className={styles.badgesLevelRow}>
-              <span className={styles.badgesLevelValue}>Niveau {niveau}</span>
-              <span className={styles.badgesLevelCaption}>{totalPoints} points</span>
-            </div>
-            <div className={styles.badgesRow}>
-              {badges.map((b) => (
-                <div key={b.id} className={styles.badgeItem}>
-                  <span className={`${styles.badgeIcon} ${b.earned ? styles.badgeIconEarned : ""}`}>
-                    <b.icon size={17} />
-                    <span className={styles.badgeTooltip}>
-                      <strong>{b.label}</strong>
-                      <span>{b.description}</span>
-                      <em>{b.earned ? "Débloqué ✓" : "Verrouillé"}</em>
-                    </span>
-                  </span>
-                  <span className={`${styles.badgeLabel} ${b.earned ? styles.badgeLabelEarned : ""}`}>
-                    {b.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
-      </div>
-    </div>
+      <LearnerDashboard
+        firstName={dbUser?.full_name?.split(/\s+/)[0] ?? null}
+        streak={gamification?.streak ?? null}
+        level={Math.floor(totalPoints / POINTS_PER_LEVEL) + 1}
+        points={totalPoints}
+        lines={lines}
+        newLines={newLines}
+        badges={badges}
+      />
+    </>
   );
 }

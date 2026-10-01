@@ -28,6 +28,8 @@
   --metro-navy:    #17183b;
   --metro-blue:    #1d46e5;
   --metro-coral:   #ff555b;
+  /* Fond des étiquettes « Vous êtes ici » : texte blanc lisible (4,6:1). */
+  --metro-coral-ink: #d63a40;
   --metro-tint:    #edf3fb;
   --metro-slate:   #424b70;
   --metro-muted:   #4b5276;
