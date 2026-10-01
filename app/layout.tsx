@@ -1,24 +1,10 @@
 import type { Metadata } from "next";
-import { Barlow, Martel_Sans, Plus_Jakarta_Sans, Winky_Sans } from "next/font/google";
+import { Martel_Sans, Winky_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-});
-
-const barlow = Barlow({
-  variable: "--font-barlow",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-});
-
-// Espace apprenant (ligne de métro) : Winky Sans pour la signalétique
-// (titres, plaques, stations), Martel Sans pour la lecture.
+// Toute l'app (monde « ligne de métro ») : Winky Sans pour les titres et la
+// signalétique, Martel Sans pour le texte.
 const winky = Winky_Sans({
   variable: "--font-display",
   subsets: ["latin", "latin-ext"],
@@ -41,7 +27,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider afterSignOutUrl="/sign-in">
-      <html lang="fr" className={`${jakarta.variable} ${barlow.variable} ${winky.variable} ${martel.variable}`}>
+      <html lang="fr" className={`${winky.variable} ${martel.variable}`}>
         <body>{children}</body>
       </html>
     </ClerkProvider>

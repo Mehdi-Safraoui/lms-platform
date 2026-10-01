@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import UpgradeNotice from "../UpgradeNotice";
 import { loadAuthoringFormation } from "../loadAuthoring";
 import { AUTHORING_BASE_PATH, AUTHORING_CATALOGUE_PATH, type AuthoringSpace } from "../space";
@@ -16,10 +16,6 @@ export default async function SourcesStep({ space, formationId }: { space: Autho
         Catalogue
       </Link>
 
-      <div className={styles.eyebrow}>
-        <Sparkles size={13} />
-        Création par IA
-      </div>
       <h1 className={styles.title}>{formation.title}</h1>
       <p className={styles.subtitle}>
         Ajoutez vos documents source (PDF, Word, PowerPoint, texte brut) ou des liens web —

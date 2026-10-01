@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { loadAuthoringFormation } from "@/components/authoring/loadAuthoring";
 import styles from "@/components/authoring/generation/generation.module.css";
 import VideoStepClient from "./VideoStepClient";
@@ -21,10 +21,6 @@ export default async function CatalogueVideoPage({ params }: Props) {
         Génération de contenu
       </Link>
 
-      <div className={styles.eyebrow}>
-        <Sparkles size={13} />
-        Création par IA — Vidéo d&apos;accompagnement
-      </div>
       <h1 className={styles.title}>{formation.title}</h1>
 
       <VideoStepClient formationId={id} suggestedQuery={formation.title} />

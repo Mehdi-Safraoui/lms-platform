@@ -1,39 +1,41 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton, useUser } from "@clerk/nextjs";
-import { BookOpen, Building2, LayoutDashboard } from "lucide-react";
+import { BookOpen, Building2, LayoutDashboard, Users } from "lucide-react";
 import { Toaster } from "sonner";
-import NotificationBell from "@/components/shared/NotificationBell";
 import LearnerShell from "@/components/learner/LearnerShell";
-import styles from "./layout.module.css";
+import WorkspaceShell, { WorkspaceIdentity, type WorkspaceNavItem } from "@/components/learner/WorkspaceShell";
 
-const adminNavItems = [
-  { href: "/admin", label: "Vue globale", icon: LayoutDashboard, exact: true },
-  { href: "/admin/catalog", label: "Catalogue IA", icon: BookOpen, exact: false },
-  { href: "/admin/tenants", label: "Tenants", icon: Building2, exact: false },
+const prefix = (href: string) => (p: string) => p === href || p.startsWith(`${href}/`);
+
+const ADMIN_NAV: WorkspaceNavItem[] = [
+  { href: "/admin", label: "Vue globale", icon: LayoutDashboard, match: (p) => p === "/admin" },
+  { href: "/admin/catalog", label: "Catalogue IA", icon: BookOpen, match: prefix("/admin/catalog") },
+  { href: "/admin/tenants", label: "Entreprises", icon: Building2, match: prefix("/admin/tenants") },
+];
+
+const TUTEUR_NAV: WorkspaceNavItem[] = [
+  { href: "/tuteur/apprenants", label: "Apprenants", icon: Users, match: prefix("/tuteur/apprenants") },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user } = useUser();
   const isApprenant = pathname.startsWith("/apprenant");
-  const displayName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.primaryEmailAddress?.emailAddress : null;
   // Page leçon (/apprenant/[formation]/[leçon]) : plein écran, la page dessine
   // elle-même son menu (la ligne de la formation) et sa barre « Prochaine station ».
   const isLessonPage = /^\/apprenant\/[^/]+\/[^/]+\/?$/.test(pathname);
+  const isTuteur = pathname.startsWith("/tuteur");
 
   const toaster = (
     <Toaster
       position="bottom-right"
       toastOptions={{
         style: {
-          fontFamily: "var(--font-jakarta), sans-serif",
+          fontFamily: "var(--font-text), sans-serif",
           fontSize: "14px",
-          fontWeight: "500",
+          fontWeight: "600",
           borderRadius: "12px",
-          background: "#191738",
+          background: "#17183b",
           color: "#ffffff",
           border: "1px solid rgba(255,255,255,0.1)",
           boxShadow: "0 8px 32px rgba(11,10,34,0.35)",
@@ -62,60 +64,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        {/* Logo */}
-        <div className={styles.logo}>
-          <div className={styles.logoMark}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2L14 13H2L8 2Z" fill="white" strokeWidth="0" />
-            </svg>
-          </div>
-          <span className={styles.logoText}>ahead<span>·</span><em>digital</em></span>
-        </div>
-
-        {/* Nav */}
-        <nav className={styles.nav}>
-          <span className={styles.navSection}>Super-admin</span>
-          {adminNavItems.map((item) => {
-            const isActive = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${styles.navItem} ${isActive ? styles.active : ""}`}
-              >
-                <item.icon size={17} strokeWidth={1.75} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Bottom */}
-        <div className={styles.sidebarBottom}>
-          <UserButton
-            appearance={{
-              elements: { avatarBox: { width: 30, height: 30 } },
-            }}
-          />
-          <span className={styles.sidebarUser}>{displayName ?? "Mon compte"}</span>
-        </div>
-      </aside>
-
-      <div className={styles.main}>
-        <header className={styles.topbar}>
-          <div className={styles.topbarLeft}>
-            <span className={styles.topbarBadge}>Super-admin</span>
-          </div>
-          <div className={styles.topbarRight}>
-            <NotificationBell />
-          </div>
-        </header>
-        <div className={styles.content}>{children}</div>
-      </div>
-
+    <>
+      <WorkspaceShell
+        homeHref={isTuteur ? "/tuteur/apprenants" : "/admin"}
+        nav={isTuteur ? TUTEUR_NAV : ADMIN_NAV}
+        muted
+        accountLinks={isTuteur ? [] : [{ href: "/admin", label: "Vue globale" }]}
+        identity={<WorkspaceIdentity name="Ahead Digital" role={isTuteur ? "Tuteur" : "Super admin"} />}
+      >
+        {children}
+      </WorkspaceShell>
       {toaster}
-    </div>
+    </>
   );
 }

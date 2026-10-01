@@ -117,10 +117,6 @@ export default function CatalogPage() {
       <div className={styles.page}>
         {/* ── Header ── */}
         <div className={styles.pageHeader}>
-          <div className={styles.eyebrow}>
-            <span className={styles.eyebrowDot} />
-            <span>FLOW SUPER-ADMIN · CRÉATION PAR AHEAD</span>
-          </div>
           <div className={styles.headerRow}>
             <div>
               <h1 className={styles.title}>

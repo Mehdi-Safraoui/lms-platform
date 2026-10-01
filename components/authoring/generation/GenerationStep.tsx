@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import UpgradeNotice from "../UpgradeNotice";
 import { loadAuthoringFormation } from "../loadAuthoring";
@@ -30,10 +30,6 @@ export default async function GenerationStep({ space, formationId }: { space: Au
         Structure
       </Link>
 
-      <div className={styles.eyebrow}>
-        <Sparkles size={13} />
-        Création par IA — Génération de contenu
-      </div>
       <h1 className={styles.title}>{formation.title}</h1>
       <p className={styles.subtitle}>
         Générez le contenu de chaque leçon, relisez-le, ajustez-le si besoin, puis validez pour passer à

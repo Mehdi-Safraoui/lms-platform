@@ -145,13 +145,9 @@ export default function TenantsPage() {
 
       <div className={styles.page}>
         <div className={styles.pageHeader}>
-          <div className={styles.eyebrow}>
-            <span className={styles.eyebrowDot} />
-            <span>GESTION DES ENTREPRISES CLIENTES</span>
-          </div>
           <div className={styles.headerRow}>
             <div>
-              <h1 className={styles.title}>Tenants</h1>
+              <h1 className={styles.title}>Entreprises</h1>
               <p className={styles.subtitle}>
                 Toutes les entreprises clientes inscrites sur la plateforme.
               </p>

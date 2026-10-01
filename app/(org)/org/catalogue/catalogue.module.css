@@ -27,7 +27,7 @@
 .title {
   font-family: var(--font-barlow), sans-serif;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text);
   letter-spacing: -0.4px;
   margin-bottom: 6px;
@@ -94,7 +94,7 @@
   width: 42px;
   height: 42px;
   border-radius: 11px;
-  background: var(--coral-light, #fdf0ec);
+  background: var(--coral-light, #eef2fc);
   color: var(--coral);
   display: flex;
   align-items: center;

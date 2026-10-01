@@ -69,11 +69,11 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
         position="bottom-right"
         toastOptions={{
           style: {
-            fontFamily: "var(--font-jakarta), sans-serif",
+            fontFamily: "var(--font-text), sans-serif",
             fontSize: "14px",
             fontWeight: "500",
             borderRadius: "12px",
-            background: "#191738",
+            background: "#17183b",
             color: "#ffffff",
             border: "1px solid rgba(255,255,255,0.1)",
             boxShadow: "0 8px 32px rgba(11,10,34,0.35)",

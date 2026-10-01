@@ -91,10 +91,6 @@ export default async function AbonnementPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.eyebrow}>
-        <span className={styles.dot} />
-        Facturation
-      </div>
       <h1 className={styles.title}>Abonnement</h1>
       <p className={styles.subtitle}>Géré via Stripe.</p>
 
