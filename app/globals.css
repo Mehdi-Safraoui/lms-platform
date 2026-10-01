@@ -23,6 +23,16 @@
   --radius:      14px;
   --radius-sm:   8px;
 
+  /* ── Ligne de métro (espace apprenant) ── */
+  --metro-ground:  #f6f8f8;
+  --metro-navy:    #17183b;
+  --metro-blue:    #1d46e5;
+  --metro-coral:   #ff555b;
+  --metro-tint:    #edf3fb;
+  --metro-slate:   #424b70;
+  --metro-muted:   #4b5276;
+  --metro-hair:    #e3e7ef;
+
   /* shadows */
   --shadow-sm:   0 1px 3px rgba(17,24,39,0.06), 0 1px 2px rgba(17,24,39,0.04);
   --shadow-md:   0 4px 16px rgba(17,24,39,0.08);
@@ -70,3 +80,21 @@ input, textarea, select, button {
 [data-sonner-toast] [data-description] {
   color: #ffffff !important;
 }
+
+/* Texte réservé aux lecteurs d'écran */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+::selection { background: #d4ddfb; color: #17183b; }
+
+/* Page leçon : l'assistant de formation se place au-dessus de la barre « Prochaine station ». */
+body:has([data-next-bar]) [data-formation-chat] { bottom: 112px; }

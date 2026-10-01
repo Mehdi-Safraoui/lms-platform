@@ -39,11 +39,11 @@ const FEATURE_ICONS: Record<string, typeof Sparkles> = {
 
 const CALLOUT_ICONS = {
   info: Info,
-  tip: Lightbulb,
+  tip: Sparkles,
   warning: AlertTriangle,
   success: CheckCircle2,
   objective: Target,
-  example: BookOpen,
+  example: Lightbulb,
 };
 
 function InlineMarkdown({ text }: { text: string }) {
@@ -60,7 +60,7 @@ function ExerciseBlockView({ prompt, answer }: { prompt: string; answer: string 
   return (
     <div className={styles.exercise}>
       <span className={styles.exerciseIcon}>
-        <PenTool size={18} />
+        <PenTool size={22} />
       </span>
       <div className={styles.exerciseBody}>
         <strong>Exercice</strong>
@@ -101,18 +101,17 @@ function PromptBlockView({ title, prompt, tip }: { title: string; prompt: string
 
   return (
     <div className={styles.prompt}>
+      <Terminal size={30} strokeWidth={1.8} className={styles.promptIcon} aria-hidden="true" />
       <div className={styles.promptHeader}>
-        <span className={styles.promptTitle}>
-          <Terminal size={15} />
-          {title}
-        </span>
-        <button type="button" className={styles.promptCopy} onClick={copy} aria-live="polite">
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? "Copié" : "Copier"}
-        </button>
+        <span className={styles.promptLabel}>Prompt à copier</span>
+        <span className={styles.promptTitle}>{title}</span>
+        <pre className={styles.promptText}>{prompt}</pre>
+        {tip && <p className={styles.promptTip}>{md(tip)}</p>}
       </div>
-      <pre className={styles.promptText}>{prompt}</pre>
-      {tip && <p className={styles.promptTip}>{md(tip)}</p>}
+      <button type="button" className={styles.promptCopy} onClick={copy} aria-live="polite">
+        {copied ? <Check size={17} /> : <Copy size={17} />}
+        {copied ? "Copié" : "Copier"}
+      </button>
     </div>
   );
 }
@@ -157,12 +156,13 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
           case "callout": {
             const Icon = CALLOUT_ICONS[block.variant];
             return (
-              <div key={i} className={`${styles.callout} ${styles[`callout_${block.variant}`]}`}>
-                <span className={styles.calloutIcon}>
-                  <Icon size={18} />
+              <div key={i} className={`${styles.callout} ${styles[`callout_${block.variant}`] ?? ""}`}>
+                <span className={styles.calloutIcon} aria-hidden="true">
+                  <Icon size={50} strokeWidth={1.8} />
                 </span>
+                <span className={styles.calloutRule} aria-hidden="true" />
                 <div className={styles.calloutBody}>
-                  <strong>{md(block.title)}</strong>
+                  <strong className={styles.calloutLabel}>{md(block.title)}</strong>
                   <p>{md(block.text)}</p>
                 </div>
               </div>
@@ -201,8 +201,8 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
                   const Icon = FEATURE_ICONS[item.icon] ?? Sparkles;
                   return (
                     <div key={j} className={styles.featureCard}>
-                      <span className={styles.featureIcon}>
-                        <Icon size={18} />
+                      <span className={styles.featureIcon} aria-hidden="true">
+                        <Icon size={19} />
                       </span>
                       <span className={styles.featureTitle}>{item.title}</span>
                       <p className={styles.featureDesc}>{md(item.description)}</p>
@@ -215,8 +215,8 @@ export default function BlockRenderer({ blocks, showPlaceholders = false }: { bl
           case "highlight":
             return (
               <div key={i} className={styles.highlight}>
-                <span className={styles.highlightIcon}>
-                  <Star size={18} />
+                <span className={styles.highlightIcon} aria-hidden="true">
+                  <Star size={20} fill="currentColor" />
                 </span>
                 <div className={styles.highlightBody}>
                   <strong>{md(block.title)}</strong>

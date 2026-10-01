@@ -26,6 +26,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const displayName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.primaryEmailAddress?.emailAddress : null;
   const navItems = isApprenant ? apprenantNavItems : adminNavItems;
   const sectionLabel = isApprenant ? "Apprenant" : "Super-admin";
+  // Page leçon (/apprenant/[formation]/[leçon]) : plein écran, la page dessine
+  // elle-même son menu (la ligne de la formation) et son tableau des départs.
+  const isLessonPage = /^\/apprenant\/[^/]+\/[^/]+\/?$/.test(pathname);
+
+  const toaster = (
+    <Toaster
+      position="bottom-right"
+      toastOptions={{
+        style: {
+          fontFamily: "var(--font-jakarta), sans-serif",
+          fontSize: "14px",
+          fontWeight: "500",
+          borderRadius: "12px",
+          background: "#191738",
+          color: "#ffffff",
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 8px 32px rgba(11,10,34,0.35)",
+        },
+        duration: 3500,
+      }}
+    />
+  );
+
+  if (isLessonPage) {
+    return (
+      <>
+        {children}
+        {toaster}
+      </>
+    );
+  }
 
   return (
     <div className={styles.shell}>
@@ -81,22 +112,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className={styles.content}>{children}</div>
       </div>
 
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            fontFamily: "var(--font-jakarta), sans-serif",
-            fontSize: "14px",
-            fontWeight: "500",
-            borderRadius: "12px",
-            background: "#191738",
-            color: "#ffffff",
-            border: "1px solid rgba(255,255,255,0.1)",
-            boxShadow: "0 8px 32px rgba(11,10,34,0.35)",
-          },
-          duration: 3500,
-        }}
-      />
+      {toaster}
     </div>
   );
 }
