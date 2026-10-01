@@ -61,3 +61,42 @@
 }
 
 .main { min-width: 0; }
+
+.shell[data-muted] { background: var(--bg); }
+.shell[data-muted] .main { min-height: 100vh; }
+
+/* Identité de l'espace sous le logo (entreprise, rôle). */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 26px 0 -14px;
+  padding: 10px 12px;
+  border: 1px solid var(--metro-hair);
+  border-radius: 12px;
+}
+.identityAvatar {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #eef2fc;
+  color: var(--metro-blue);
+  font-family: var(--font-display), sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  object-fit: cover;
+}
+.identityText { display: flex; flex-direction: column; min-width: 0; }
+.identityName {
+  font-family: var(--font-text), sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--metro-navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.identityRole { font-family: var(--font-text), sans-serif; font-size: 13px; color: var(--metro-muted); }

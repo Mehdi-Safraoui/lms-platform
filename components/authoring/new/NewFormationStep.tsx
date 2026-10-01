@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import UpgradeNotice from "../UpgradeNotice";
 import { loadAuthoringUser } from "../loadAuthoring";
 import { getFormationQuota } from "@/lib/aiGenerationQuota";
@@ -19,10 +19,6 @@ export default async function NewFormationStep({ space }: { space: AuthoringSpac
         Catalogue
       </Link>
 
-      <div className={styles.eyebrow}>
-        <Sparkles size={13} />
-        Création par IA
-      </div>
       <h1 className={styles.title}>Nouvelle formation</h1>
       <p className={styles.subtitle}>
         Donnez un titre à votre formation. Vous pourrez ensuite uploader vos documents source

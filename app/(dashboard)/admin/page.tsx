@@ -82,10 +82,6 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.eyebrow}>
-        <span className={styles.dot} />
-        Flow super-admin · Ahead
-      </div>
       <h1 className={styles.title}>Vue globale</h1>
       <p className={styles.subtitle}>Activité de la plateforme, tous tenants confondus.</p>
 

@@ -32,7 +32,7 @@
 .title {
   font-family: var(--font-barlow), sans-serif;
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text);
   letter-spacing: -0.4px;
   margin-bottom: 10px;
@@ -137,7 +137,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--coral);
-  background: #fdf0ec;
+  background: #eef2fc;
   border-radius: 999px;
   padding: 4px 10px;
 }

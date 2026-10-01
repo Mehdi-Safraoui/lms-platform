@@ -142,10 +142,6 @@ export default async function FormationsPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <div className={styles.eyebrow}>
-            <Sparkles size={13} />
-            Formations
-          </div>
           <h1 className={styles.title}>Formations</h1>
           <p className={styles.subtitle}>
             Les formations que vous créez avec l&apos;assistant IA et celles du catalogue Ahead, au même endroit.

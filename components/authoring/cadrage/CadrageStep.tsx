@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import UpgradeNotice from "../UpgradeNotice";
 import { loadAuthoringFormation } from "../loadAuthoring";
@@ -36,10 +36,6 @@ export default async function CadrageStep({ space, formationId }: { space: Autho
         Documents source
       </Link>
 
-      <div className={styles.eyebrow}>
-        <Sparkles size={13} />
-        Création par IA — Cadrage
-      </div>
       <h1 className={styles.title}>{formation.title}</h1>
       <p className={styles.subtitle}>
         Quelques questions avant de générer votre formation — vos réponses guident l&apos;IA pour

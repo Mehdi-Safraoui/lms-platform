@@ -1,22 +1,25 @@
 @import '@uiw/react-md-editor/markdown-editor.css';
 
 :root {
-  /* ── Ahead Design System ── */
-  --navy:        #191738;
-  --navy-dark:   #0d0c24;
-  --navy-light:  #252349;
-  --coral:       #e8603a;
-  --coral-light: #fdf0ec;
+  /* ── Espaces admin (entreprise, super admin) : registre calme du monde
+     « ligne de métro » (voir DESIGN.md). Les anciens noms de variables sont
+     gardés pour tous les écrans existants ; --coral désigne désormais
+     l'accent bleu (le corail est réservé à « Vous êtes ici »). ── */
+  --navy:        #17183b;
+  --navy-dark:   #0e0f2a;
+  --navy-light:  #26285a;
+  --coral:       #1d46e5;
+  --coral-light: #eef2fc;
 
-  --bg:          #f0f2f8;
-  --bg-alt:      #eef0f7;
+  --bg:          #f6f7fb;
+  --bg-alt:      #f2f4fa;
   --card:        #ffffff;
-  --border:      #e2e5ef;
-  --border-soft: #eceef6;
+  --border:      #e3e7ef;
+  --border-soft: #edf0f6;
 
-  --text:        #111827;
-  --text-muted:  #64748b;
-  --text-light:  #94a3b8;
+  --text:        #17183b;
+  --text-muted:  #4b5276;
+  --text-light:  #8b94b8;
 
   --sidebar-w:   264px;
   --topbar-h:    60px;
@@ -48,6 +51,13 @@ html, body {
   overflow-x: hidden;
 }
 
+/* Anciennes variables de police des écrans admin : mêmes familles que
+   l'espace apprenant (Martel Sans pour le texte, Winky Sans pour les titres). */
+html {
+  --font-jakarta: var(--font-text);
+  --font-barlow: var(--font-display);
+}
+
 body {
   min-height: 100%;
   display: flex;
@@ -76,7 +86,7 @@ input, textarea, select, button {
 
 /* ── Sonner toast overrides ── */
 [data-sonner-toast] [data-title] {
-  color: #e8603a !important;
+  color: #ffffff !important;
 }
 
 [data-sonner-toast] [data-description] {

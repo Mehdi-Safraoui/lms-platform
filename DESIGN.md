@@ -135,7 +135,7 @@ A training is a metro line the learner rides to its terminus, the certificate. E
 
 Density is calm and generous. Text is set large (20px body) in a wide reading column, the signage face speaks only on plaques, line labels and headings, and decoration is limited to the line itself and its markers. Panels are plaques (light blue tint or navy enamel), never shadowed cards. Motion is a single gesture: the coral position ring lands once on its station when the page opens.
 
-**Scope.** This world covers the learner area only (`/apprenant`: dashboard, progression, formation page, lesson page, plus the learner certificate and formation assistant that consume `--metro-*` tokens). The org admin (`/org`, `/tuteur`) and super-admin (`/admin`) areas still use the older incumbent system: navy/coral sidebar, Plus Jakarta Sans and Barlow, tokens `--navy`, `--coral`, `--bg`, `--card`, `--radius` in `app/globals.css`. Those screens are not part of this world and this file does not describe them; do not mix the two token sets on one surface. **Responsive** is a planned second phase and has not been designed: the world is specified for desktop; the few existing media queries are stopgaps, not a responsive system.
+**Scope.** Since 2026-10-01 the whole app uses this world. The learner formation and lesson pages use the full signage register; the learner overview pages (dashboard, progression) and the admin areas (`/org`, `/tuteur`, `/admin`) use the calm register described at the end of this file. The admin screens keep their historical token names (`--navy`, `--coral`, `--bg`, `--card`, `--font-jakarta`, `--font-barlow`) remapped in `app/globals.css` to this world: `--coral` now means the accent blue, and the two font variables point to Martel Sans and Winky Sans. **Responsive** is a planned second phase and has not been designed: the world is specified for desktop; the few existing media queries are stopgaps, not a responsive system.
 
 **Key Characteristics:**
 - White ground, navy ink, one electric blue line, coral only for the learner's position.
@@ -191,7 +191,7 @@ A restrained transit palette: navy ink and enamel, one saturated line blue, one 
 - **Label** (600, 12.5-13.5px): the "Vous êtes ici" tag and badge status chips only.
 
 ### Named Rules
-**The Signage/Reading Split Rule.** Winky Sans names places (titles, plaques, lines, modules, buttons); Martel Sans carries everything that is read or scanned (prose, station titles, meta, tags). Every learner element declares its family explicitly, because `body` still defaults to the incumbent Plus Jakarta Sans.
+**The Signage/Reading Split Rule.** Winky Sans names places (titles, plaques, lines, modules, buttons); Martel Sans carries everything that is read or scanned (prose, station titles, meta, tags). `body` defaults to Martel Sans (through `--font-jakarta`); signage elements declare Winky Sans explicitly.
 
 **The Large Reading Rule.** Lesson prose never drops below 19px; the column is capped at 860px and indented 44px from headings and panels, like a guide column.
 
@@ -279,7 +279,7 @@ One signature gesture: on load, the current station marker scales from 0.4 to 1 
 - **Don't** use coral for anything other than the learner's current position.
 - **Don't** introduce a second accent hue or a thin generic progress bar as the main expression of the journey; gauges are secondary readouts next to the line.
 - **Don't** put drop shadows on panels at rest; shadows are for floating menus and the assistant launcher only.
-- **Don't** use the incumbent `--navy`/`--coral` tokens, Plus Jakarta Sans or Barlow in the learner area, and don't apply this world to `/org`, `/tuteur` or `/admin` without an explicit decision.
+- **Don't** read the legacy `--coral` token as coral: it is the accent blue. Real coral stays `--metro-coral` / `--metro-coral-ink`, for "Vous êtes ici" only.
 - **Don't** treat the current breakpoints as a responsive design; phone layouts are a separate phase.
 
 ## Calm register (dashboard, progression) — added 2026-10-01
@@ -292,3 +292,9 @@ User feedback after the first release: the overview pages felt "too marked", les
 - **Formation cards:** cover image (or the generated cover) at 16:7, 14px corners, 1px hairline, soft hover shadow; the metro line survives as a thin track (2px, 9px stops, coral ring for the current module).
 - **Badges:** 60px medallions without rings; earned = navy disc, locked = #f1f3f9.
 - **Summaries:** light #f7f9fe panel with hairline instead of the navy plaque; wording says "leçons", not "stations".
+
+### Admin areas (company admin, super admin) — added 2026-10-01
+
+Same calm register, applied on user request ("applique ces changements à la vue admin entreprise et super admin"):
+- **Shell:** `WorkspaceShell` (shared with the learner area). It has the Ahead Digital logo, an identity card under the logo (company and role, or "Ahead Digital · Super admin"), the icon navigation and, at the bottom, the account and notifications. There is no top bar. The content sits on `--bg` #f6f7fb so white cards read.
+- **Pages:** no eyebrow labels above titles; display weights capped at 700; accent blue for primary actions.

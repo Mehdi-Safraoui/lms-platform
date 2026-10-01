@@ -6,8 +6,21 @@ import { useClerk } from "@clerk/nextjs";
 import { ChevronDown, User } from "lucide-react";
 import styles from "./account.module.css";
 
-/** Compte de l'apprenant : avatar + nom, menu (formations, progression, compte, déconnexion). */
-export default function AccountMenu({ name, placement = "below" }: { name: string | null; placement?: "below" | "above" }) {
+const LEARNER_LINKS = [
+  { href: "/apprenant", label: "Mes formations" },
+  { href: "/apprenant/progression", label: "Ma progression" },
+];
+
+/** Compte connecté : avatar + nom, menu (liens de l'espace, compte, déconnexion). */
+export default function AccountMenu({
+  name,
+  placement = "below",
+  links = LEARNER_LINKS,
+}: {
+  name: string | null;
+  placement?: "below" | "above";
+  links?: { href: string; label: string }[];
+}) {
   const clerk = useClerk();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -32,8 +45,9 @@ export default function AccountMenu({ name, placement = "below" }: { name: strin
       </button>
       {open && (
         <div className={styles.menu} data-placement={placement} role="menu">
-          <Link href="/apprenant" role="menuitem" className={styles.item}>Mes formations</Link>
-          <Link href="/apprenant/progression" role="menuitem" className={styles.item}>Ma progression</Link>
+          {links.map((l) => (
+            <Link key={l.href} href={l.href} role="menuitem" className={styles.item}>{l.label}</Link>
+          ))}
           <button type="button" role="menuitem" className={styles.item} onClick={() => clerk.openUserProfile()}>Mon compte</button>
           <button type="button" role="menuitem" className={styles.item} onClick={() => clerk.signOut({ redirectUrl: "/sign-in" })}>Se déconnecter</button>
         </div>

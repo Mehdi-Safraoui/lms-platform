@@ -1,27 +1,26 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { UserButton, useUser } from "@clerk/nextjs";
 import { LayoutDashboard, Users, CreditCard, Sparkles, Wand2, BarChart3 } from "lucide-react";
-import styles from "./layout.module.css";
+import WorkspaceShell, { WorkspaceIdentity, type WorkspaceNavItem } from "@/components/learner/WorkspaceShell";
 import SubscriptionModal from "./SubscriptionModal";
-import NotificationBell from "@/components/shared/NotificationBell";
 
-const baseNavItems = [
-  { href: "/org", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
-  { href: "/org/apprenants", label: "Apprenants", icon: Users, exact: false },
-  { href: "/org/suivi", label: "Suivi", icon: BarChart3, exact: false },
+const exact = (href: string) => (p: string) => p === href;
+const prefix = (href: string) => (p: string) => p === href || p.startsWith(`${href}/`);
+
+const baseNavItems: WorkspaceNavItem[] = [
+  { href: "/org", label: "Tableau de bord", icon: LayoutDashboard, match: exact("/org") },
+  { href: "/org/apprenants", label: "Apprenants", icon: Users, match: prefix("/org/apprenants") },
+  { href: "/org/suivi", label: "Suivi", icon: BarChart3, match: prefix("/org/suivi") },
 ];
 
 // "Formations" fusionne le catalogue Ahead et les formations créées par le
 // tenant (voir app/(org)/org/formations/page.tsx) — plus d'entrée "Catalogue"
 // séparée, elle induisait en erreur (une formation créée par le tenant n'y
 // apparaissait jamais, donnant l'impression qu'elle avait disparu).
-const adminOnlyNavItems = [
-  { href: "/org/formations", label: "Formations", icon: Wand2, exact: true },
-  { href: "/org/formations/new", label: "Générer une formation", icon: Sparkles, exact: false },
-  { href: "/org/abonnement", label: "Abonnement", icon: CreditCard, exact: false },
+const adminOnlyNavItems: WorkspaceNavItem[] = [
+  { href: "/org/formations", label: "Formations", icon: Wand2, match: (p) => p === "/org/formations" || (p.startsWith("/org/formations/") && !p.startsWith("/org/formations/new")) || p.startsWith("/org/catalogue") },
+  { href: "/org/formations/new", label: "Générer une formation", icon: Sparkles, match: prefix("/org/formations/new") },
+  { href: "/org/abonnement", label: "Abonnement", icon: CreditCard, match: prefix("/org/abonnement") },
 ];
 
 interface Props {
@@ -33,78 +32,21 @@ interface Props {
 }
 
 export default function OrgShell({ tenantName, tenantLogoUrl, userRole, hasSubscription, children }: Props) {
-  const pathname = usePathname();
-  const { user } = useUser();
-  const displayName = user
-    ? [user.firstName, user.lastName].filter(Boolean).join(" ") || user.primaryEmailAddress?.emailAddress
-    : null;
   const roleLabel = userRole === "tuteur" ? "Tuteur" : "Administrateur";
-  const orgNavItems = userRole === "admin_tenant" ? [...baseNavItems, ...adminOnlyNavItems] : baseNavItems;
+  const nav = userRole === "admin_tenant" ? [...baseNavItems, ...adminOnlyNavItems] : baseNavItems;
 
   return (
-    <div className={styles.shell}>
+    <>
       {!hasSubscription && <SubscriptionModal />}
-      <aside className={styles.sidebar}>
-        {/* Logo Ahead */}
-        <div className={styles.logo}>
-          <div className={styles.logoMark}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2L14 13H2L8 2Z" fill="white" strokeWidth="0" />
-            </svg>
-          </div>
-          <span className={styles.logoText}>ahead<span>·</span><em>digital</em></span>
-        </div>
-
-        {/* Tenant identity */}
-        <div className={styles.tenantBlock}>
-          {tenantLogoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- logo hébergé par Clerk, pas un asset local
-            <img src={tenantLogoUrl} alt="" className={styles.tenantAvatar} />
-          ) : (
-            <div className={styles.tenantAvatar}>{tenantName.charAt(0).toUpperCase()}</div>
-          )}
-          <div className={styles.tenantInfo}>
-            <span className={styles.tenantName}>{tenantName}</span>
-            <span className={styles.tenantRole}>{roleLabel}</span>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav className={styles.nav}>
-          <span className={styles.navSection}>Menu</span>
-          {orgNavItems.map((item) => {
-            const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${styles.navItem} ${isActive ? styles.active : ""}`}
-              >
-                <item.icon size={17} strokeWidth={1.75} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Bottom */}
-        <div className={styles.sidebarBottom}>
-          <UserButton appearance={{ elements: { avatarBox: { width: 30, height: 30 } } }} />
-          <span className={styles.sidebarUser}>{displayName ?? "Mon compte"}</span>
-        </div>
-      </aside>
-
-      <div className={styles.main}>
-        <header className={styles.topbar}>
-          <div className={styles.topbarLeft}>
-            <span className={styles.topbarBadge}>{tenantName}</span>
-          </div>
-          <div className={styles.topbarRight}>
-            <NotificationBell />
-          </div>
-        </header>
-        <div className={styles.content}>{children}</div>
-      </div>
-    </div>
+      <WorkspaceShell
+        homeHref="/org"
+        nav={nav}
+        muted
+        accountLinks={[{ href: "/org", label: "Tableau de bord" }]}
+        identity={<WorkspaceIdentity name={tenantName} role={roleLabel} logoUrl={tenantLogoUrl} />}
+      >
+        {children}
+      </WorkspaceShell>
+    </>
   );
 }

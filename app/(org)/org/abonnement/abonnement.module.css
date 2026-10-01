@@ -27,7 +27,7 @@
 .title {
   font-family: var(--font-barlow), sans-serif;
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text);
   letter-spacing: -0.4px;
   margin-bottom: 6px;
@@ -91,7 +91,7 @@
 .planName {
   font-family: var(--font-barlow), sans-serif;
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.4px;
   margin-bottom: 8px;
 }
@@ -134,7 +134,7 @@
 .planStatValue {
   font-family: var(--font-barlow), sans-serif;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .planStatLabel {
