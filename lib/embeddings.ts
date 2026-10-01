@@ -1,4 +1,5 @@
 import { voyage, VOYAGE_MODEL, EMBEDDING_DIMENSION } from "@/lib/voyage";
+import { recordVoyageUsage } from "@/lib/aiUsage";
 
 /**
  * Génère l'embedding d'un texte via Voyage AI.
@@ -22,6 +23,7 @@ export async function generateEmbedding(
     inputType,
     outputDimension: EMBEDDING_DIMENSION,
   });
+  await recordVoyageUsage(VOYAGE_MODEL, response.usage?.totalTokens);
 
   const embedding = response.data?.[0]?.embedding;
   if (!embedding) {
@@ -62,6 +64,7 @@ export async function generateEmbeddings(
       inputType,
       outputDimension: EMBEDDING_DIMENSION,
     });
+    await recordVoyageUsage(VOYAGE_MODEL, response.usage?.totalTokens);
 
     const data = response.data;
     if (!data || data.length !== batch.length) {

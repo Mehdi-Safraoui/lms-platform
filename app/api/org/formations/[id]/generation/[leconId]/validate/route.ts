@@ -4,6 +4,7 @@ import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { touchFormation } from "@/lib/api/touch-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { embedAndInsertLessonChunks } from "@/lib/chunkLesson";
+import { withAiUsage } from "@/lib/aiUsage";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   if (lecon.content_type === "rich") {
     try {
-      await embedAndInsertLessonChunks(leconId, formationId, guard.tenantId, lecon.content_blocks);
+      await withAiUsage({ tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "indexation_lecons" }, () =>
+        embedAndInsertLessonChunks(leconId, formationId, guard.tenantId, lecon.content_blocks)
+      );
     } catch (err) {
       console.error(`[generation validate] Indexation RAG échouée pour la leçon ${leconId}:`, err);
     }

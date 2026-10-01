@@ -4,6 +4,7 @@ import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getOrCreateSourcesSummary } from "@/lib/sourcesSummary";
 import { suggestFullCadrage, type CadrageContext } from "@/lib/ai/suggestCadrage";
+import { withAiUsage } from "@/lib/aiUsage";
 
 export const dynamic = "force-dynamic";
 // Le premier appel peut devoir générer la synthèse (~30 s) avant la suggestion.
@@ -38,14 +39,16 @@ export async function POST(req: NextRequest, { params }: Params) {
   const context: CadrageContext = body?.context ?? {};
 
   try {
-    const documentContext = await getOrCreateSourcesSummary(supabase, formationId);
-    if (!documentContext) {
-      return NextResponse.json(
-        { error: "Aucun document indexé pour cette formation — impossible de proposer une réponse." },
-        { status: 400 }
-      );
-    }
-    return NextResponse.json({ data: await suggestFullCadrage(documentContext, context) });
+    return await withAiUsage({ tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "cadrage" }, async () => {
+      const documentContext = await getOrCreateSourcesSummary(supabase, formationId);
+      if (!documentContext) {
+        return NextResponse.json(
+          { error: "Aucun document indexé pour cette formation — impossible de proposer une réponse." },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({ data: await suggestFullCadrage(documentContext, context) });
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue lors de la suggestion.";
     return NextResponse.json({ error: message }, { status: 500 });

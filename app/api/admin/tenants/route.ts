@@ -3,6 +3,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getTenantsUsageSummary } from "@/lib/tenantUsage";
+import { getAiCostsOverview } from "@/lib/aiCosts";
 
 export async function GET() {
   const guard = await requireSuperAdmin();
@@ -18,7 +19,10 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const usage = await getTenantsUsageSummary(supabase, (tenants ?? []).map((t) => t.id));
+  const [usage, aiCosts] = await Promise.all([
+    getTenantsUsageSummary(supabase, (tenants ?? []).map((t) => t.id)),
+    getAiCostsOverview(supabase),
+  ]);
 
   const tenantsWithStats = await Promise.all(
     (tenants ?? []).map(async (tenant) => {
@@ -37,11 +41,20 @@ export async function GET() {
         activeApprenantCount,
         followedFormationCount: followedFormationCount ?? 0,
         usage: usage.get(tenant.id) ?? null,
+        aiCostThisMonthUsd: aiCosts.byTenant.get(tenant.id) ?? 0,
       };
     })
   );
 
-  return NextResponse.json({ tenants: tenantsWithStats });
+  return NextResponse.json({
+    tenants: tenantsWithStats,
+    aiCosts: {
+      totalUsd: aiCosts.totalUsd,
+      catalogueUsd: aiCosts.catalogueUsd,
+      unattributedUsd: aiCosts.unattributedUsd,
+      unpricedModels: aiCosts.unpricedModels,
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {

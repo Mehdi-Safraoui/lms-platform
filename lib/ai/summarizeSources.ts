@@ -1,4 +1,5 @@
 import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
+import { recordOpenAiUsage } from "@/lib/aiUsage";
 
 // Même plafond que la proposition de structure (lib/ai/generateStructureProposal.ts) :
 // la synthèse lit le texte complet des documents, pas seulement leur début.
@@ -33,6 +34,7 @@ export async function summarizeSources(sourceText: string): Promise<string> {
     ],
     max_output_tokens: 8_000,
   });
+  await recordOpenAiUsage(response.model, response.usage);
 
   const summary = response.output_text?.trim();
   if (!summary) throw new Error("Le modèle n'a renvoyé aucune synthèse.");

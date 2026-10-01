@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { zodTextFormat } from "openai/helpers/zod";
 import { openai, OPENAI_GENERATION_MODEL } from "@/lib/openai";
+import { recordOpenAiUsage } from "@/lib/aiUsage";
 
 /**
  * Champs du cadrage reformulés par l'IA : réponse libre du Formateur → valeur
@@ -57,6 +58,7 @@ async function callModel<T extends z.ZodTypeAny>(
     text: { format: zodTextFormat(schema, schemaName) },
     max_output_tokens: 500,
   });
+  await recordOpenAiUsage(response.model, response.usage);
 
   if (!response.output_text) {
     throw new Error("Le modèle n'a renvoyé aucun contenu.");

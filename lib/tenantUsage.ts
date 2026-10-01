@@ -30,7 +30,12 @@ export interface TenantUsage extends TenantUsageSummary {
 const monthKey = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit" });
 const monthLabel = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", month: "short", year: "2-digit" });
 
-function lastSixMonths(): { month: string; label: string }[] {
+/** « 2026-10 » : mois en cours, à l'heure de Paris. */
+export function currentMonthKey(): string {
+  return monthKey.format(new Date());
+}
+
+export function lastSixMonths(): { month: string; label: string }[] {
   const now = new Date();
   return Array.from({ length: 6 }, (_, i) => {
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + i, 15));

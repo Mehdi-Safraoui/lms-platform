@@ -3,6 +3,7 @@ import { requireAuth, type AuthGuard } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { searchChunks, type ChunkSearchResult } from "@/lib/searchChunks";
 import { openai, OPENAI_CHAT_MODEL } from "@/lib/openai";
+import { recordOpenAiUsage, withAiUsage, type AiUsageContext } from "@/lib/aiUsage";
 
 type Params = { params: Promise<{ formationId: string }> };
 type Supabase = ReturnType<typeof createServiceRoleSupabaseClient>;
@@ -167,11 +168,15 @@ export async function POST(req: Request, { params }: Params) {
     content: question,
   });
 
+  // Coût IA imputé à l'entreprise de l'apprenant, y compris sur une formation
+  // du catalogue Ahead.
+  const usageContext: AiUsageContext = { tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "chat" };
+
   // Recherche vectorielle isolée par formation (voir lib/searchChunks.ts) —
   // l'accès à cette formation précise vient d'être vérifié ci-dessus.
   let chunks: ChunkSearchResult[];
   try {
-    chunks = await searchChunks(question, formationId, TOP_K, "lesson");
+    chunks = await withAiUsage(usageContext, () => searchChunks(question, formationId, TOP_K, "lesson"));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue.";
     return NextResponse.json({ error: `Échec de la recherche de contexte : ${message}` }, { status: 500 });
@@ -201,6 +206,7 @@ export async function POST(req: Request, { params }: Params) {
       ],
       max_output_tokens: 1000,
     });
+    await withAiUsage(usageContext, () => recordOpenAiUsage(response.model, response.usage));
 
     if (!response.output_text) {
       throw new Error("Le modèle n'a renvoyé aucun contenu.");

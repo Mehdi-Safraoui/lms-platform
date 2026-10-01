@@ -3,6 +3,7 @@ import { requireFormationAuthor } from "@/lib/api/require-formation-author";
 import { assertOwnFormation } from "@/lib/api/assert-own-formation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getOrCreateSourcesSummary } from "@/lib/sourcesSummary";
+import { withAiUsage } from "@/lib/aiUsage";
 
 export const dynamic = "force-dynamic";
 // Génération de la synthèse à partir du texte complet des documents (~30 s).
@@ -26,7 +27,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   }
 
   try {
-    const summary = await getOrCreateSourcesSummary(supabase, formationId);
+    const summary = await withAiUsage({ tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "cadrage" }, () => getOrCreateSourcesSummary(supabase, formationId));
     return NextResponse.json({ data: { ready: summary !== null } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue lors de la synthèse.";

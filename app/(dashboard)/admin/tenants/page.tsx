@@ -7,6 +7,7 @@ import styles from "./tenants.module.css";
 import TenantDetailModal from "./TenantDetailModal";
 import UsageMeter from "@/components/usage/UsageMeter";
 import type { TenantUsageSummary } from "@/lib/tenantUsage";
+import { formatUsd } from "@/lib/aiPricing";
 
 interface Tenant {
   id: string;
@@ -18,6 +19,14 @@ interface Tenant {
   activeApprenantCount: number;
   followedFormationCount: number;
   usage: TenantUsageSummary | null;
+  aiCostThisMonthUsd: number;
+}
+
+interface AiCostsOverview {
+  totalUsd: number;
+  catalogueUsd: number;
+  unattributedUsd: number;
+  unpricedModels: string[];
 }
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
@@ -103,6 +112,7 @@ function NewTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [aiCosts, setAiCosts] = useState<AiCostsOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
@@ -110,7 +120,10 @@ export default function TenantsPage() {
   function fetchTenants() {
     fetch("/api/admin/tenants")
       .then((r) => r.json())
-      .then((j) => setTenants(j.tenants ?? []))
+      .then((j) => {
+        setTenants(j.tenants ?? []);
+        setAiCosts(j.aiCosts ?? null);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -150,6 +163,31 @@ export default function TenantsPage() {
           </div>
         </div>
 
+        {aiCosts && (
+          <div className={styles.costStrip}>
+            <div className={styles.usageTile}>
+              <span className={styles.usageTileLabel}>Coût IA ce mois-ci</span>
+              <span className={styles.usageTileValue}>{formatUsd(aiCosts.totalUsd)}</span>
+              <span className={styles.usageTileHint}>toutes entreprises et catalogue confondus</span>
+            </div>
+            <div className={styles.usageTile}>
+              <span className={styles.usageTileLabel}>Entreprises clientes</span>
+              <span className={styles.usageTileValue}>
+                {formatUsd(aiCosts.totalUsd - aiCosts.catalogueUsd - aiCosts.unattributedUsd)}
+              </span>
+              <span className={styles.usageTileHint}>formations créées par IA et chat des apprenants</span>
+            </div>
+            <div className={styles.usageTile}>
+              <span className={styles.usageTileLabel}>Catalogue Ahead</span>
+              <span className={styles.usageTileValue}>{formatUsd(aiCosts.catalogueUsd)}</span>
+              <span className={styles.usageTileHint}>
+                formations créées par le super admin
+                {aiCosts.unattributedUsd > 0 && ` · ${formatUsd(aiCosts.unattributedUsd)} non attribué`}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className={styles.tableWrap}>
           {tenants.length === 0 ? (
             <div className={styles.empty}>
@@ -173,6 +211,7 @@ export default function TenantsPage() {
                   <th>Apprenants</th>
                   <th>Formations IA ce mois</th>
                   <th>Générations IA</th>
+                  <th>Coût IA ce mois</th>
                   <th>Formations suivies</th>
                   <th>Créée le</th>
                 </tr>
@@ -216,6 +255,9 @@ export default function TenantsPage() {
                       </td>
                       <td className={styles.cellMuted} title="Structures, leçons, quiz et régénérations, toutes formations confondues">
                         {t.usage?.totalAiGenerations ?? 0}
+                      </td>
+                      <td className={`${styles.cellMuted} ${styles.costValue}`} title="Tokens facturés par OpenAI et Voyage AI, aux tarifs publics">
+                        {formatUsd(t.aiCostThisMonthUsd)}
                       </td>
                       <td className={styles.cellMuted}>{t.followedFormationCount}</td>
                       <td className={styles.cellMuted}>

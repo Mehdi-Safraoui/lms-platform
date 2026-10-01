@@ -8,6 +8,7 @@ import {
   type OpenCadrageField,
   type ListCadrageField,
 } from "@/lib/ai/reformulateCadrage";
+import { withAiUsage } from "@/lib/aiUsage";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +49,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   try {
     if (OPEN_FIELDS.includes(field)) {
-      const result = await reformulateOpenField(field, rawAnswer.trim());
+      const result = await withAiUsage({ tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "cadrage" }, () => reformulateOpenField(field, rawAnswer.trim()));
       return NextResponse.json({ data: result });
     }
     if (LIST_FIELDS.includes(field)) {
-      const result = await reformulateListField(field, rawAnswer.trim());
+      const result = await withAiUsage({ tenantId: guard.tenantId, formationId, userId: guard.userId, feature: "cadrage" }, () => reformulateListField(field, rawAnswer.trim()));
       return NextResponse.json({ data: result });
     }
     return NextResponse.json({ error: `Champ inconnu : "${field}".` }, { status: 400 });
