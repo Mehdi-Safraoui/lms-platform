@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { hasActiveSubscription } from "@/lib/subscription";
 import FormationContentPreview, {
   type PreviewModule,
@@ -13,16 +13,10 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function CatalogueFormationPreviewPage({ params }: Props) {
   const { id: formationId } = await params;
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) notFound();
+  const dbUser = await getCurrentUser();
+  if (!dbUser) notFound();
 
   const supabase = createServiceRoleSupabaseClient();
-
-  const { data: dbUser } = await supabase
-    .from("users")
-    .select("tenant_id")
-    .eq("clerk_user_id", clerkUserId)
-    .single();
   if (!dbUser?.tenant_id) notFound();
   if (!(await hasActiveSubscription(dbUser.tenant_id))) redirect("/pricing");
 

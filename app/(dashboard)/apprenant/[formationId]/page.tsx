@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
 import { ChevronRight, FileText, Video, ClipboardList, CheckCircle, Circle, Lock, BookOpen, Layers, Clock, Building2, Award } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
 import { formatDuration } from "@/lib/utils";
@@ -32,38 +32,37 @@ interface FormationVideo {
 
 export default async function FormationDetailPage({ params }: Props) {
   const { formationId } = await params;
-  const { userId: clerkUserId } = await auth();
   const supabase = createServiceRoleSupabaseClient();
 
-  const [{ data: formation }, { data: modules }, { data: dbUser }] = await Promise.all([
+  // Leçons incluses dans la même requête que les modules (au lieu d'une requête par module).
+  const [{ data: formation }, { data: modules }, dbUser] = await Promise.all([
     supabase
       .from("formations")
       .select("id, title, description, niveau, estimated_duration_minutes, attestation_threshold_pct, videos, tenant_id")
       .eq("id", formationId)
       .eq("is_published", true)
       .single(),
-    supabase.from("modules").select("id, title, order_index").eq("formation_id", formationId).order("order_index"),
-    clerkUserId
-      ? supabase.from("users").select("id, tenant_id").eq("clerk_user_id", clerkUserId).single()
-      : { data: null },
+    supabase
+      .from("modules")
+      .select("id, title, order_index, lecons(id, title, content_type, order_index)")
+      .eq("formation_id", formationId)
+      .order("order_index")
+      .order("order_index", { referencedTable: "lecons" }),
+    getCurrentUser(),
   ]);
 
   if (!formation) notFound();
-  if (!(await isFormationAccessibleToTenant(supabase, dbUser?.tenant_id ?? null, formation))) notFound();
 
-  const tenantHasSubscription = dbUser?.tenant_id ? await hasActiveSubscription(dbUser.tenant_id) : false;
-
-  // Vérifier si l'apprenant est inscrit à cette formation
-  let isEnrolled = false;
-  if (dbUser) {
-    const { data: enrollment } = await supabase
-      .from("user_enrollments")
-      .select("id")
-      .eq("user_id", dbUser.id)
-      .eq("formation_id", formationId)
-      .single();
-    isEnrolled = !!enrollment;
-  }
+  // Accès, abonnement et inscription : lectures indépendantes, en parallèle.
+  const [accessible, tenantHasSubscription, { data: enrollment }] = await Promise.all([
+    isFormationAccessibleToTenant(supabase, dbUser?.tenant_id ?? null, formation),
+    dbUser?.tenant_id ? hasActiveSubscription(dbUser.tenant_id) : false,
+    dbUser
+      ? supabase.from("user_enrollments").select("id").eq("user_id", dbUser.id).eq("formation_id", formationId).maybeSingle()
+      : { data: null },
+  ]);
+  if (!accessible) notFound();
+  const isEnrolled = !!enrollment;
 
   // Vue non-inscrit : aperçu verrouillé + bouton S'inscrire
   if (!isEnrolled) {
@@ -122,38 +121,25 @@ export default async function FormationDetailPage({ params }: Props) {
   }
 
   // Vue inscrit : contenu complet avec progression
-  const lessonsByModule: Record<string, { id: string; title: string; content_type: string }[]> = {};
-  await Promise.all(
-    (modules ?? []).map(async (mod) => {
-      const { data: lecons } = await supabase
-        .from("lecons")
-        .select("id, title, content_type")
-        .eq("module_id", mod.id)
-        .order("order_index");
-      lessonsByModule[mod.id] = lecons ?? [];
-    })
+  const lessonsByModule: Record<string, { id: string; title: string; content_type: string }[]> = Object.fromEntries(
+    (modules ?? []).map((mod) => [mod.id, (mod.lecons ?? []) as { id: string; title: string; content_type: string }[]])
   );
 
   const allLeconIds = (modules ?? []).flatMap((m) => lessonsByModule[m.id]?.map((l) => l.id) ?? []);
-  let userProgress: Record<string, string> = {};
-  let completedCount = 0;
 
-  if (dbUser && allLeconIds.length > 0) {
-    const { data: progressRecords } = await supabase
-      .from("progress")
-      .select("lecon_id, status")
-      .eq("user_id", dbUser.id)
-      .in("lecon_id", allLeconIds);
-
-    userProgress = Object.fromEntries((progressRecords ?? []).map((p) => [p.lecon_id, p.status]));
-    completedCount = (progressRecords ?? []).filter((p) => p.status === "completed").length;
-  }
+  // Progression et certificat (délivré automatiquement dès le seuil de
+  // complétion atteint), en parallèle.
+  const [{ data: progressRecords }, certificateStatus] = await Promise.all([
+    dbUser && allLeconIds.length > 0
+      ? supabase.from("progress").select("lecon_id, status").eq("user_id", dbUser.id).in("lecon_id", allLeconIds)
+      : { data: [] as { lecon_id: string; status: string }[] },
+    dbUser ? getOrIssueCertificate(supabase, dbUser.id, formationId) : null,
+  ]);
+  const userProgress: Record<string, string> = Object.fromEntries((progressRecords ?? []).map((p) => [p.lecon_id, p.status]));
+  const completedCount = (progressRecords ?? []).filter((p) => p.status === "completed").length;
 
   const totalLessons = allLeconIds.length;
   const completionRate = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
-
-  // Certificat : délivré automatiquement dès le seuil de complétion atteint.
-  const certificateStatus = dbUser && isEnrolled ? await getOrIssueCertificate(supabase, dbUser.id, formationId) : null;
 
   return (
     <div className={styles.page}>

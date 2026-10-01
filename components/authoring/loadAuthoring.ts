@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { canAuthorFormationByAi } from "@/lib/subscription";
 import type { AuthoringSpace } from "./space";
 
@@ -22,15 +22,8 @@ export interface AuthoringFormation extends AuthoringUser {
  * vérification explicite côté page).
  */
 export async function loadAuthoringUser(space: AuthoringSpace): Promise<AuthoringUser> {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) redirect("/sign-in");
-
-  const supabase = createServiceRoleSupabaseClient();
-  const { data: currentUser } = await supabase
-    .from("users")
-    .select("role, tenant_id")
-    .eq("clerk_user_id", clerkUserId)
-    .single();
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/sign-in");
 
   if (space === "admin") {
     if (currentUser?.role !== "super_admin") redirect("/");
@@ -47,14 +40,14 @@ export async function loadAuthoringUser(space: AuthoringSpace): Promise<Authorin
  * privée d'un tenant vue depuis l'espace admin, et inversement).
  */
 export async function loadAuthoringFormation(space: AuthoringSpace, formationId: string): Promise<AuthoringFormation> {
-  const user = await loadAuthoringUser(space);
-
-  const supabase = createServiceRoleSupabaseClient();
-  const { data: formation } = await supabase
-    .from("formations")
-    .select("id, title, tenant_id, is_published")
-    .eq("id", formationId)
-    .single();
+  const [user, { data: formation }] = await Promise.all([
+    loadAuthoringUser(space),
+    createServiceRoleSupabaseClient()
+      .from("formations")
+      .select("id, title, tenant_id, is_published")
+      .eq("id", formationId)
+      .single(),
+  ]);
 
   if (!formation || formation.tenant_id !== user.tenantId) notFound();
 

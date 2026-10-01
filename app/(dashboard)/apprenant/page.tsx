@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Star, CheckCircle, Building2, Flame } from "lucide-react";
-import { auth } from "@clerk/nextjs/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { computeGamification, detectAndPersistNewBadges } from "@/lib/badges";
 import { formationCover } from "@/lib/formationAccent";
 import BadgeUnlockToasts from "./BadgeUnlockToasts";
@@ -16,21 +16,22 @@ const NIVEAU_LABEL: Record<string, string> = {
 };
 
 export default async function ApprenantPage() {
-  const { userId: clerkUserId } = await auth();
+  const dbUser = await getCurrentUser();
   const supabase = createServiceRoleSupabaseClient();
 
-  const { data: rawUser } = clerkUserId
-    ? await supabase.from("users").select("id, total_points, tenant_id").eq("clerk_user_id", clerkUserId).single()
-    : { data: null };
-  const dbUser = rawUser as { id: string; total_points: number; tenant_id: string | null } | null;
+  // Formations activées par le tenant de l'apprenant, et ses inscriptions.
+  const [{ data: tenantEnrollments }, { data: userEnrollments }] = await Promise.all([
+    dbUser?.tenant_id
+      ? supabase.from("tenant_formations").select("formation_id").eq("tenant_id", dbUser.tenant_id)
+      : { data: [] as { formation_id: string }[] },
+    dbUser
+      ? supabase.from("user_enrollments").select("formation_id").eq("user_id", dbUser.id)
+      : { data: null },
+  ]);
+  const tenantFormationIds = (tenantEnrollments ?? []).map((e) => e.formation_id);
 
-  // Formations activées par le tenant de l'apprenant
-  const tenantEnrollments = dbUser?.tenant_id
-    ? (await supabase.from("tenant_formations").select("formation_id").eq("tenant_id", dbUser.tenant_id)).data ?? []
-    : [];
-  const tenantFormationIds = tenantEnrollments.map((e) => e.formation_id);
-
-  const [{ data: formations }, { data: userEnrollments }] = await Promise.all([
+  // ── Formations et badges (calculés en direct depuis la progression réelle) ──
+  const [{ data: formations }, gamification] = await Promise.all([
     tenantFormationIds.length > 0
       ? supabase
           .from("formations")
@@ -44,17 +45,13 @@ export default async function ApprenantPage() {
             thumbnail_url: string | null; tenant_id: string | null;
           }[],
         },
-    dbUser
-      ? supabase.from("user_enrollments").select("formation_id").eq("user_id", dbUser.id)
-      : { data: null },
+    dbUser ? computeGamification(dbUser.id, tenantFormationIds) : null,
   ]);
 
   const totalPoints = dbUser?.total_points ?? 0;
   const niveau = Math.floor(totalPoints / POINTS_PER_LEVEL) + 1;
   const enrolledIds = new Set((userEnrollments ?? []).map((e) => e.formation_id));
 
-  // ── Badges : calculés en direct depuis la progression réelle ──
-  const gamification = dbUser ? await computeGamification(dbUser.id, tenantFormationIds) : null;
   const badges = gamification?.badges ?? [];
   const streak = gamification?.streak ?? null;
   const newlyUnlocked = dbUser && gamification

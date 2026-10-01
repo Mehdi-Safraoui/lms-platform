@@ -1,7 +1,7 @@
-import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { Star, TrendingUp, BookOpen, CheckCircle2, Flame, Award, ChevronRight } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { computeGamification } from "@/lib/badges";
 import { getOrIssueCertificate, formatCertificateDate } from "@/lib/certificates";
 import styles from "./progression.module.css";
@@ -9,50 +9,46 @@ import styles from "./progression.module.css";
 const POINTS_PER_LEVEL = 500;
 
 export default async function ProgressionPage() {
-  const { userId: clerkUserId } = await auth();
+  const dbUser = await getCurrentUser();
   const supabase = createServiceRoleSupabaseClient();
 
-  const { data: rawUser } = clerkUserId
-    ? await supabase.from("users").select("id, total_points, tenant_id").eq("clerk_user_id", clerkUserId).single()
-    : { data: null };
-  const dbUser = rawUser as { id: string; total_points: number; tenant_id: string | null } | null;
-
-  const tenantEnrollments = dbUser?.tenant_id
-    ? (await supabase.from("tenant_formations").select("formation_id").eq("tenant_id", dbUser.tenant_id)).data ?? []
-    : [];
-  const tenantFormationIds = tenantEnrollments.map((e) => e.formation_id);
-
-  const [{ data: userEnrollments }, { count: quizPassedCount }] = await Promise.all([
+  // Lectures indépendantes en parallèle (une seule attente au lieu de six).
+  const [{ data: tenantEnrollments }, { data: userEnrollments }, { count: quizPassedCount }, { data: progressRows }] = await Promise.all([
+    dbUser?.tenant_id
+      ? supabase.from("tenant_formations").select("formation_id").eq("tenant_id", dbUser.tenant_id)
+      : { data: [] as { formation_id: string }[] },
     dbUser
       ? supabase.from("user_enrollments").select("formation_id").eq("user_id", dbUser.id)
       : { data: [] as { formation_id: string }[] },
     dbUser
       ? supabase.from("quiz_results").select("*", { count: "exact", head: true }).eq("user_id", dbUser.id).eq("passed", true)
       : { count: 0 },
+    dbUser
+      ? supabase.from("progress").select("lecon_id, status").eq("user_id", dbUser.id)
+      : { data: [] as { lecon_id: string; status: string }[] },
   ]);
-
+  const tenantFormationIds = (tenantEnrollments ?? []).map((e) => e.formation_id);
   const enrolledFormationIds = (userEnrollments ?? []).map((e) => e.formation_id);
 
-  const { data: enrolledFormations } = enrolledFormationIds.length > 0
-    ? await supabase.from("formations").select("id, title").in("id", enrolledFormationIds)
-    : { data: [] as { id: string; title: string }[] };
-
-  const { data: modules } = enrolledFormationIds.length > 0
-    ? await supabase.from("modules").select("id, formation_id, lecons(id)").in("formation_id", enrolledFormationIds)
-    : { data: [] as { id: string; formation_id: string; lecons: { id: string }[] }[] };
+  // Formations suivies avec leurs leçons, badges et certificats (délivrance au
+  // passage si un seuil vient d'être atteint), en parallèle.
+  const [{ data: enrolledFormations }, gamification, certificateStatuses] = await Promise.all([
+    enrolledFormationIds.length > 0
+      ? supabase.from("formations").select("id, title, modules(lecons(id))").in("id", enrolledFormationIds)
+      : { data: [] as { id: string; title: string; modules: { lecons: { id: string }[] }[] }[] },
+    dbUser ? computeGamification(dbUser.id, tenantFormationIds) : null,
+    dbUser ? Promise.all(enrolledFormationIds.map((id) => getOrIssueCertificate(supabase, dbUser.id, id))) : [],
+  ]);
 
   const lessonsByFormation: Record<string, string[]> = {};
-  (modules ?? []).forEach((m) => {
-    const ids = ((m.lecons as { id: string }[]) ?? []).map((l) => l.id);
-    lessonsByFormation[m.formation_id] = [...(lessonsByFormation[m.formation_id] ?? []), ...ids];
-  });
-  const allLeconIds = Object.values(lessonsByFormation).flat();
+  for (const f of enrolledFormations ?? []) {
+    lessonsByFormation[f.id] = ((f.modules ?? []) as { lecons: { id: string }[] }[]).flatMap((m) => (m.lecons ?? []).map((l) => l.id));
+  }
+  const allLeconIds = new Set(Object.values(lessonsByFormation).flat());
 
-  const { data: progressRows } = dbUser && allLeconIds.length > 0
-    ? await supabase.from("progress").select("lecon_id, status").eq("user_id", dbUser.id).in("lecon_id", allLeconIds)
-    : { data: [] as { lecon_id: string; status: string }[] };
-
-  const completedLeconIds = new Set((progressRows ?? []).filter((p) => p.status === "completed").map((p) => p.lecon_id));
+  const completedLeconIds = new Set(
+    (progressRows ?? []).filter((p) => p.status === "completed" && allLeconIds.has(p.lecon_id)).map((p) => p.lecon_id)
+  );
 
   const formationProgress = (enrolledFormations ?? []).map((f) => {
     const leconIds = lessonsByFormation[f.id] ?? [];
@@ -65,9 +61,8 @@ export default async function ProgressionPage() {
   const totalPoints = dbUser?.total_points ?? 0;
   const niveau = Math.floor(totalPoints / POINTS_PER_LEVEL) + 1;
   const pointsToNextLevel = POINTS_PER_LEVEL - (totalPoints % POINTS_PER_LEVEL);
-  const globalPct = allLeconIds.length > 0 ? Math.round((completedLeconIds.size / allLeconIds.length) * 100) : 0;
+  const globalPct = allLeconIds.size > 0 ? Math.round((completedLeconIds.size / allLeconIds.size) * 100) : 0;
 
-  const gamification = dbUser ? await computeGamification(dbUser.id, tenantFormationIds) : null;
   const badges = gamification?.badges ?? [];
   const competences = gamification?.competences ?? [];
   const streak = gamification?.streak ?? { current: 0, best: 0, activeToday: false, activeDays: 0 };
@@ -77,12 +72,9 @@ export default async function ProgressionPage() {
     return acc;
   }, {});
 
-  // Certificats : délivrance au passage si un seuil vient d'être atteint.
-  const certificates = dbUser
-    ? (await Promise.all(enrolledFormationIds.map((id) => getOrIssueCertificate(supabase, dbUser.id, id))))
-        .map((status) => status.certificate)
-        .filter((c): c is NonNullable<typeof c> => c !== null)
-    : [];
+  const certificates = certificateStatuses
+    .map((status) => status.certificate)
+    .filter((c): c is NonNullable<typeof c> => c !== null);
 
   return (
     <div className={styles.page}>

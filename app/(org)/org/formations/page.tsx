@@ -1,8 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, ClipboardList, Layers, PenSquare, CheckCircle2, Plus } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { canCreateFormationByAi, hasActiveSubscription } from "@/lib/subscription";
 import UpgradeNotice from "@/components/authoring/UpgradeNotice";
 import FormationsListClient, { type FormationListItem } from "./FormationsListClient";
@@ -26,15 +26,10 @@ const STAGE_INFO: Record<Stage, { label: string; icon: typeof ClipboardList; hre
 // supprimer pour les formations du tenant, activer/désactiver + voir le
 // contenu pour le catalogue Ahead.
 export default async function FormationsPage() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) redirect("/sign-in");
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/sign-in");
 
   const supabase = createServiceRoleSupabaseClient();
-  const { data: currentUser } = await supabase
-    .from("users")
-    .select("role, tenant_id")
-    .eq("clerk_user_id", clerkUserId)
-    .single();
 
   if (!currentUser?.tenant_id || currentUser.role !== "admin_tenant") {
     redirect("/org");

@@ -1,8 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Users, BookOpen, CheckCircle, ArrowRight, CreditCard } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { PLANS, type PlanKey } from "@/lib/stripe";
 import styles from "./org.module.css";
 
@@ -16,15 +16,10 @@ function monthLabel(date: Date): string {
 }
 
 export default async function OrgDashboardPage() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) redirect("/sign-in");
+  const user = await getCurrentUser();
+  if (!user) redirect("/sign-in");
 
   const supabase = createServiceRoleSupabaseClient();
-  const { data: user } = await supabase
-    .from("users")
-    .select("tenant_id")
-    .eq("clerk_user_id", clerkUserId)
-    .single();
 
   if (!user?.tenant_id) redirect("/sign-in");
   const tenantId = user.tenant_id;

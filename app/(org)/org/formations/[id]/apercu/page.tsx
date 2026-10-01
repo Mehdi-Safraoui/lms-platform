@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import FormationContentPreview, {
   type PreviewModule,
   type PreviewLesson,
@@ -19,15 +19,10 @@ type Props = { params: Promise<{ id: string }> };
 // toujours directement à ce tenant).
 export default async function FormationApercuPage({ params }: Props) {
   const { id: formationId } = await params;
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) redirect("/sign-in");
+  const currentUser = await getCurrentUser();
+  if (!currentUser) redirect("/sign-in");
 
   const supabase = createServiceRoleSupabaseClient();
-  const { data: currentUser } = await supabase
-    .from("users")
-    .select("role, tenant_id")
-    .eq("clerk_user_id", clerkUserId)
-    .single();
 
   if (!currentUser?.tenant_id || currentUser.role !== "admin_tenant") {
     redirect("/org");

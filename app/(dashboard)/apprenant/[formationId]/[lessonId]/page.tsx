@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
 import { ChevronLeft, Lock } from "lucide-react";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/currentUser";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
 import LessonView from "./LessonView";
@@ -16,19 +16,15 @@ const FREE_PREVIEW_LESSON_COUNT = 2;
 export default async function ApprenantLessonPage({ params }: Props) {
   const { formationId, lessonId } = await params;
   const supabase = createServiceRoleSupabaseClient();
-  const { userId: clerkUserId } = await auth();
 
-  const [{ data: formation }, { data: lecon }, { data: allModules }, { data: dbUser }] = await Promise.all([
+  const [{ data: formation }, { data: lecon }, { data: allModules }, dbUser] = await Promise.all([
     supabase.from("formations").select("id, title, is_published, tenant_id").eq("id", formationId).single(),
     supabase.from("lecons").select("id, title, content_type, content_markdown, content_blocks, video_url").eq("id", lessonId).single(),
     supabase.from("modules").select("id, title, order_index, lecons(id, title, order_index)").eq("formation_id", formationId).order("order_index"),
-    clerkUserId
-      ? supabase.from("users").select("id, tenant_id").eq("clerk_user_id", clerkUserId).single()
-      : { data: null },
+    getCurrentUser(),
   ]);
 
   if (!formation || !formation.is_published || !lecon) notFound();
-  if (!(await isFormationAccessibleToTenant(supabase, dbUser?.tenant_id ?? null, formation))) notFound();
 
   const sortedModules = (allModules ?? []).sort((a, b) => a.order_index - b.order_index);
   const allLessons = sortedModules.flatMap((m) =>
@@ -36,6 +32,9 @@ export default async function ApprenantLessonPage({ params }: Props) {
   );
 
   const currentIdx = allLessons.findIndex((l) => l.id === lessonId);
+  // La leçon doit appartenir à la formation de l'URL (sinon une leçon d'une
+  // autre formation serait lisible via une formation accessible).
+  if (currentIdx === -1) notFound();
   const prevLesson = currentIdx > 0 ? allLessons[currentIdx - 1] : null;
   const nextLesson = currentIdx < allLessons.length - 1 ? allLessons[currentIdx + 1] : null;
 
@@ -56,7 +55,27 @@ export default async function ApprenantLessonPage({ params }: Props) {
     }
   });
 
-  const tenantHasSubscription = dbUser?.tenant_id ? await hasActiveSubscription(dbUser.tenant_id) : false;
+  // Accès, abonnement, quiz et progression : lectures indépendantes, en parallèle.
+  const [accessible, tenantHasSubscription, quizResult, progressResult] = await Promise.all([
+    isFormationAccessibleToTenant(supabase, dbUser?.tenant_id ?? null, formation),
+    dbUser?.tenant_id ? hasActiveSubscription(dbUser.tenant_id) : false,
+    lecon.content_type === "quiz"
+      ? supabase
+          .from("quizzes")
+          .select("id, title, pass_score, quiz_questions(id, question_text, options, order_index, points)")
+          .eq("lecon_id", lessonId)
+          .single()
+      : { data: null },
+    dbUser?.id
+      ? supabase
+          .from("progress")
+          .select("lecon_id")
+          .eq("user_id", dbUser.id)
+          .eq("status", "completed")
+          .in("lecon_id", allLessons.map((l) => l.id))
+      : { data: [] as { lecon_id: string }[] },
+  ]);
+  if (!accessible) notFound();
 
   if (!tenantHasSubscription && currentIdx >= FREE_PREVIEW_LESSON_COUNT) {
     return (
@@ -84,11 +103,7 @@ export default async function ApprenantLessonPage({ params }: Props) {
 
   let quizData = null;
   if (lecon.content_type === "quiz") {
-    const { data } = await supabase
-      .from("quizzes")
-      .select("id, title, pass_score, quiz_questions(id, question_text, options, order_index, points)")
-      .eq("lecon_id", lessonId)
-      .single();
+    const data = quizResult.data;
     // Sans les bonnes réponses : la correction est faite et renvoyée par le
     // serveur à la soumission (POST /api/progress/quiz-passed).
     quizData = data
@@ -101,16 +116,7 @@ export default async function ApprenantLessonPage({ params }: Props) {
       : null;
   }
 
-  let completedInFormation = 0;
-  if (dbUser?.id && allLessons.length > 0) {
-    const { data: progressRows } = await supabase
-      .from("progress")
-      .select("lecon_id")
-      .eq("user_id", dbUser.id)
-      .eq("status", "completed")
-      .in("lecon_id", allLessons.map((l) => l.id));
-    completedInFormation = progressRows?.length ?? 0;
-  }
+  const completedInFormation = progressResult.data?.length ?? 0;
 
   return (
     <LessonView
