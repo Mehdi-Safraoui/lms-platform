@@ -366,3 +366,15 @@ a.planStation:hover .planStationTitle { color: var(--metro-blue); }
 @media (max-width: 1100px) {
   .columns { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Même mouvement que la page leçon : la position de l'apprenant se pose une fois. */
+@keyframes arrive {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.stop[data-marker="current"] .stopMarker { animation: arrive 520ms cubic-bezier(0.16, 1, 0.3, 1) 180ms both; }
+.stop[data-marker="current"] .here { animation: arrive 420ms cubic-bezier(0.16, 1, 0.3, 1) 420ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .stop[data-marker="current"] .stopMarker,
+  .stop[data-marker="current"] .here { animation: none; }
+}

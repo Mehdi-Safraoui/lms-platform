@@ -192,3 +192,21 @@ a.moduleHead:hover .moduleName,
   outline-offset: 3px;
   border-radius: 6px;
 }
+
+/* Mouvement signature : à l'ouverture d'une leçon, l'anneau « Vous êtes ici »
+   se pose une fois sur sa station. Rien d'autre ne bouge. */
+@keyframes arrive {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.station[data-status="current"] .dot,
+.marker[data-marker="current"] { animation: arrive 520ms cubic-bezier(0.16, 1, 0.3, 1) 180ms both; }
+.station[data-status="current"] .here,
+.module .here { animation: arrive 420ms cubic-bezier(0.16, 1, 0.3, 1) 420ms both; transform-origin: left center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .station[data-status="current"] .dot,
+  .marker[data-marker="current"],
+  .station[data-status="current"] .here,
+  .module .here { animation: none; }
+}
