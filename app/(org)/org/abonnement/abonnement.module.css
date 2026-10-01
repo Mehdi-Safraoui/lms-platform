@@ -121,7 +121,8 @@
 
 .planStats {
   display: flex;
-  gap: 32px;
+  flex-wrap: wrap;
+  gap: 16px 32px;
 }
 
 .planStat {
@@ -301,3 +302,5 @@
   transition: background 0.15s, color 0.15s;
 }
 .downloadBtn:hover { background: var(--bg-alt); color: var(--navy); }
+
+.planStatLimit { font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, 0.55); }

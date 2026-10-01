@@ -1,0 +1,8 @@
+.usage { display: inline-flex; flex-direction: column; gap: 4px; min-width: 90px; }
+.value { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.limit { font-weight: 500; color: var(--text-muted); }
+.meter { position: relative; display: block; height: 5px; border-radius: 3px; background: var(--coral-light); overflow: hidden; }
+.fill { position: absolute; inset: 0 auto 0 0; background: var(--coral); border-radius: 0 3px 3px 0; }
+.reached { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #92400e; white-space: nowrap; }
+.reached svg { color: #b45309; flex-shrink: 0; }
+.muted { font-size: 12.5px; color: var(--text-light); white-space: nowrap; }

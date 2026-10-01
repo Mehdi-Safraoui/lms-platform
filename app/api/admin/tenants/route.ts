@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { getTenantsUsageSummary } from "@/lib/tenantUsage";
 
 export async function GET() {
   const guard = await requireSuperAdmin();
@@ -16,6 +17,8 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  const usage = await getTenantsUsageSummary(supabase, (tenants ?? []).map((t) => t.id));
 
   const tenantsWithStats = await Promise.all(
     (tenants ?? []).map(async (tenant) => {
@@ -33,6 +36,7 @@ export async function GET() {
         ...tenant,
         activeApprenantCount,
         followedFormationCount: followedFormationCount ?? 0,
+        usage: usage.get(tenant.id) ?? null,
       };
     })
   );

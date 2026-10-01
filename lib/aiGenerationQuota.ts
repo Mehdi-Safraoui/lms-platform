@@ -35,7 +35,7 @@ function parisOffsetMs(date: Date): number {
 }
 
 /** Minuit du 1er du mois en cours à Paris, en ISO UTC — même borne que consume_formation_ai. */
-function monthStartParisIso(): string {
+export function monthStartParisIso(): string {
   const parisNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
   const firstDayUtc = Date.UTC(parisNow.getFullYear(), parisNow.getMonth(), 1);
   return new Date(firstDayUtc - parisOffsetMs(new Date(firstDayUtc))).toISOString();
