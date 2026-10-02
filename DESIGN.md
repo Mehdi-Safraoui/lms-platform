@@ -298,3 +298,13 @@ User feedback after the first release: the overview pages felt "too marked", les
 Same calm register, applied on user request ("applique ces changements à la vue admin entreprise et super admin"):
 - **Shell:** `WorkspaceShell` (shared with the learner area). It has the Ahead Digital logo, an identity card under the logo (company and role, or "Ahead Digital · Super admin"), the icon navigation and, at the bottom, the account and notifications. There is no top bar. The content sits on `--bg` #f6f7fb so white cards read.
 - **Pages:** no eyebrow labels above titles; display weights capped at 700; accent blue for primary actions.
+
+### Access pages (sign-in, sign-up, invitation, company creation) — added 2026-10-02
+- **Frame:** `app/(auth)/layout.tsx`. The left side is a navy enamel panel with the Ahead Digital logo, one headline, one supporting line, a short section of metro line (the coral ring marks « Vous êtes ici ») and the copyright. The right side is the form column, 420px max, on white.
+- **Clerk widget:** `lib/clerkAppearance.ts`, applied once on `<ClerkProvider>`.
+  - It uses `elevation: "flush"`, so there is no card.
+  - Colours: accent blue, navy text, Martel Sans, Winky Sans titles, 10px radius.
+  - The primary button is flat: no gradient, no shadow.
+  - The input border is set in `auth.module.css`, because Clerk renders `colorBorder` at about 11 % opacity.
+- **Language:** Clerk's French translation, with app vocabulary: « entreprise », not « organisation ».
+- **Custom invitation flow:** `AcceptInvitationFlow` copies the widget's look: display-face title, 44px inputs, flat blue button.
