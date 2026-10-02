@@ -46,7 +46,7 @@
   fill: #ffffff;
 }
 
-.footer { margin: 0; font-family: var(--font-text), sans-serif; font-size: 13px; color: #9aa3c7; }
+.footer { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-text), sans-serif; font-size: 13px; color: #9aa3c7; }
 
 .main {
   display: flex;

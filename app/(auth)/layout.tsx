@@ -1,4 +1,5 @@
 import AheadLogo from "@/components/learner/AheadLogo";
+import AheadLearningLogo from "@/components/learner/AheadLearningLogo";
 import styles from "./auth.module.css";
 
 /**
@@ -11,7 +12,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className={styles.shell}>
       <aside className={styles.panel}>
-        <AheadLogo width={150} className={styles.logo} />
+        <AheadLearningLogo tone="light" size={44} />
 
         <div className={styles.pitch}>
           <p className={styles.headline}>Apprenez l&apos;IA à votre rythme, une station après l&apos;autre.</p>
@@ -33,7 +34,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <text x="97" y="58" textAnchor="middle" className={styles.here}>Vous êtes ici</text>
         </svg>
 
-        <p className={styles.footer}>© {new Date().getFullYear()} Ahead Digital</p>
+        <p className={styles.footer}>
+          <span>Un produit</span>
+          <AheadLogo width={104} className={styles.logo} />
+        </p>
       </aside>
 
       <main className={styles.main}>
