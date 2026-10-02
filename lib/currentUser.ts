@@ -39,6 +39,9 @@ export interface TenantRow {
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   cancel_at_period_end: boolean | null;
+  /** "stripe" (payé en ligne) ou "manual" (attribué par Ahead depuis le super admin). */
+  plan_source: "stripe" | "manual" | null;
+  plan_ends_at: string | null;
   [column: string]: unknown;
 }
 

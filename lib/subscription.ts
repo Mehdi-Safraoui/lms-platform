@@ -3,10 +3,22 @@ import { getTenant } from "@/lib/currentUser";
 // Ligne tenants lue via getTenant (React cache) : déjà chargée par le layout
 // org dans la même requête, pas de nouvelle lecture en base.
 
-export async function hasActiveSubscription(tenantId: string): Promise<boolean> {
-  const tenant = await getTenant(tenantId);
+/**
+ * Abonnement actif : statut Stripe actif ou en essai, ou offre attribuée par
+ * Ahead (plan_source "manual") dont la date de fin n'est pas passée.
+ */
+export function isTenantActive(
+  tenant: { subscription_status?: string | null; plan_ends_at?: unknown } | null | undefined,
+  now: Date = new Date()
+): boolean {
+  if (!tenant) return false;
+  const activeStatus = tenant.subscription_status === "active" || tenant.subscription_status === "trialing";
+  const endsAt = typeof tenant.plan_ends_at === "string" ? new Date(tenant.plan_ends_at) : null;
+  return activeStatus && (!endsAt || endsAt > now);
+}
 
-  return tenant?.subscription_status === "active" || tenant?.subscription_status === "trialing";
+export async function hasActiveSubscription(tenantId: string): Promise<boolean> {
+  return isTenantActive(await getTenant(tenantId));
 }
 
 /**
@@ -16,7 +28,7 @@ export async function hasActiveSubscription(tenantId: string): Promise<boolean> 
 export async function canCreateFormationByAi(tenantId: string): Promise<boolean> {
   const tenant = await getTenant(tenantId);
 
-  const activeStatus = tenant?.subscription_status === "active" || tenant?.subscription_status === "trialing";
+  const activeStatus = isTenantActive(tenant);
   const eligiblePlan = tenant?.subscription_plan === "creation" || tenant?.subscription_plan === "entreprise";
   return activeStatus && eligiblePlan;
 }

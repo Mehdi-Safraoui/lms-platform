@@ -33,6 +33,9 @@ export default async function AbonnementPage() {
   const [tenant, usage] = await Promise.all([getTenant(currentUser.tenant_id), getTenantUsage(supabase, currentUser.tenant_id)]);
 
   const planKey = tenant?.subscription_plan as PlanKey | null;
+  // Offre attribuée par Ahead Digital depuis le super admin : ni paiement ni factures Stripe.
+  const grantedByAhead = tenant?.plan_source === "manual" && !!planKey;
+  const grantedUntil = grantedByAhead && tenant?.plan_ends_at ? new Date(tenant.plan_ends_at) : null;
   const plan = planKey && PLANS[planKey] ? PLANS[planKey] : null;
   const cancelScheduled = tenant?.subscription_status === "active" && tenant?.cancel_at_period_end;
   const status = cancelScheduled
@@ -92,7 +95,9 @@ export default async function AbonnementPage() {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>Abonnement</h1>
-      <p className={styles.subtitle}>Géré via Stripe.</p>
+      <p className={styles.subtitle}>
+        {grantedByAhead ? "Offre attribuée par Ahead Digital. Contactez-nous pour la modifier." : "Géré via Stripe."}
+      </p>
 
       <div className={styles.topRow}>
         <div className={styles.planCard}>
@@ -101,7 +106,14 @@ export default async function AbonnementPage() {
             {status && <span className={`${styles.statusBadge} ${styles[status.className]}`}>{status.label}</span>}
           </div>
           <h2 className={styles.planName}>{plan?.name ?? "Aucune offre active"}</h2>
-          {plan && (
+          {plan && grantedByAhead && (
+            <p className={styles.planPrice}>
+              {grantedUntil
+                ? `Accès jusqu'au ${grantedUntil.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}`
+                : "Sans date de fin"}
+            </p>
+          )}
+          {plan && !grantedByAhead && (
             <p className={styles.planPrice}>
               {billedPrice ?? `${plan.price} ${plan.period}`}
               {renewalDate &&
@@ -144,6 +156,7 @@ export default async function AbonnementPage() {
           </div>
         </div>
 
+        {!grantedByAhead && (
         <div className={styles.paymentCard}>
           <span className={styles.paymentLabel}>Moyen de paiement</span>
           {card ? (
@@ -163,6 +176,7 @@ export default async function AbonnementPage() {
           )}
           <ManageBillingButton />
         </div>
+        )}
       </div>
 
       <h2 className={styles.sectionTitle}>Factures</h2>

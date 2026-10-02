@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentUser, getTenant } from "@/lib/currentUser";
 import OrgShell from "./OrgShell";
+import { isTenantActive } from "@/lib/subscription";
 
 /**
  * Filet de sécurité pour le logo tenant : on ne dépend plus uniquement du
@@ -53,7 +54,7 @@ export default async function OrgLayout({ children }: { children: React.ReactNod
 
   const tenantLogoUrl = tenant ? await resolveTenantLogoUrl(createServiceRoleSupabaseClient(), tenant) : null;
 
-  const hasSubscription = tenant?.subscription_status === "active" || tenant?.subscription_status === "trialing";
+  const hasSubscription = isTenantActive(tenant);
 
   return (
     <>

@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { X, Clock, BookOpen } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { X, Clock, BookOpen, Link2 } from "lucide-react";
+import { toast } from "sonner";
+import PlanFields from "./PlanFields";
+import { PLAN_LABEL, isPlanKey } from "@/lib/manualPlans";
 import styles from "./tenants.module.css";
 import UsageMeter from "@/components/usage/UsageMeter";
 import type { TenantUsage } from "@/lib/tenantUsage";
@@ -14,6 +17,9 @@ interface TenantDetail {
   slug: string;
   subscription_status: string | null;
   subscription_plan: string | null;
+  plan_source: "stripe" | "manual" | null;
+  plan_ends_at: string | null;
+  hasStripeSubscription: boolean;
   created_at: string;
 }
 
@@ -29,6 +35,8 @@ interface PendingInvitation {
   id: string;
   emailAddress: string;
   role: string;
+  createdAt: number;
+  url: string | null;
 }
 
 interface FormationProgress {
@@ -49,12 +57,20 @@ function roleLabelFromClerkRole(clerkRole: string): string {
   return clerkRole === "org:admin" ? "Administrateur" : "Membre";
 }
 
+/** Date ISO → valeur d'un champ date (AAAA-MM-JJ), en heure de Paris. */
+function toDateInput(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }) : "";
+}
+
 export default function TenantDetailModal({
   tenantId,
   onClose,
+  onChanged,
 }: {
   tenantId: string;
   onClose: () => void;
+  /** Rafraîchit la liste des entreprises après un changement d'offre. */
+  onChanged: () => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
@@ -64,11 +80,21 @@ export default function TenantDetailModal({
   const [usage, setUsage] = useState<TenantUsage | null>(null);
   const [aiCosts, setAiCosts] = useState<TenantAiCosts | null>(null);
 
-  useEffect(() => {
-    fetch(`/api/admin/tenants/${tenantId}`)
+  const [plan, setPlan] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"admin" | "apprenant">("admin");
+  const [inviting, setInviting] = useState(false);
+  const [busyInvitation, setBusyInvitation] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    return fetch(`/api/admin/tenants/${tenantId}`)
       .then((r) => r.json())
       .then((j) => {
         setTenant(j.tenant ?? null);
+        setPlan(j.tenant?.subscription_plan ?? "");
+        setEndsAt(toDateInput(j.tenant?.plan_ends_at ?? null));
         setMembers(j.members ?? []);
         setPendingInvitations(j.pendingInvitations ?? []);
         setFormationProgress(j.formationProgress ?? []);
@@ -77,6 +103,83 @@ export default function TenantDetailModal({
       })
       .finally(() => setLoading(false));
   }, [tenantId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function savePlan() {
+    setSavingPlan(true);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: plan || null, endsAt: endsAt || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "L'offre n'a pas été changée.");
+      toast.success(plan ? `Offre ${isPlanKey(plan) ? PLAN_LABEL[plan] : plan} attribuée.` : "Offre retirée.");
+      await load();
+      onChanged();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "L'offre n'a pas été changée.");
+    } finally {
+      setSavingPlan(false);
+    }
+  }
+
+  async function invite(e: React.FormEvent) {
+    e.preventDefault();
+    setInviting(true);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/invitations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "L'invitation n'a pas été envoyée.");
+      toast.success("Invitation envoyée.", { description: inviteEmail });
+      setInviteEmail("");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "L'invitation n'a pas été envoyée.");
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function copyInvitationLink(inv: PendingInvitation) {
+    if (!inv.url) return toast.error("Lien indisponible pour cette invitation.");
+    try {
+      await navigator.clipboard.writeText(inv.url);
+      toast.success("Lien d'invitation copié.", { description: inv.emailAddress });
+    } catch {
+      toast.error("Copie impossible. Autorisez l'accès au presse-papiers.");
+    }
+  }
+
+  async function revokeInvitation(inv: PendingInvitation) {
+    setBusyInvitation(inv.id);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/invitations/${inv.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "L'invitation n'a pas été annulée.");
+      toast.success("Invitation annulée.", { description: inv.emailAddress });
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "L'invitation n'a pas été annulée.");
+    } finally {
+      setBusyInvitation(null);
+    }
+  }
+
+  // Une entreprise qui paie en ligne change d'offre depuis Stripe, pas ici.
+  const paysOnline =
+    !!tenant && tenant.plan_source !== "manual" && tenant.hasStripeSubscription &&
+    ["active", "trialing", "past_due"].includes(tenant.subscription_status ?? "");
+  const planChanged =
+    !!tenant && (plan !== (tenant.subscription_plan ?? "") || endsAt !== toDateInput(tenant.plan_ends_at));
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -114,6 +217,41 @@ export default function TenantDetailModal({
             <p className={styles.detailMeta}>
               {tenant.slug} · Créé le {new Date(tenant.created_at).toLocaleDateString("fr-FR")}
             </p>
+
+            <div className={styles.detailSection}>
+              <span className={styles.detailSectionTitle}>Offre</span>
+              <p className={styles.planSummary}>
+                {tenant.subscription_plan
+                  ? `${isPlanKey(tenant.subscription_plan) ? PLAN_LABEL[tenant.subscription_plan] : tenant.subscription_plan} · `
+                  : "Aucune offre · "}
+                {tenant.plan_source === "manual"
+                  ? `attribuée par Ahead${tenant.plan_ends_at ? `, jusqu'au ${new Date(tenant.plan_ends_at).toLocaleDateString("fr-FR")}` : ", sans date de fin"}`
+                  : tenant.hasStripeSubscription
+                    ? "payée en ligne via Stripe"
+                    : "l'entreprise peut choisir et payer en ligne"}
+              </p>
+              {paysOnline ? (
+                <p className={styles.detailEmpty}>
+                  Cette entreprise paie son abonnement en ligne : son offre se change depuis Stripe.
+                </p>
+              ) : (
+                <>
+                  <PlanFields
+                    idPrefix={`tenant-${tenant.id}`}
+                    plan={plan}
+                    endsAt={endsAt}
+                    onPlanChange={setPlan}
+                    onEndsAtChange={setEndsAt}
+                    emptyLabel="Aucune offre attribuée"
+                  />
+                  <div className={styles.inlineActions}>
+                    <button type="button" className={styles.btnSubmit} onClick={savePlan} disabled={!planChanged || savingPlan}>
+                      {savingPlan ? "Enregistrement…" : "Enregistrer l'offre"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
 
             {usage && (
               <div className={styles.detailSection}>
@@ -279,6 +417,33 @@ export default function TenantDetailModal({
             )}
 
             <div className={styles.detailSection}>
+              <span className={styles.detailSectionTitle}>Inviter quelqu&apos;un</span>
+              <form className={styles.inviteForm} onSubmit={invite}>
+                <input
+                  type="email"
+                  required
+                  className={styles.input}
+                  placeholder="prenom.nom@entreprise.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  aria-label="Email de la personne à inviter"
+                />
+                <select
+                  className={styles.input}
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value as "admin" | "apprenant")}
+                  aria-label="Rôle"
+                >
+                  <option value="admin">Administrateur</option>
+                  <option value="apprenant">Apprenant</option>
+                </select>
+                <button type="submit" className={styles.btnSubmit} disabled={inviting}>
+                  {inviting ? "Envoi…" : "Inviter"}
+                </button>
+              </form>
+            </div>
+
+            <div className={styles.detailSection}>
               <span className={styles.detailSectionTitle}>Membres ({members.length})</span>
               {members.length === 0 ? (
                 <p className={styles.detailEmpty}>Aucun membre pour le moment.</p>
@@ -350,9 +515,25 @@ export default function TenantDetailModal({
                           {roleLabelFromClerkRole(inv.role)}
                         </span>
                       </div>
-                      <span className={`${styles.roleBadge} ${styles.roleBadgePending}`}>
-                        En attente
-                      </span>
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        onClick={() => copyInvitationLink(inv)}
+                        title="Copier le lien d'invitation"
+                        aria-label={`Copier le lien d'invitation de ${inv.emailAddress}`}
+                      >
+                        <Link2 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.iconBtn}
+                        onClick={() => revokeInvitation(inv)}
+                        disabled={busyInvitation === inv.id}
+                        title="Annuler l'invitation"
+                        aria-label={`Annuler l'invitation de ${inv.emailAddress}`}
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
                   ))}
                 </div>

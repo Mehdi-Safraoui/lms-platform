@@ -53,6 +53,9 @@ export async function POST(req: NextRequest) {
           cancel_at_period_end: false,
           ai_generation_quota: plan ? QUOTA_BY_PLAN[plan] : null,
           ai_generation_used: 0,
+          // Un paiement en ligne reprend la main sur une éventuelle offre attribuée par Ahead.
+          plan_source: "stripe",
+          plan_ends_at: null,
         })
         .eq("id", tenantId)
         .select("name")
@@ -80,7 +83,8 @@ export async function POST(req: NextRequest) {
       const { error } = await supabase
         .from("tenants")
         .update({ subscription_status: "past_due" })
-        .eq("stripe_customer_id", customerId);
+        .eq("stripe_customer_id", customerId)
+        .neq("plan_source", "manual");
 
       if (error) console.error("[stripe webhook] invoice.payment_failed update error:", error);
       else console.log(`[stripe webhook] customer ${customerId} → past_due`);
@@ -118,7 +122,8 @@ export async function POST(req: NextRequest) {
           cancel_at_period_end: subscription.cancel_at_period_end,
           ...(newPlan && { subscription_plan: newPlan, ai_generation_quota: QUOTA_BY_PLAN[newPlan] }),
         })
-        .eq("stripe_customer_id", customerId);
+        .eq("stripe_customer_id", customerId)
+        .neq("plan_source", "manual");
 
       if (error) console.error("[stripe webhook] subscription.updated update error:", error);
       else
@@ -142,7 +147,8 @@ export async function POST(req: NextRequest) {
           stripe_subscription_id: null,
           cancel_at_period_end: false,
         })
-        .eq("stripe_customer_id", customerId);
+        .eq("stripe_customer_id", customerId)
+        .neq("plan_source", "manual");
 
       if (error) console.error("[stripe webhook] subscription.deleted update error:", error);
       else console.log(`[stripe webhook] customer ${customerId} → canceled`);
