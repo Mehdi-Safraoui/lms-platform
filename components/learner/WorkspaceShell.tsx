@@ -6,7 +6,7 @@ import { useUser } from "@clerk/nextjs";
 import type { LucideIcon } from "lucide-react";
 import NotificationBell from "@/components/shared/NotificationBell";
 import AccountMenu from "./AccountMenu";
-import AheadLogo from "./AheadLogo";
+import AheadLearningLogo from "./AheadLearningLogo";
 import styles from "./learnerShell.module.css";
 
 export interface WorkspaceNavItem {
@@ -46,7 +46,7 @@ export default function WorkspaceShell({
     <div className={styles.shell} data-muted={muted || undefined}>
       <aside className={styles.sidebar}>
         <Link href={homeHref} className={styles.logo}>
-          <AheadLogo width={164} />
+          <AheadLearningLogo size={38} />
         </Link>
         {identity}
         <nav aria-label="Navigation principale">

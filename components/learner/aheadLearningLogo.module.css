@@ -1,0 +1,16 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--mark) * 0.3);
+  color: var(--metro-navy);
+}
+.logo[data-tone="light"] { color: #ffffff; }
+.mark { width: var(--mark); height: var(--mark); flex-shrink: 0; }
+.name {
+  font-family: var(--font-display), sans-serif;
+  font-size: calc(var(--mark) * 0.58);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
