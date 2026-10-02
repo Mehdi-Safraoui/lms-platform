@@ -21,7 +21,7 @@ const martel = Martel_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Ahead LMS",
+  title: "Ahead Learning",
   description: "Plateforme de formation en ligne multi-tenant",
 };
 

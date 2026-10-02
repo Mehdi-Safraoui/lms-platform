@@ -16,7 +16,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className={styles.pitch}>
           <p className={styles.headline}>Apprenez l&apos;IA à votre rythme, une station après l&apos;autre.</p>
           <p className={styles.lead}>
-            Ahead LMS : des parcours courts, des quiz pour ancrer chaque notion et un certificat au terminus.
+            Ahead Learning : des parcours courts, des quiz pour ancrer chaque notion et un certificat au terminus.
           </p>
         </div>
 
