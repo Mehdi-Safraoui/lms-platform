@@ -5,6 +5,8 @@ import { Users, Search, UserPlus, Star } from "lucide-react";
 import styles from "./apprenants.module.css";
 import InviteApprenantModal from "./InviteApprenantModal";
 import ApprenantDetailModal from "./ApprenantDetailModal";
+import PendingInvitations from "./PendingInvitations";
+import type { PendingInvitation } from "@/lib/orgInvitations";
 import { getCompletion, getLastActivity, type ProgressRecord } from "@/lib/apprenantProgress";
 
 export interface Apprenant {
@@ -29,14 +31,15 @@ interface Props {
   progressRecords: ProgressRecord[];
   /** Limite de l'offre (null = illimité) et invitations encore en attente. */
   learnerLimit: number | null;
-  pendingInvitations: number;
+  pendingCount: number;
+  pendingInvitations: PendingInvitation[];
 }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default function ApprenantTable({ apprenants, formations, progressRecords, learnerLimit, pendingInvitations }: Props) {
+export default function ApprenantTable({ apprenants, formations, progressRecords, learnerLimit, pendingCount, pendingInvitations }: Props) {
   const [selectedFormation, setSelectedFormation] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "not_started" | "in_progress" | "completed">("all");
@@ -92,8 +95,8 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
           <h1 className={styles.title}>Apprenants</h1>
           <p className={styles.subtitle}>
             {apprenants.length} apprenant{apprenants.length > 1 ? "s" : ""} inscrit{apprenants.length > 1 ? "s" : ""}
-            {pendingInvitations > 0 && ` · ${pendingInvitations} invitation${pendingInvitations > 1 ? "s" : ""} en attente`}
-            {learnerLimit !== null && ` · ${apprenants.length + pendingInvitations} / ${learnerLimit} places de votre offre`}
+            {pendingCount > 0 && ` · ${pendingCount} invitation${pendingCount > 1 ? "s" : ""} en attente`}
+            {learnerLimit !== null && ` · ${apprenants.length + pendingCount} / ${learnerLimit} places de votre offre`}
           </p>
         </div>
         <button className={styles.btnInvite} onClick={() => setInviteModalOpen(true)}>
@@ -101,6 +104,10 @@ export default function ApprenantTable({ apprenants, formations, progressRecords
           Ajouter un apprenant
         </button>
       </div>
+
+      <PendingInvitations invitations={pendingInvitations} />
+
+      {pendingInvitations.length > 0 && <h2 className={styles.sectionTitle}>Apprenants inscrits</h2>}
 
       {/* Filters */}
       <div className={styles.filters}>
