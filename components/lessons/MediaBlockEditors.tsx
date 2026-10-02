@@ -140,6 +140,7 @@ export function ImageTextEditor({
 export function VideoEditor({ block, onChange }: { block: VideoBlock; onChange: (block: VideoBlock) => void }) {
   const [query, setQuery] = React.useState(block.search_query);
   const [pasted, setPasted] = React.useState("");
+  const [pasteError, setPasteError] = React.useState(false);
   const [results, setResults] = React.useState<YoutubeVideoResult[] | null>(null);
   const [searching, setSearching] = React.useState(false);
   const embedUrl = block.url ? getVideoEmbedUrl(block.url) : null;
@@ -166,14 +167,24 @@ export function VideoEditor({ block, onChange }: { block: VideoBlock; onChange: 
     }
   }
 
-  function applyPastedLink() {
-    if (!getVideoEmbedUrl(pasted)) {
-      toast.error("Lien non reconnu. Collez un lien YouTube ou Vimeo.");
+  function applyPastedLink(value = pasted) {
+    if (!getVideoEmbedUrl(value)) {
+      setPasteError(true);
       return;
     }
-    onChange({ ...block, url: pasted.trim() });
+    onChange({ ...block, url: value.trim() });
     setPasted("");
+    setPasteError(false);
     setResults(null);
+  }
+
+  // Un lien reconnu est pris en compte dès qu'il est collé : sans ça, il
+  // restait dans le champ sans être enregistré si l'on oubliait de cliquer
+  // sur « Utiliser ce lien » avant d'enregistrer la leçon.
+  function onPastedChange(value: string) {
+    setPasted(value);
+    setPasteError(false);
+    if (getVideoEmbedUrl(value)) applyPastedLink(value);
   }
 
   return (
@@ -229,15 +240,22 @@ export function VideoEditor({ block, onChange }: { block: VideoBlock; onChange: 
           <div className={editorStyles.fieldsRow}>
             <input
               className={editorStyles.input}
-              placeholder="…ou collez un lien YouTube / Vimeo"
+              placeholder="…ou collez un lien YouTube, Vimeo ou Loom"
               value={pasted}
-              onChange={(e) => setPasted(e.target.value)}
+              onChange={(e) => onPastedChange(e.target.value)}
+              onBlur={() => pasted.trim() && applyPastedLink()}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyPastedLink(); } }}
+              aria-invalid={pasteError || undefined}
             />
-            <button type="button" className={editorStyles.addBtn} onClick={applyPastedLink} disabled={!pasted.trim()}>
+            <button type="button" className={editorStyles.addBtn} onClick={() => applyPastedLink()} disabled={!pasted.trim()}>
               <Link2 size={13} /> Utiliser ce lien
             </button>
           </div>
+          {pasteError && (
+            <span className={editorStyles.mediaError} role="alert">
+              Lien non reconnu : collez l&apos;adresse d&apos;une vidéo YouTube, Vimeo ou Loom (par exemple https://www.youtube.com/watch?v=…).
+            </span>
+          )}
         </div>
       )}
 

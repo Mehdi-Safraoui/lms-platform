@@ -227,3 +227,5 @@
 .fieldLabel { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
 .videoPicker .addBtn,
 .mediaPreviewActions .addBtn { white-space: nowrap; flex-shrink: 0; }
+
+.mediaError { font-size: 13px; line-height: 1.45; color: #b91c1c; }

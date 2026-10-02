@@ -1,29 +1,37 @@
+/**
+ * Lien de vidéo collé par le Formateur → URL à intégrer dans une iframe, ou
+ * null si la plateforme n'est pas reconnue. Formats acceptés : YouTube (watch,
+ * youtu.be, shorts, live, embed, mobile, nocookie), Vimeo et Loom.
+ */
 export function getVideoEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url.trim());
+    const host = u.hostname.replace(/^(www|m|music)\./, "");
+    const parts = u.pathname.split("/").filter(Boolean);
 
-    // YouTube watch: youtube.com/watch?v=ID
-    if ((u.hostname === "www.youtube.com" || u.hostname === "youtube.com") && u.pathname === "/watch") {
-      const v = u.searchParams.get("v");
-      return v ? `https://www.youtube.com/embed/${v}` : null;
+    if (host === "youtube.com" || host === "youtube-nocookie.com") {
+      if (parts[0] === "watch") {
+        const v = u.searchParams.get("v");
+        return v ? `https://www.youtube.com/embed/${v}` : null;
+      }
+      if ((parts[0] === "shorts" || parts[0] === "live" || parts[0] === "embed" || parts[0] === "v") && parts[1]) {
+        return `https://www.youtube.com/embed/${parts[1]}`;
+      }
+      return null;
     }
-    // YouTube short: youtu.be/ID
-    if (u.hostname === "youtu.be") {
-      const id = u.pathname.slice(1);
-      return id ? `https://www.youtube.com/embed/${id}` : null;
-    }
-    // YouTube embed: already in embed format
-    if ((u.hostname === "www.youtube.com" || u.hostname === "youtube.com") && u.pathname.startsWith("/embed/")) {
-      return url.trim();
+    if (host === "youtu.be") {
+      return parts[0] ? `https://www.youtube.com/embed/${parts[0]}` : null;
     }
 
-    // Vimeo standard: vimeo.com/ID
-    if (u.hostname === "vimeo.com" || u.hostname === "www.vimeo.com") {
-      const id = u.pathname.slice(1).split("/")[0];
-      return id && /^\d+$/.test(id) ? `https://player.vimeo.com/video/${id}` : null;
+    if (host === "vimeo.com") {
+      const id = parts.find((p) => /^\d+$/.test(p));
+      return id ? `https://player.vimeo.com/video/${id}` : null;
     }
-    // Vimeo player: already in embed format
-    if (u.hostname === "player.vimeo.com") return url.trim();
+    if (host === "player.vimeo.com") return url.trim();
+
+    if (host === "loom.com" && (parts[0] === "share" || parts[0] === "embed") && parts[1]) {
+      return `https://www.loom.com/embed/${parts[1]}`;
+    }
 
     return null;
   } catch {
