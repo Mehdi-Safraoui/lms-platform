@@ -74,7 +74,7 @@ export const clerkLocalization = {
     },
     password: {
       ...frFR.signIn?.password,
-      subtitle: "Pour accéder à Ahead LMS.",
+      subtitle: "Pour accéder à Ahead Learning.",
     },
   },
   signUp: {
@@ -82,7 +82,7 @@ export const clerkLocalization = {
     start: {
       ...frFR.signUp?.start,
       title: "Créer votre compte",
-      subtitle: "Pour démarrer Ahead LMS dans votre entreprise.",
+      subtitle: "Pour démarrer Ahead Learning dans votre entreprise.",
     },
   },
   createOrganization: {

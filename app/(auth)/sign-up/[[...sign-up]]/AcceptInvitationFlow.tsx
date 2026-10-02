@@ -150,7 +150,7 @@ export default function AcceptInvitationFlow() {
       <div className={styles.card}>
         <h1 className={styles.title}>Créer votre compte</h1>
         <p className={styles.subtitle}>
-          Complétez vos informations pour rejoindre votre entreprise sur Ahead LMS.
+          Complétez vos informations pour rejoindre votre entreprise sur Ahead Learning.
         </p>
         <form onSubmit={handleSignUp} className={styles.form}>
           <div className={styles.field}>
