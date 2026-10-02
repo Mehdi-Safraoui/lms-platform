@@ -526,3 +526,27 @@
 @media (max-width: 640px) {
   .costStrip { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Offre attribuée par Ahead, invitations ── */
+.planSource { display: block; font-size: 11.5px; color: var(--text-light); margin-top: 2px; }
+.planSummary { font-size: 14px; color: var(--text); margin: 0 0 12px; }
+.planFields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
+.planFields .input { margin-bottom: 0; }
+.inlineActions { display: flex; justify-content: flex-end; }
+.inviteForm { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; gap: 8px; align-items: center; }
+.inviteForm .input { margin-bottom: 0; }
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.iconBtn:hover:not(:disabled) { color: var(--text); border-color: var(--navy); }
+.iconBtn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.iconBtn:disabled { opacity: 0.5; cursor: default; }

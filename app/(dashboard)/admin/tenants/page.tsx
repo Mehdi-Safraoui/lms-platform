@@ -5,6 +5,8 @@ import { Plus, Building2, X } from "lucide-react";
 import { toast } from "sonner";
 import styles from "./tenants.module.css";
 import TenantDetailModal from "./TenantDetailModal";
+import PlanFields from "./PlanFields";
+import { PLAN_LABEL, isPlanKey } from "@/lib/manualPlans";
 import UsageMeter from "@/components/usage/UsageMeter";
 import type { TenantUsageSummary } from "@/lib/tenantUsage";
 import { formatUsd } from "@/lib/aiPricing";
@@ -15,6 +17,8 @@ interface Tenant {
   slug: string;
   subscription_status: string | null;
   subscription_plan: string | null;
+  plan_source: "stripe" | "manual" | null;
+  plan_ends_at: string | null;
   created_at: string;
   activeApprenantCount: number;
   followedFormationCount: number;
@@ -39,6 +43,8 @@ const STATUS_LABEL: Record<string, { label: string; className: string }> = {
 function NewTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [companyName, setCompanyName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [plan, setPlan] = useState("");
+  const [endsAt, setEndsAt] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -48,7 +54,7 @@ function NewTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated
       const res = await fetch("/api/admin/tenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName, adminEmail }),
+        body: JSON.stringify({ companyName, adminEmail, plan: plan || null, endsAt: endsAt || null }),
       });
       const data = await res.json().catch(() => null);
 
@@ -76,7 +82,7 @@ function NewTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated
           </button>
         </div>
         <p className={styles.modalText}>
-          Un nouveau tenant sera créé, et un email d&apos;invitation sera envoyé à l&apos;administrateur pour rejoindre la plateforme.
+          L&apos;entreprise est créée et son administrateur reçoit une invitation par email. Choisissez une offre pour l&apos;ouvrir sans paiement en ligne, ou laissez-la choisir et payer elle-même.
         </p>
         <form onSubmit={handleSubmit}>
           <label className={styles.label} htmlFor="companyName">Nom de l&apos;entreprise</label>
@@ -97,6 +103,14 @@ function NewTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated
             onChange={(e) => setAdminEmail(e.target.value)}
             placeholder="admin@entreprise.com"
             required
+          />
+          <PlanFields
+            idPrefix="new-tenant"
+            plan={plan}
+            endsAt={endsAt}
+            onPlanChange={setPlan}
+            onEndsAtChange={setEndsAt}
+            emptyLabel="Aucune : l'entreprise choisit et paie en ligne"
           />
           <div className={styles.modalActions}>
             <button type="button" className={styles.btnCancel} onClick={onClose}>Annuler</button>
@@ -140,7 +154,11 @@ export default function TenantsPage() {
       )}
 
       {selectedTenantId && (
-        <TenantDetailModal tenantId={selectedTenantId} onClose={() => setSelectedTenantId(null)} />
+        <TenantDetailModal
+          tenantId={selectedTenantId}
+          onClose={() => setSelectedTenantId(null)}
+          onChanged={fetchTenants}
+        />
       )}
 
       <div className={styles.page}>
@@ -234,7 +252,19 @@ export default function TenantsPage() {
                         </div>
                       </td>
                       <td className={styles.cellMuted}>
-                        {t.subscription_plan ?? <span style={{ color: "var(--text-light)" }}>—</span>}
+                        {t.subscription_plan ? (
+                          <>
+                            {isPlanKey(t.subscription_plan) ? PLAN_LABEL[t.subscription_plan] : t.subscription_plan}
+                            {t.plan_source === "manual" && (
+                              <span className={styles.planSource}>
+                                Attribuée par Ahead
+                                {t.plan_ends_at && ` · jusqu'au ${new Date(t.plan_ends_at).toLocaleDateString("fr-FR")}`}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span style={{ color: "var(--text-light)" }}>—</span>
+                        )}
                       </td>
                       <td>
                         {status ? (

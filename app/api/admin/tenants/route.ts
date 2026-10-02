@@ -4,6 +4,8 @@ import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getTenantsUsageSummary } from "@/lib/tenantUsage";
 import { getAiCostsOverview } from "@/lib/aiCosts";
+import { manualPlanColumns, parseManualPlan } from "@/lib/manualPlans";
+import { invitationRedirectUrl } from "@/lib/orgInvitations";
 
 export async function GET() {
   const guard = await requireSuperAdmin();
@@ -12,7 +14,7 @@ export async function GET() {
   const supabase = createServiceRoleSupabaseClient();
   const { data: tenants, error } = await supabase
     .from("tenants")
-    .select("id, name, slug, subscription_status, subscription_plan, created_at")
+    .select("id, name, slug, subscription_status, subscription_plan, plan_source, plan_ends_at, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -61,7 +63,9 @@ export async function POST(req: NextRequest) {
   const guard = await requireSuperAdmin();
   if (guard instanceof NextResponse) return guard;
 
-  const { companyName, adminEmail } = await req.json();
+  const body = await req.json().catch(() => null);
+  const companyName: string | undefined = body?.companyName;
+  const adminEmail: string | undefined = body?.adminEmail;
 
   if (!companyName?.trim() || !adminEmail?.trim()) {
     return NextResponse.json(
@@ -69,6 +73,9 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  // Offre facultative, attribuée par Ahead dès la création (sinon : libre-service via Stripe).
+  const manualPlan = parseManualPlan(body);
+  if ("error" in manualPlan) return NextResponse.json({ error: manualPlan.error }, { status: 400 });
 
   const client = await clerkClient();
 
@@ -80,16 +87,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Impossible de créer l'entreprise (nom déjà utilisé ?)" }, { status: 500 });
   }
 
+  // La ligne tenants est créée ici, sans attendre le webhook organization.created
+  // (qui fera ensuite le même upsert sur clerk_org_id sans toucher à l'offre),
+  // pour pouvoir y écrire l'offre attribuée tout de suite.
+  const supabase = createServiceRoleSupabaseClient();
+  const { error: tenantError } = await supabase.from("tenants").upsert(
+    {
+      clerk_org_id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      ...(manualPlan.plan ? manualPlanColumns(manualPlan.plan, manualPlan.endsAt) : {}),
+    },
+    { onConflict: "clerk_org_id" }
+  );
+  if (tenantError) {
+    console.error("[admin/tenants] tenant upsert error:", tenantError);
+    return NextResponse.json({ error: "Entreprise créée dans Clerk mais pas dans l'app. Réessayez." }, { status: 500 });
+  }
+
   try {
     // redirectUrl obligatoire : sans lui, l'invité atterrit sur les pages hébergées
-    // par défaut de Clerk (accounts.dev/default-redirect) au lieu du formulaire
-    // /sign-up de l'app — même correctif que app/api/org/apprenants/invite/route.ts.
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    // par défaut de Clerk au lieu du formulaire /sign-up de l'app — même correctif
+    // que app/api/org/apprenants/invite/route.ts.
     await client.organizations.createOrganizationInvitation({
       organizationId: organization.id,
       emailAddress: adminEmail.trim(),
       role: "org:admin",
-      redirectUrl: `${appUrl}/sign-up`,
+      redirectUrl: invitationRedirectUrl(),
     });
   } catch (err) {
     console.error("[admin/tenants] createOrganizationInvitation error:", err);

@@ -5,6 +5,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/currentUser";
 import { PLANS, type PlanKey } from "@/lib/stripe";
 import styles from "./org.module.css";
+import { isTenantActive } from "@/lib/subscription";
 
 function startOfMonth(date: Date): string {
   return new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
@@ -36,7 +37,7 @@ export default async function OrgDashboardPage() {
     { data: tenantFormationRows },
     { data: progressRows },
   ] = await Promise.all([
-    supabase.from("tenants").select("name, subscription_status, subscription_plan").eq("id", tenantId).single(),
+    supabase.from("tenants").select("name, subscription_status, subscription_plan, plan_ends_at").eq("id", tenantId).single(),
     supabase.from("users").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("role", "apprenant"),
     supabase.from("users").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("role", "apprenant").gte("created_at", monthStart),
     supabase.from("progress").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "completed"),
@@ -113,7 +114,7 @@ export default async function OrgDashboardPage() {
 
   const planKey = tenant?.subscription_plan as PlanKey | null;
   const planName = planKey ? PLANS[planKey]?.name ?? planKey : "Aucun";
-  const isActive = tenant?.subscription_status === "active" || tenant?.subscription_status === "trialing";
+  const isActive = isTenantActive(tenant);
 
   return (
     <div className={styles.page}>

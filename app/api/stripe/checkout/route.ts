@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { requireAuth } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { isTenantActive } from "@/lib/subscription";
 
 export async function POST(req: Request) {
   const guard = await requireAuth();
@@ -20,12 +21,19 @@ export async function POST(req: Request) {
 
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("id, name, stripe_customer_id")
+    .select("id, name, stripe_customer_id, plan_source, subscription_status, plan_ends_at")
     .eq("id", guard.tenantId)
     .single();
 
   if (!tenant) {
     return NextResponse.json({ error: "Tenant introuvable" }, { status: 404 });
+  }
+  // Offre attribuée par Ahead et encore en cours : pas de paiement en ligne en parallèle.
+  if (tenant.plan_source === "manual" && isTenantActive(tenant)) {
+    return NextResponse.json(
+      { error: "Votre offre est gérée par Ahead Digital. Contactez-nous pour la modifier." },
+      { status: 409 }
+    );
   }
 
   const { data: user } = await supabase

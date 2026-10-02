@@ -4,6 +4,7 @@ import { requireSuperAdmin } from "@/lib/api/require-super-admin";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getTenantUsage } from "@/lib/tenantUsage";
 import { getTenantAiCosts } from "@/lib/aiCosts";
+import { manualPlanColumns, parseManualPlan } from "@/lib/manualPlans";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -16,7 +17,7 @@ export async function GET(_req: Request, { params }: Props) {
 
   const { data: tenant, error } = await supabase
     .from("tenants")
-    .select("id, name, slug, clerk_org_id, subscription_status, subscription_plan, created_at")
+    .select("id, name, slug, clerk_org_id, subscription_status, subscription_plan, plan_source, plan_ends_at, stripe_subscription_id, created_at")
     .eq("id", id)
     .single();
 
@@ -89,28 +90,73 @@ export async function GET(_req: Request, { params }: Props) {
     });
   }
 
-  let pendingInvitations: { id: string; emailAddress: string; role: string }[] = [];
+  let pendingInvitations: { id: string; emailAddress: string; role: string; createdAt: number; url: string | null }[] = [];
   try {
     const client = await clerkClient();
     const { data: invitations } = await client.organizations.getOrganizationInvitationList({
       organizationId: tenant.clerk_org_id,
       status: ["pending"],
+      limit: 100,
     });
     pendingInvitations = invitations.map((inv) => ({
       id: inv.id,
       emailAddress: inv.emailAddress,
       role: inv.role,
+      createdAt: inv.createdAt,
+      url: inv.url,
     }));
   } catch (err) {
     console.error("[admin/tenants/:id] getOrganizationInvitationList error:", err);
   }
 
+  const { stripe_subscription_id, ...tenantFields } = tenant;
   return NextResponse.json({
-    tenant,
+    tenant: { ...tenantFields, hasStripeSubscription: !!stripe_subscription_id },
     members: members ?? [],
     pendingInvitations,
     formationProgress,
     usage: await getTenantUsage(supabase, id),
     aiCosts: await getTenantAiCosts(supabase, id),
   });
+}
+
+/**
+ * PATCH /api/admin/tenants/[id] — { plan, endsAt } : attribue, change ou
+ * retire l'offre d'une entreprise (offre « attribuée par Ahead »). Refusé
+ * pour une entreprise qui paie en ligne : Stripe écraserait le changement au
+ * prochain renouvellement, le changement passe donc par Stripe.
+ */
+export async function PATCH(req: Request, { params }: Props) {
+  const guard = await requireSuperAdmin();
+  if (guard instanceof NextResponse) return guard;
+
+  const { id } = await params;
+  const parsed = parseManualPlan(await req.json().catch(() => null));
+  if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+
+  const supabase = createServiceRoleSupabaseClient();
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("id, plan_source, stripe_subscription_id, subscription_status")
+    .eq("id", id)
+    .single();
+  if (!tenant) return NextResponse.json({ error: "Entreprise introuvable" }, { status: 404 });
+
+  const paysOnline =
+    tenant.plan_source !== "manual" &&
+    !!tenant.stripe_subscription_id &&
+    ["active", "trialing", "past_due"].includes(tenant.subscription_status ?? "");
+  if (paysOnline) {
+    return NextResponse.json(
+      { error: "Cette entreprise paie son abonnement en ligne : son offre se change depuis Stripe." },
+      { status: 409 }
+    );
+  }
+
+  const { error } = await supabase.from("tenants").update(manualPlanColumns(parsed.plan, parsed.endsAt)).eq("id", id);
+  if (error) {
+    console.error("[admin/tenants/:id] plan update error:", error);
+    return NextResponse.json({ error: "Impossible de changer l'offre." }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
 }
