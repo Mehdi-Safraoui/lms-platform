@@ -1,0 +1,75 @@
+/* ══ Pages d'accès : plaque marine à gauche, formulaire à droite ══ */
+.shell {
+  display: grid;
+  grid-template-columns: minmax(380px, 0.9fr) minmax(0, 1.1fr);
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+.panel {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 44px 56px 36px;
+  background: var(--metro-navy);
+  color: #ffffff;
+}
+.logo { color: #ffffff; }
+
+.pitch { margin-top: auto; max-width: 30rem; }
+.headline {
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(32px, 3.2vw, 44px);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.lead {
+  margin: 18px 0 0;
+  font-family: var(--font-text), sans-serif;
+  font-size: 17px;
+  line-height: 1.55;
+  color: #d9def3;
+  max-width: 26rem;
+}
+
+.line { width: 100%; max-width: 360px; height: auto; margin: 40px 0 auto; overflow: visible; }
+.here {
+  font-family: var(--font-text), sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  fill: #ffffff;
+}
+
+.footer { margin: 0; font-family: var(--font-text), sans-serif; font-size: 13px; color: #9aa3c7; }
+
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 32px 10vh;
+  box-sizing: border-box;
+}
+.form { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: stretch; }
+/* Le widget Clerk prend toute la largeur de la colonne. */
+.form :global(.cl-rootBox),
+.form :global(.cl-cardBox) { width: 100%; max-width: none; }
+
+/* Clerk dessine la bordure des champs avec colorBorder à ≈ 11 % d'opacité,
+   trop pâle sur blanc : on la fixe ici, avec un vrai anneau au focus. */
+.form :global(.cl-formFieldInput) { box-shadow: 0 0 0 1px #c3cbe0 !important; }
+.form :global(.cl-formFieldInput:hover) { box-shadow: 0 0 0 1px #9aa6c6 !important; }
+.form :global(.cl-formFieldInput:focus) { box-shadow: 0 0 0 1px #1d46e5, 0 0 0 4px rgba(29, 70, 229, 0.18) !important; }
+
+/* Responsive détaillé : phase 2 ; ici, la plaque se replie au-dessus du formulaire. */
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .panel { position: static; height: auto; padding: 24px 20px; flex-direction: row; align-items: center; }
+  .pitch, .line, .footer { display: none; }
+  .main { padding: 32px 16px; align-items: flex-start; }
+}

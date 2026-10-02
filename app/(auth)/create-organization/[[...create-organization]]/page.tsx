@@ -2,7 +2,7 @@ import { CreateOrganization } from "@clerk/nextjs";
 
 export default function CreateOrganizationPage() {
   return (
-    <div style={{ display: "flex", justifyContent: "center", paddingTop: "4rem" }}>
+    <>
       {/* skipInvitationScreen : l'écran d'invitation intégré de Clerk après
           création de l'Organization utilise organization.inviteMembers()
           (SDK client), qui ne supporte pas redirectUrl — un apprenant invité
@@ -14,6 +14,6 @@ export default function CreateOrganizationPage() {
           laisse WaitForSync gérer l'attente de la synchro webhook puis la
           redirection vers /org. */}
       <CreateOrganization afterCreateOrganizationUrl="/" skipInvitationScreen />
-    </div>
+    </>
   );
 }

@@ -132,19 +132,6 @@ export default function AcceptInvitationFlow() {
     }
   }
 
-  const brand = (
-    <div className={styles.brand}>
-      <div className={styles.brandMark}>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M8 2L14 13H2L8 2Z" fill="white" strokeWidth="0" />
-        </svg>
-      </div>
-      <span className={styles.brandText}>
-        ahead<span>·</span>
-        <em>digital</em>
-      </span>
-    </div>
-  );
 
   let content: React.ReactNode;
 
@@ -163,7 +150,7 @@ export default function AcceptInvitationFlow() {
       <div className={styles.card}>
         <h1 className={styles.title}>Créer votre compte</h1>
         <p className={styles.subtitle}>
-          Complétez vos informations pour rejoindre votre organisation sur LMS Platform.
+          Complétez vos informations pour rejoindre votre entreprise sur Ahead LMS.
         </p>
         <form onSubmit={handleSignUp} className={styles.form}>
           <div className={styles.field}>
@@ -223,10 +210,5 @@ export default function AcceptInvitationFlow() {
     );
   }
 
-  return (
-    <>
-      {brand}
-      {content}
-    </>
-  );
+  return content;
 }

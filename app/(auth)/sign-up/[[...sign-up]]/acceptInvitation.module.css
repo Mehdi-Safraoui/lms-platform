@@ -1,120 +1,49 @@
-.wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-  min-height: 100vh;
-  /* Padding bas plus grand que le haut : décale le centrage vers le haut de
-     l'écran plutôt qu'un centrage strict, visuellement plus naturel. */
-  padding: 24px 24px 16vh;
-  box-sizing: border-box;
-  background:
-    radial-gradient(560px circle at 50% 0%, rgba(232, 96, 58, 0.06), transparent 65%),
-    var(--bg);
-}
+/* Écran d'acceptation d'invitation : même apparence que le widget Clerk
+   (lib/clerkAppearance.ts), dans le cadre de app/(auth)/layout.tsx. */
+.wrap { width: 100%; }
 
-/* Petit branding en haut, cohérent avec la sidebar de l'app */
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brandMark {
-  width: 32px;
-  height: 32px;
-  background: var(--coral);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.brandText {
-  font-family: var(--font-barlow), sans-serif;
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--navy);
-  letter-spacing: -0.3px;
-}
-.brandText span { color: var(--coral); }
-.brandText em { font-style: normal; font-weight: 500; opacity: 0.55; }
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 36px;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 24px 64px rgba(11, 10, 34, 0.1);
-  box-sizing: border-box;
-}
+.card { width: 100%; }
 
 .title {
-  font-family: var(--font-barlow), sans-serif;
-  font-size: 23px;
-  font-weight: 800;
-  color: var(--text);
-  letter-spacing: -0.3px;
-  margin-bottom: 6px;
+  margin: 0 0 6px;
+  font-family: var(--font-display), sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--metro-navy);
 }
 
 .subtitle {
-  font-size: 13px;
-  color: var(--text-muted);
+  margin: 0 0 26px;
+  font-family: var(--font-text), sans-serif;
+  font-size: 15px;
   line-height: 1.5;
-  margin-bottom: 26px;
+  color: var(--metro-muted);
 }
 
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-}
+.form { display: flex; flex-direction: column; gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-family: var(--font-text), sans-serif; font-size: 14px; font-weight: 600; color: var(--metro-navy); }
 
 .field input {
-  height: 42px;
+  height: 44px;
   width: 100%;
   padding: 0 14px;
-  border: 1px solid var(--border);
+  border: 1px solid #d6dcea;
   border-radius: 10px;
-  font-size: 14px;
-  color: var(--text);
-  background: var(--card);
+  font-family: var(--font-text), sans-serif;
+  font-size: 15px;
+  color: var(--metro-navy);
+  background: #ffffff;
   outline: none;
-  font-family: var(--font-jakarta), sans-serif;
-  transition: border-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.field input:focus {
-  border-color: var(--navy);
-  box-shadow: 0 0 0 3px rgba(25, 23, 56, 0.08);
-}
+.field input:focus { border-color: var(--metro-blue); box-shadow: 0 0 0 3px rgba(29, 70, 229, 0.2); }
 
 /* Champ mot de passe avec bouton "afficher/masquer" */
-.passwordWrap {
-  position: relative;
-  display: flex;
-}
-.passwordWrap input {
-  padding-right: 42px;
-}
-
+.passwordWrap { position: relative; display: flex; }
+.passwordWrap input { padding-right: 42px; }
 .togglePassword {
   position: absolute;
   top: 50%;
@@ -123,50 +52,48 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   background: none;
   border: none;
   border-radius: 8px;
-  color: var(--text-muted);
+  color: var(--metro-muted);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
 }
-.togglePassword:hover {
-  background: var(--bg-alt);
-  color: var(--text);
-}
+.togglePassword:hover { background: var(--metro-tint); color: var(--metro-navy); }
 
 .error {
-  font-size: 13px;
-  color: #dc2626;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 10px;
+  margin: 0;
   padding: 10px 12px;
+  border: 1px solid #f3c4c6;
+  border-radius: 10px;
+  background: #fff5f5;
+  font-family: var(--font-text), sans-serif;
+  font-size: 14px;
   line-height: 1.4;
+  color: #b4232a;
 }
 
 .submit {
   height: 44px;
-  border-radius: 999px;
-  border: none;
-  background: var(--coral);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
   margin-top: 6px;
+  border: none;
+  border-radius: 10px;
+  background: var(--metro-blue);
+  color: #ffffff;
+  font-family: var(--font-text), sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
 }
-.submit:hover:not(:disabled) { opacity: 0.88; }
-.submit:active:not(:disabled) { transform: scale(0.98); }
+.submit:hover:not(:disabled) { background: #1838b8; }
+.submit:focus-visible { outline: 3px solid rgba(29, 70, 229, 0.35); outline-offset: 2px; }
 .submit:disabled { opacity: 0.6; cursor: default; }
 
 .message {
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 14px;
-  max-width: 360px;
+  margin: 0;
+  font-family: var(--font-text), sans-serif;
+  font-size: 16px;
   line-height: 1.6;
+  color: var(--metro-muted);
 }
