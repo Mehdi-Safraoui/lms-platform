@@ -116,8 +116,8 @@ function QuizPlayer({ quiz, objective }: { quiz: QuizData; objective: QuizObject
             {objective && (
               <p className={styles.quizResultLabel}>
                 {countedNow
-                  ? `Ce score compte pour l'objectif « ${objective.rewardLabel} ».`
-                  : `Entraînement : votre score retenu pour l'objectif reste ${countedPct} %.`}
+                  ? `Score enregistré pour votre objectif « ${objective.rewardLabel} ».`
+                  : `Le score retenu pour l'objectif reste celui de votre premier passage : ${countedPct} %.`}
               </p>
             )}
           </div>
@@ -188,8 +188,8 @@ function QuizIntro({ quiz, objective, onStart }: { quiz: QuizData; objective: Qu
         {objective && (
           <p className={styles.quizObjective}>
             {objective.firstScorePct === null
-              ? `Objectif « ${objective.rewardLabel} » : cette première tentative compte pour votre score (${objective.minScorePct} % minimum sur l'ensemble des quiz). Les suivantes serviront à vous entraîner.`
-              : `Votre première tentative est enregistrée : ${objective.firstScorePct} %. Vous pouvez refaire le quiz pour vous entraîner, sans changer ce score.`}
+              ? `Ce quiz compte pour votre objectif « ${objective.rewardLabel} ».`
+              : `Score retenu pour votre objectif : ${objective.firstScorePct} %.`}
           </p>
         )}
       </div>
