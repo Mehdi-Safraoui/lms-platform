@@ -74,6 +74,8 @@
   color: #b4232a;
 }
 
+.errorLink { font-weight: 700; color: #b4232a; text-decoration: underline; text-underline-offset: 3px; }
+
 .submit {
   height: 44px;
   margin-top: 6px;

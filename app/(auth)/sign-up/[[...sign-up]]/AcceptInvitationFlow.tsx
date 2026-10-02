@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import { Eye, EyeOff } from "lucide-react";
@@ -33,6 +34,14 @@ import styles from "./acceptInvitation.module.css";
  * de traiter le ticket, plutôt que de compter sur un test en navigation
  * privée — vérifié en conditions réelles comme cause de blocage.
  */
+const ALREADY_ACCEPTED = "Cette invitation a déjà été acceptée : votre compte existe. Connectez-vous avec votre email et votre mot de passe.";
+
+/** Ticket d'invitation déjà consommé (compte déjà créé avec ce lien). */
+function isTicketAlreadyUsed(error: { code?: string; message?: string; longMessage?: string }): boolean {
+  const text = `${error.code ?? ""} ${error.message ?? ""} ${error.longMessage ?? ""}`.toLowerCase();
+  return text.includes("already been accepted") || text.includes("already_accepted");
+}
+
 export default function AcceptInvitationFlow() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -51,12 +60,18 @@ export default function AcceptInvitationFlow() {
   const [error, setError] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
 
-  const signOutTriggered = React.useRef(false);
+  const sessionChecked = React.useRef(false);
   const signInAttempted = React.useRef(false);
 
   React.useEffect(() => {
-    if (!authLoaded || !isSignedIn || signOutTriggered.current) return;
-    signOutTriggered.current = true;
+    // Une seule vérification, à l'arrivée sur la page : seule une session
+    // présente AVANT de traiter le ticket est à fermer. Sans ce garde-fou, la
+    // session que l'inscription vient d'ouvrir déclenchait cette déconnexion
+    // avant la redirection (plus lente en production) : l'apprenant revenait
+    // sur ce formulaire, puis « invitation already accepted » au second essai.
+    if (!authLoaded || sessionChecked.current) return;
+    sessionChecked.current = true;
+    if (!isSignedIn) return;
     // Redéclenche cette même page (ticket toujours dans l'URL) une fois
     // déconnecté, pour repartir sur une session propre.
     void signOut({ redirectUrl: window.location.href });
@@ -81,7 +96,7 @@ export default function AcceptInvitationFlow() {
     (async () => {
       const { error: createError } = await signIn.create({ strategy: "ticket", ticket });
       if (createError) {
-        setError(createError.longMessage ?? createError.message);
+        setError(isTicketAlreadyUsed(createError) ? ALREADY_ACCEPTED : (createError.longMessage ?? createError.message));
         return;
       }
       if (signIn.status !== "complete") {
@@ -114,7 +129,11 @@ export default function AcceptInvitationFlow() {
       password,
     });
     if (createError) {
-      setError(createError.longMessage ?? createError.message);
+      setError(
+        isTicketAlreadyUsed(createError)
+          ? ALREADY_ACCEPTED
+          : (createError.longMessage ?? createError.message)
+      );
       setSubmitting(false);
       return;
     }
@@ -138,9 +157,11 @@ export default function AcceptInvitationFlow() {
   if (!ticket) {
     content = <p className={styles.message}>Lien d&apos;invitation invalide ou expiré.</p>;
   } else if (!authLoaded || isSignedIn) {
+    // Session ouverte : soit une ancienne session en cours de fermeture, soit
+    // celle que l'invitation vient d'ouvrir, juste avant la redirection.
     content = (
       <p className={styles.message}>
-        {error ?? "Déconnexion de votre session actuelle pour accepter cette invitation…"}
+        {error ?? (submitting || status === "sign_in" ? "Ouverture de votre espace…" : "Déconnexion de votre session actuelle pour accepter cette invitation…")}
       </p>
     );
   } else if (status === "sign_in") {
@@ -198,7 +219,17 @@ export default function AcceptInvitationFlow() {
               </button>
             </div>
           </div>
-          {error && <p className={styles.error}>{error}</p>}
+          {error && (
+            <p className={styles.error}>
+              {error}
+              {error === ALREADY_ACCEPTED && (
+                <>
+                  {" "}
+                  <Link href="/sign-in" className={styles.errorLink}>Se connecter</Link>
+                </>
+              )}
+            </p>
+          )}
           {/* Requis par Clerk si la protection anti-bot (Smart CAPTCHA) est
               activée sur l'instance ; sans effet visuel sinon. */}
           <div id="clerk-captcha" />
