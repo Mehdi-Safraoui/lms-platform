@@ -25,6 +25,7 @@ export default async function OrgFormationSuiviPage({ params }: Props) {
       backLabel="Suivi des formations"
       exportHref={`/api/suivi/${formationId}/export`}
       showTenant={false}
+      rewardMode={scope.role === "admin_tenant" ? "edit" : "view"}
     />
   );
 }

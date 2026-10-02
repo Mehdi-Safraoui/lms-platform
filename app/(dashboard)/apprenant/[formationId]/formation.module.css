@@ -382,3 +382,30 @@ a.planStation:hover .planStationTitle { color: var(--metro-blue); }
   .stop[data-marker="current"] .stopMarker,
   .stop[data-marker="current"] .here { animation: none; }
 }
+
+/* Objectif au mérite fixé par l'entreprise : plaque émaillée marine. */
+.objective {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--metro-navy);
+  color: #fff;
+}
+.objectiveTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.objectiveTitle svg { flex-shrink: 0; color: #9fb4ff; }
+.objectiveRule,
+.objectiveState { margin: 0; font-family: var(--font-text), sans-serif; font-size: 16px; line-height: 1.45; color: #d9def3; }
+.objectiveRule strong { color: #fff; }
+.objectiveState { padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.16); color: #fff; font-weight: 600; }
+.objective[data-status="eligible"] .objectiveState { color: #a7f3c4; }

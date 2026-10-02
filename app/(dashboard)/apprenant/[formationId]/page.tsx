@@ -6,6 +6,7 @@ import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
 import { buildLessonLine, type LineSourceModule } from "@/lib/lessonLine";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import { getOrIssueCertificate } from "@/lib/certificates";
+import { loadLearnerMerit } from "@/lib/merit";
 import FormationOverview from "./FormationOverview";
 
 type Props = { params: Promise<{ formationId: string }> };
@@ -85,7 +86,10 @@ export default async function FormationDetailPage({ params }: Props) {
   });
   const lockedIds = new Set(tenantHasSubscription ? [] : ordered.slice(FREE_PREVIEW_LESSON_COUNT).map((l) => l.id));
 
-  const certificateStatus = dbUser && isEnrolled ? await getOrIssueCertificate(supabase, dbUser.id, formationId) : null;
+  const [certificateStatus, learnerMerit] = await Promise.all([
+    dbUser && isEnrolled ? getOrIssueCertificate(supabase, dbUser.id, formationId) : null,
+    dbUser?.tenant_id ? loadLearnerMerit(supabase, { userId: dbUser.id, tenantId: dbUser.tenant_id, formationId }) : null,
+  ]);
 
   return (
     <FormationOverview
@@ -95,6 +99,7 @@ export default async function FormationDetailPage({ params }: Props) {
       isEnrolled={isEnrolled}
       lockedIds={[...lockedIds]}
       certificate={certificateStatus?.certificate ?? null}
+      objective={learnerMerit ? { reward: learnerMerit.reward, merit: learnerMerit.merit } : null}
     />
   );
 }

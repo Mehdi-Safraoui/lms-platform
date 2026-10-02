@@ -1,4 +1,5 @@
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
+import { computeMerit, loadFormationReward, type FormationReward, type Merit } from "@/lib/merit";
 
 type Supabase = ReturnType<typeof createServiceRoleSupabaseClient>;
 
@@ -21,6 +22,8 @@ export interface LearnerRow {
   /** Moyenne des meilleurs scores obtenus aux quiz tentés (null = aucun quiz tenté). */
   quizAvgPct: number | null;
   quizzesPassed: number;
+  /** Score au mérite : premières tentatives seulement, et statut face à l'objectif (lib/merit.ts). */
+  merit: Merit;
   lastActivity: string | null;
   status: LearnerStatus;
   /** lessonId → date de fin, pour l'export détaillé. */
@@ -75,6 +78,8 @@ export interface FormationAnalytics {
   funnel: LessonFunnelRow[];
   quizzes: QuizStat[];
   learners: LearnerRow[];
+  /** Objectif au mérite fixé par l'entreprise (null : aucun, ou vue super_admin tous tenants). */
+  reward: FormationReward | null;
 }
 
 async function selectAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
@@ -114,9 +119,12 @@ export async function loadFormationAnalytics(supabase: Supabase, formationId: st
     );
   const lessonIds = lessons.map((l) => l.id);
 
-  const { data: quizzes } = lessonIds.length
-    ? await supabase.from("quizzes").select("id, lecon_id, quiz_questions(id, question_text, options, order_index)").in("lecon_id", lessonIds)
-    : { data: [] };
+  const [{ data: quizzes }, reward] = await Promise.all([
+    lessonIds.length
+      ? supabase.from("quizzes").select("id, lecon_id, quiz_questions(id, question_text, options, order_index)").in("lecon_id", lessonIds)
+      : { data: [] },
+    tenantId ? loadFormationReward(supabase, tenantId, formationId) : null,
+  ]);
   const quizIds = (quizzes ?? []).map((q) => q.id);
 
   // Apprenants : inscrits à la formation, ou ayant déjà une progression dessus.
@@ -176,6 +184,7 @@ export async function loadFormationAnalytics(supabase: Supabase, formationId: st
       timeMinutes: Math.round(own.reduce((sum, p) => sum + (p.time_spent_seconds ?? 0), 0) / 60),
       quizAvgPct: avg([...bestByQuiz.values()]),
       quizzesPassed: new Set(ownResults.filter((r) => r.passed).map((r) => r.quiz_id)).size,
+      merit: computeMerit(ownResults, quizIds, reward?.minScorePct ?? null),
       lastActivity: activity.at(-1) ?? null,
       status: progressPct === 100 ? "completed" : own.length > 0 || ownResults.length > 0 ? "in_progress" : "not_started",
       completedAt: Object.fromEntries(done.map((p) => [p.lecon_id, p.completed_at ?? p.updated_at])),
@@ -265,6 +274,7 @@ export async function loadFormationAnalytics(supabase: Supabase, formationId: st
     funnel,
     quizzes: quizStats,
     learners: learners.sort((a, b) => b.progressPct - a.progressPct || a.name.localeCompare(b.name)),
+    reward,
   };
 }
 
