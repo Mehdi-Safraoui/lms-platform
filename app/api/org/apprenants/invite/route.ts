@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clerkClient } from "@clerk/nextjs/server";
-import { requireAuth } from "@/lib/api/require-auth";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
-import { hasActiveSubscription } from "@/lib/subscription";
 import { learnerLimitFor } from "@/lib/planLimits";
+import { invitationRedirectUrl, requireInviter } from "@/lib/orgInvitations";
 
 /**
  * Invite des apprenants dans l'Organization Clerk du tenant de l'appelant.
@@ -18,26 +16,11 @@ import { learnerLimitFor } from "@/lib/planLimits";
  * Voir aussi app/(auth)/sign-up/[[...sign-up]]/page.tsx : le ticket ramène vers
  * /sign-up, qui doit alors rediriger vers "/" (et non /create-organization) puisque
  * l'apprenant rejoint une Organization existante plutôt que d'en créer une.
+ * Renvoyer ou annuler une invitation : app/api/org/apprenants/invitations/[invitationId].
  */
 export async function POST(req: NextRequest) {
-  const guard = await requireAuth();
-  if (guard instanceof NextResponse) return guard;
-
-  const supabase = createServiceRoleSupabaseClient();
-
-  const { data: user } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", guard.userId)
-    .single();
-
-  if (!user || !["admin_tenant", "tuteur"].includes(user.role)) {
-    return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
-  }
-
-  if (!(await hasActiveSubscription(guard.tenantId))) {
-    return NextResponse.json({ error: "Un abonnement actif est requis pour inviter des apprenants." }, { status: 403 });
-  }
+  const ctx = await requireInviter();
+  if (ctx instanceof NextResponse) return ctx;
 
   const body = await req.json().catch(() => null);
   const emailAddresses: string[] = Array.isArray(body?.emails)
@@ -48,26 +31,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Au moins une adresse email est requise." }, { status: 400 });
   }
 
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("clerk_org_id, subscription_plan")
-    .eq("id", guard.tenantId)
-    .single();
-
-  if (!tenant?.clerk_org_id) {
-    return NextResponse.json({ error: "Organisation introuvable." }, { status: 404 });
-  }
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const client = await clerkClient();
+  const supabase = createServiceRoleSupabaseClient();
+  const { client } = ctx;
 
   // Limite d'apprenants de l'offre (lib/planLimits.ts) : apprenants inscrits
   // + invitations encore en attente + nouvelles invitations.
-  const limit = learnerLimitFor(tenant.subscription_plan);
+  const limit = learnerLimitFor(ctx.subscriptionPlan);
   if (limit !== null) {
     const [{ count: learners }, pending] = await Promise.all([
-      supabase.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", guard.tenantId).eq("role", "apprenant"),
-      client.organizations.getOrganizationInvitationList({ organizationId: tenant.clerk_org_id, status: ["pending"], limit: 1 }),
+      supabase.from("users").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).eq("role", "apprenant"),
+      client.organizations.getOrganizationInvitationList({ organizationId: ctx.clerkOrgId, status: ["pending"], limit: 1 }),
     ]);
     const used = (learners ?? 0) + pending.totalCount;
     if (used + emailAddresses.length > limit) {
@@ -87,11 +60,11 @@ export async function POST(req: NextRequest) {
 
   try {
     await client.organizations.createOrganizationInvitationBulk(
-      tenant.clerk_org_id,
+      ctx.clerkOrgId,
       emailAddresses.map((emailAddress) => ({
         emailAddress,
         role: "org:member" as const,
-        redirectUrl: `${appUrl}/sign-up`,
+        redirectUrl: invitationRedirectUrl(),
       }))
     );
   } catch (err) {

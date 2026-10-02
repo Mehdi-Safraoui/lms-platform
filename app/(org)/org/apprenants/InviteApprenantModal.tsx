@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import styles from "./apprenants.module.css";
@@ -8,6 +9,7 @@ import styles from "./apprenants.module.css";
 export default function InviteApprenantModal({ onClose }: { onClose: () => void }) {
   const [emails, setEmails] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,6 +43,8 @@ export default function InviteApprenantModal({ onClose }: { onClose: () => void 
         { description: emailAddresses.join(", ") }
       );
       onClose();
+      // Les nouvelles invitations apparaissent dans « Invitations en attente ».
+      router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur lors de l'envoi des invitations.");
     } finally {

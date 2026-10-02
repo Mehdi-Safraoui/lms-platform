@@ -522,3 +522,59 @@
   min-width: 36px;
   text-align: right;
 }
+
+/* Invitations en attente */
+.invitations { margin-bottom: 36px; }
+.invitationsHead { margin-bottom: 14px; }
+.sectionTitle {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 14px;
+}
+.invitationsHead .sectionTitle { margin-bottom: 4px; }
+.sectionHint { margin: 0; font-size: 13px; color: var(--text-muted); }
+
+.avatarPending {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px dashed var(--border);
+  background: var(--bg-alt);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.invitedCell { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.statusPending { background: #eef2fc; color: var(--coral); border: 1px solid #d5def8; }
+
+.rowActions { display: flex; justify-content: flex-end; gap: 6px; }
+.invitations .dateCell { white-space: nowrap; }
+.invitations .table th,
+.invitations .table td { padding-left: 12px; padding-right: 12px; }
+.invitations .table td:last-child { width: 1%; }
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btnGhost:hover:not(:disabled) { border-color: var(--coral); color: var(--coral); }
+.btnGhost:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.btnGhost:disabled { opacity: 0.55; cursor: default; }
+.btnIcon { width: 30px; padding: 0; justify-content: center; }
+.btnDanger { border-color: #f3c4c6; color: #b4232a; background: #fff5f5; }
+.btnDanger:hover:not(:disabled) { border-color: #b4232a; color: #b4232a; }

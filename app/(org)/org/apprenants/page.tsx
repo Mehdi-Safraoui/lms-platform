@@ -4,6 +4,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentUser, getTenant } from "@/lib/currentUser";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { learnerLimitFor } from "@/lib/planLimits";
+import { toPendingInvitation } from "@/lib/orgInvitations";
 import ApprenantTable from "./ApprenantTable";
 
 export default async function ApprenantPage() {
@@ -26,13 +27,15 @@ export default async function ApprenantPage() {
   // apprenants du tenant, formations publiées avec leurs leçons, progression.
   const learnerLimit = learnerLimitFor(tenant?.subscription_plan);
   const clerkOrgId = tenant?.clerk_org_id;
-  const [pendingInvitations, { data: apprenants }, { data: formations }, { data: progressRecords }] = await Promise.all([
+  const [pending, { data: apprenants }, { data: formations }, { data: progressRecords }] = await Promise.all([
     clerkOrgId
       ? clerkClient()
-          .then((client) => client.organizations.getOrganizationInvitationList({ organizationId: clerkOrgId, status: ["pending"], limit: 1 }))
-          .then((res) => res.totalCount)
-          .catch(() => 0)
-      : 0,
+          .then((client) =>
+            client.organizations.getOrganizationInvitationList({ organizationId: clerkOrgId, status: ["pending"], limit: 100 })
+          )
+          .then((res) => ({ count: res.totalCount, invitations: res.data.map(toPendingInvitation).sort((a, b) => b.createdAt - a.createdAt) }))
+          .catch(() => ({ count: 0, invitations: [] }))
+      : { count: 0, invitations: [] },
     supabase
       .from("users")
       .select("id, email, full_name, created_at, total_points")
@@ -60,7 +63,8 @@ export default async function ApprenantPage() {
       formations={formationsWithLessons}
       progressRecords={progressRecords ?? []}
       learnerLimit={learnerLimit}
-      pendingInvitations={pendingInvitations}
+      pendingCount={pending.count}
+      pendingInvitations={pending.invitations}
     />
   );
 }
