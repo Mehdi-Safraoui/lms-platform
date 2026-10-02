@@ -189,7 +189,7 @@ export default function FormationOverview({
                 Objectif : {objective.reward.rewardLabel}
               </p>
               <p className={styles.objectiveRule}>
-                <strong>{objective.reward.minScorePct} %</strong> minimum aux quiz. Seule votre première tentative de chaque quiz compte : prenez le temps de bien la préparer.
+                <strong>{objective.reward.minScorePct} %</strong> de bonnes réponses aux quiz du parcours. Le score retenu est celui de votre premier passage de chaque quiz.
               </p>
               <p className={styles.objectiveState}>{objectiveStatus(objective)}</p>
             </div>
