@@ -4,6 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, Download, AlertTriangle, TrendingDown, ClipboardList, GraduationCap, ChevronUp, ChevronDown } from "lucide-react";
 import type { FormationAnalytics, LearnerRow, LearnerStatus } from "@/lib/formationAnalytics";
+import { MERIT_LABEL, type MeritStatus } from "@/lib/merit";
+import RewardPanel from "./RewardPanel";
 import styles from "./analytics.module.css";
 
 const STATUS_LABEL: Record<LearnerStatus, string> = {
@@ -44,7 +46,11 @@ function StatTile({ label, value, hint }: { label: string; value: string; hint?:
   );
 }
 
-type SortKey = "name" | "progressPct" | "timeMinutes" | "quizAvgPct" | "lastActivity";
+type SortKey = "name" | "progressPct" | "timeMinutes" | "quizAvgPct" | "meritScore" | "lastActivity";
+
+function sortValue(l: LearnerRow, key: SortKey): string | number | null {
+  return key === "meritScore" ? l.merit.scorePct : l[key];
+}
 
 export default function FormationAnalyticsView({
   data,
@@ -52,6 +58,7 @@ export default function FormationAnalyticsView({
   backLabel,
   exportHref,
   showTenant,
+  rewardMode = null,
 }: {
   data: FormationAnalytics;
   backHref: string;
@@ -59,9 +66,15 @@ export default function FormationAnalyticsView({
   exportHref: string;
   /** Vue super_admin : colonne "Entreprise" dans le tableau des apprenants. */
   showTenant: boolean;
+  /** Objectif au mérite : "edit" admin entreprise, "view" tuteur, null vue super_admin. */
+  rewardMode?: "edit" | "view" | null;
 }) {
   const { kpis, funnel, quizzes } = data;
   const [statusFilter, setStatusFilter] = React.useState<LearnerStatus | "all">("all");
+  const [meritFilter, setMeritFilter] = React.useState<MeritStatus | "all">("all");
+  const reward = data.reward;
+  const meritCounts = { eligible: 0, below: 0, pending: 0, not_started: 0 } as Record<MeritStatus, number>;
+  for (const l of data.learners) if (l.merit.status) meritCounts[l.merit.status] += 1;
   const [sort, setSort] = React.useState<{ key: SortKey; dir: 1 | -1 }>({ key: "progressPct", dir: -1 });
 
   // Plus forte baisse de complétion d'une leçon à la suivante : là où les
@@ -77,9 +90,10 @@ export default function FormationAnalyticsView({
 
   const learners = data.learners
     .filter((l) => statusFilter === "all" || l.status === statusFilter)
+    .filter((l) => !reward || meritFilter === "all" || l.merit.status === meritFilter)
     .sort((a, b) => {
-      const va = a[sort.key] as LearnerRow[SortKey];
-      const vb = b[sort.key] as LearnerRow[SortKey];
+      const va = sortValue(a, sort.key);
+      const vb = sortValue(b, sort.key);
       if (va === vb) return 0;
       if (va === null) return 1;
       if (vb === null) return -1;
@@ -141,6 +155,17 @@ export default function FormationAnalyticsView({
               <StatTile label="Score moyen aux quiz" value={kpis.avgQuizPct === null ? "—" : `${kpis.avgQuizPct} %`} hint="meilleur score par quiz" />
             </div>
           </section>
+
+          {rewardMode && (
+            <RewardPanel
+              formationId={data.formation.id}
+              reward={reward}
+              counts={meritCounts}
+              totalQuizzes={quizzes.length}
+              canEdit={rewardMode === "edit"}
+              exportHref={exportHref}
+            />
+          )}
 
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Progression leçon par leçon</h2>
@@ -232,6 +257,20 @@ export default function FormationAnalyticsView({
           <section className={styles.section}>
             <div className={styles.sectionHeaderRow}>
               <h2 className={styles.sectionTitle}>Apprenants</h2>
+              <div className={styles.filters}>
+              {reward && (
+                <select
+                  className={styles.filter}
+                  value={meritFilter}
+                  onChange={(e) => setMeritFilter(e.target.value as MeritStatus | "all")}
+                  aria-label="Filtrer par objectif"
+                >
+                  <option value="all">Tous (objectif)</option>
+                  {(Object.keys(MERIT_LABEL) as MeritStatus[]).map((s) => (
+                    <option key={s} value={s}>{MERIT_LABEL[s]}</option>
+                  ))}
+                </select>
+              )}
               <select
                 className={styles.filter}
                 value={statusFilter}
@@ -243,6 +282,7 @@ export default function FormationAnalyticsView({
                 <option value="in_progress">En cours</option>
                 <option value="completed">Terminé</option>
               </select>
+              </div>
             </div>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
@@ -252,9 +292,11 @@ export default function FormationAnalyticsView({
                     {showTenant && <th>Entreprise</th>}
                     {sortHeader("Progression", "progressPct")}
                     {sortHeader("Temps passé", "timeMinutes")}
-                    {sortHeader("Quiz", "quizAvgPct")}
+                    {/* Avec un objectif, seul le score retenu (premières tentatives) est montré. */}
+                    {reward ? sortHeader("1ʳᵉ tentative", "meritScore") : sortHeader("Quiz", "quizAvgPct")}
                     {sortHeader("Dernière activité", "lastActivity")}
                     <th>Statut</th>
+                    {reward && <th>Objectif {reward.minScorePct} %</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -272,11 +314,25 @@ export default function FormationAnalyticsView({
                         </div>
                       </td>
                       <td className={styles.num}>{formatMinutes(l.timeMinutes)}</td>
-                      <td className={styles.num}>{l.quizAvgPct === null ? "—" : `${l.quizAvgPct} %`}</td>
+                      {reward ? (
+                        <td className={styles.num}>
+                          {l.merit.scorePct === null ? "—" : `${l.merit.scorePct} %`}
+                          <span className={styles.meritQuizzes}>{l.merit.quizzesTaken}/{l.merit.totalQuizzes} quiz</span>
+                        </td>
+                      ) : (
+                        <td className={styles.num}>{l.quizAvgPct === null ? "—" : `${l.quizAvgPct} %`}</td>
+                      )}
                       <td className={styles.num}>{formatDate(l.lastActivity)}</td>
                       <td>
                         <span className={`${styles.status} ${styles[`status_${l.status}`]}`}>{STATUS_LABEL[l.status]}</span>
                       </td>
+                      {reward && (
+                        <td>
+                          {l.merit.status && (
+                            <span className={`${styles.status} ${styles[`merit_${l.merit.status}`]}`}>{MERIT_LABEL[l.merit.status]}</span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

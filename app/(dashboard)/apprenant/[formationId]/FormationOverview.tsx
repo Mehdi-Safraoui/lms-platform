@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, Award, Clock, Flag, MapPin } from "lucide-react";
+import { ArrowRight, Award, Clock, Flag, MapPin, Target } from "lucide-react";
 import { TerminusPicto, TrainPicto } from "@/components/learner/MetroPictos";
 import { formatMinutes } from "@/lib/lessonDuration";
 import type { LessonLine } from "@/lib/lessonLine";
 import { certificateUrl, formatCertificateDate, linkedinAddToProfileUrl, type Certificate } from "@/lib/certificates";
 import CertificateActions from "@/components/certificates/CertificateActions";
+import type { FormationReward, Merit } from "@/lib/merit";
 import EnrollButton from "./EnrollButton";
 import ModulePlan from "./ModulePlan";
 import styles from "./formation.module.css";
@@ -28,6 +29,20 @@ function shortLabel(title: string): string {
   return title.length <= 22 ? title : `${title.slice(0, 21).replace(/\s+\S*$/, "")}…`;
 }
 
+/** Phrase d'état de l'objectif au mérite, à la deuxième personne. */
+function objectiveStatus({ reward, merit }: { reward: FormationReward; merit: Merit }): string {
+  switch (merit.status) {
+    case "eligible":
+      return `Objectif atteint avec ${merit.scorePct} % : vous êtes éligible (${reward.rewardLabel}).`;
+    case "below":
+      return `Score retenu : ${merit.scorePct} %, pour un objectif de ${reward.minScorePct} %.`;
+    case "pending":
+      return `Votre score pour l'instant : ${merit.scorePct} %, sur ${merit.quizzesTaken} quiz faits sur ${merit.totalQuizzes}.`;
+    default:
+      return `${merit.totalQuizzes} quiz à passer sur le parcours.`;
+  }
+}
+
 /**
  * Page formation de l'apprenant, en ligne de métro : plan de ligne
  * horizontal (une station par module), plan détaillé dépliable, terminus
@@ -40,6 +55,7 @@ export default function FormationOverview({
   isEnrolled,
   lockedIds,
   certificate,
+  objective,
 }: {
   formationId: string;
   formation: { title: string; description: string | null; niveau: string | null; tenant_id: string | null; videos: unknown };
@@ -47,6 +63,8 @@ export default function FormationOverview({
   isEnrolled: boolean;
   lockedIds: string[];
   certificate: Certificate | null;
+  /** Objectif au mérite fixé par l'entreprise (null : aucun). */
+  objective: { reward: FormationReward; merit: Merit } | null;
 }) {
   const totalMinutes = line.modules.reduce((sum, m) => sum + m.stations.reduce((s, st) => s + (st.minutes ?? 0), 0), 0);
   const progressPct = line.total > 0 ? Math.round((line.completed / line.total) * 100) : 0;
@@ -163,6 +181,18 @@ export default function FormationOverview({
                 <span className={styles.gaugePct}>{progressPct} %</span>
               </div>
             </>
+          )}
+          {objective && objective.merit.totalQuizzes > 0 && (
+            <div className={styles.objective} data-status={objective.merit.status ?? undefined}>
+              <p className={styles.objectiveTitle}>
+                <Target size={22} strokeWidth={2} aria-hidden="true" />
+                Objectif : {objective.reward.rewardLabel}
+              </p>
+              <p className={styles.objectiveRule}>
+                <strong>{objective.reward.minScorePct} %</strong> minimum aux quiz. Seule votre première tentative de chaque quiz compte : prenez le temps de bien la préparer.
+              </p>
+              <p className={styles.objectiveState}>{objectiveStatus(objective)}</p>
+            </div>
           )}
           <p className={styles.terminusNote}>
             <Award size={26} strokeWidth={1.9} aria-hidden="true" />

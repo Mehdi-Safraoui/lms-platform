@@ -261,3 +261,85 @@
   .kpis { grid-template-columns: minmax(0, 1fr); }
   .header { flex-direction: column; }
 }
+
+/* ── Objectif au mérite ── */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.rewardCard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.rewardHead { display: flex; align-items: flex-start; gap: 14px; }
+.rewardIcon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--coral-light);
+  color: var(--coral);
+}
+.rewardIntro { flex: 1; min-width: 0; }
+.rewardSummary { font-size: 14px; line-height: 1.55; color: var(--text-muted); max-width: 70ch; }
+.rewardSummary strong { color: var(--text); }
+.rewardNote { font-size: 13px; color: var(--text-muted); }
+
+.rewardStats { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.rewardCounts { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; flex: 1; margin: 0; }
+.rewardCount { padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-alt); }
+.rewardCount dt { font-size: 12.5px; color: var(--text-muted); }
+.rewardCount dd { margin: 2px 0 0; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.rewardCount[data-status="eligible"] { background: #f0fdf4; border-color: #bbf7d0; }
+.rewardCount[data-status="eligible"] dd { color: #166534; }
+
+.rewardForm { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.rewardField { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.rewardFieldWide { flex: 1; min-width: 220px; max-width: 360px; }
+.rewardInputWrap { display: inline-flex; align-items: center; gap: 6px; color: var(--text); font-size: 14px; }
+.rewardInputWrap .rewardInput { width: 84px; }
+.rewardInput {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+.rewardInput:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; border-color: var(--coral); }
+.rewardFormActions { display: flex; align-items: center; gap: 8px; }
+
+.primaryBtn,
+.ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.primaryBtn { border: none; background: var(--coral); color: #fff; }
+.primaryBtn:hover:not(:disabled) { opacity: 0.9; }
+.ghostBtn { border: 1px solid var(--border); background: var(--card); color: var(--text); flex-shrink: 0; }
+.ghostBtn:hover:not(:disabled) { border-color: var(--navy); }
+.linkDangerBtn { border: none; background: none; padding: 0 6px; font-size: 13px; font-weight: 600; color: #b4232a; cursor: pointer; }
+.linkDangerBtn:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+.primaryBtn:disabled, .ghostBtn:disabled, .linkDangerBtn:disabled { opacity: 0.55; cursor: default; }
+.primaryBtn:focus-visible, .ghostBtn:focus-visible, .linkDangerBtn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+
+.meritQuizzes { display: block; font-size: 11.5px; color: var(--text-light); }
+.merit_eligible { background: #dcfce7; color: #166534; }
+.merit_below { background: #fee2e2; color: #991b1b; }
+.merit_pending { background: #fef3c7; color: #92400e; }
+.merit_not_started { background: var(--bg-alt); color: var(--text-muted); }

@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/currentUser";
 import { hasActiveSubscription } from "@/lib/subscription";
 import { isFormationAccessibleToTenant } from "@/lib/formationTenantAccess";
 import { buildLessonLine, type LineSourceModule } from "@/lib/lessonLine";
+import { loadLearnerMerit } from "@/lib/merit";
 import type { ContentBlock } from "@/lib/ai/contentBlocks";
 import MetroLine from "@/components/learner/MetroLine";
 import LessonView from "./LessonView";
@@ -135,6 +136,14 @@ export default async function ApprenantLessonPage({ params }: Props) {
       : null;
   }
 
+  // Objectif au mérite de l'entreprise : la page du quiz indique si cette tentative compte.
+  const merit = quizData && dbUser?.tenant_id
+    ? await loadLearnerMerit(supabase, { userId: dbUser.id, tenantId: dbUser.tenant_id, formationId })
+    : null;
+  const quizObjective = merit && quizData
+    ? { rewardLabel: merit.reward.rewardLabel, minScorePct: merit.reward.minScorePct, firstScorePct: merit.firstScoreByQuiz[quizData.id] ?? null }
+    : null;
+
   return (
     <div className={styles.shell}>
       <MetroLine line={line} />
@@ -146,6 +155,7 @@ export default async function ApprenantLessonPage({ params }: Props) {
         contentBlocks={lecon.content_blocks}
         videoUrl={lecon.video_url}
         quizData={quizData}
+        quizObjective={quizObjective}
         line={line}
         initiallyCompleted={completedLessonIds.has(lessonId)}
         learnerName={dbUser?.full_name || dbUser?.email || null}

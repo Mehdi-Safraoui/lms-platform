@@ -23,6 +23,8 @@ const Markdown = dynamic(
 interface QuizOption { text: string; }
 interface QuizQuestion { id: string; question_text: string; options: QuizOption[]; order_index: number; points: number; }
 interface QuizData { id: string; title: string; pass_score: number; quiz_questions: QuizQuestion[]; }
+/** Objectif au mérite de l'entreprise : seule la première tentative compte. */
+export interface QuizObjective { rewardLabel: string; minScorePct: number; firstScorePct: number | null; }
 
 interface Props {
   lessonId: string;
@@ -32,6 +34,7 @@ interface Props {
   contentBlocks: ContentBlock[] | null;
   videoUrl: string | null;
   quizData: QuizData | null;
+  quizObjective: QuizObjective | null;
   line: LessonLine;
   initiallyCompleted: boolean;
   learnerName: string | null;
@@ -44,7 +47,7 @@ function normalize(text: string): string {
 // ── Quiz ─────────────────────────────────────────────────
 // Toutes les réponses restent visibles ; la réponse choisie passe au premier
 // plan (plaque marine), les autres s'effacent d'un cran.
-function QuizPlayer({ quiz }: { quiz: QuizData }) {
+function QuizPlayer({ quiz, objective }: { quiz: QuizData; objective: QuizObjective | null }) {
   const questions = [...(quiz.quiz_questions ?? [])].sort((a, b) => a.order_index - b.order_index);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
@@ -53,6 +56,9 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
   const [submitting, setSubmitting] = useState(false);
   // question_id → index de la bonne réponse, renvoyé par le serveur.
   const [correction, setCorrection] = useState<Record<string, number>>({});
+  // Score retenu pour l'objectif : celui de la première tentative.
+  const [countedPct, setCountedPct] = useState<number | null>(objective?.firstScorePct ?? null);
+  const [countedNow, setCountedNow] = useState(false);
 
   const allAnswered = questions.every((_, i) => answers[i] !== undefined);
 
@@ -80,6 +86,8 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
       setCorrection(Object.fromEntries((data.correction as { question_id: string; correct_index: number }[]).map((c) => [c.question_id, c.correct_index])));
       setScorePercent(data.percent);
       setPassed(data.passed);
+      setCountedNow(countedPct === null);
+      if (countedPct === null) setCountedPct(data.percent);
       setSubmitted(true);
       if (data.points_awarded > 0) toast.success(`+${data.points_awarded} points remportés !`);
     } catch {
@@ -105,6 +113,13 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
           <div>
             <p className={styles.quizResultScore}>{scorePercent} %</p>
             <p className={styles.quizResultLabel}>{passed ? "Quiz validé, la station est franchie." : `Pas encore validé : il faut ${quiz.pass_score} %.`}</p>
+            {objective && (
+              <p className={styles.quizResultLabel}>
+                {countedNow
+                  ? `Ce score compte pour l'objectif « ${objective.rewardLabel} ».`
+                  : `Entraînement : votre score retenu pour l'objectif reste ${countedPct} %.`}
+              </p>
+            )}
           </div>
           <button className={styles.quizRetryBtn} onClick={retry}>Réessayer</button>
         </div>
@@ -156,7 +171,7 @@ function QuizPlayer({ quiz }: { quiz: QuizData }) {
   );
 }
 
-function QuizIntro({ quiz, onStart }: { quiz: QuizData; onStart: () => void }) {
+function QuizIntro({ quiz, objective, onStart }: { quiz: QuizData; objective: QuizObjective | null; onStart: () => void }) {
   const count = quiz.quiz_questions.length;
   return (
     <div className={styles.quizIntro}>
@@ -170,6 +185,13 @@ function QuizIntro({ quiz, onStart }: { quiz: QuizData; onStart: () => void }) {
         <p className={styles.quizIntroMeta}>
           {count} question{count > 1 ? "s" : ""} · réussite à partir de {quiz.pass_score} %
         </p>
+        {objective && (
+          <p className={styles.quizObjective}>
+            {objective.firstScorePct === null
+              ? `Objectif « ${objective.rewardLabel} » : cette première tentative compte pour votre score (${objective.minScorePct} % minimum sur l'ensemble des quiz). Les suivantes serviront à vous entraîner.`
+              : `Votre première tentative est enregistrée : ${objective.firstScorePct} %. Vous pouvez refaire le quiz pour vous entraîner, sans changer ce score.`}
+          </p>
+        )}
       </div>
       <button className={styles.quizStartBtn} onClick={onStart}>
         Commencer le quiz
@@ -187,6 +209,7 @@ export default function LessonView({
   contentBlocks,
   videoUrl,
   quizData,
+  quizObjective,
   line,
   initiallyCompleted,
   learnerName,
@@ -311,8 +334,8 @@ export default function LessonView({
 
         {contentType === "quiz" && quizData && quizData.quiz_questions?.length > 0 && (
           quizStarted
-            ? <QuizPlayer quiz={quizData} />
-            : <QuizIntro quiz={quizData} onStart={() => setQuizStarted(true)} />
+            ? <QuizPlayer quiz={quizData} objective={quizObjective} />
+            : <QuizIntro quiz={quizData} objective={quizObjective} onStart={() => setQuizStarted(true)} />
         )}
 
         {contentType === "quiz" && (!quizData || !quizData.quiz_questions?.length) && (

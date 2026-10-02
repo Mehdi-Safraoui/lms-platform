@@ -3,6 +3,7 @@ import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { resolveAnalyticsScope } from "@/lib/api/require-analytics-viewer";
 import { loadFormationAnalytics, type LearnerStatus } from "@/lib/formationAnalytics";
 import { slugify } from "@/lib/slug";
+import { MERIT_LABEL } from "@/lib/merit";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,8 @@ function frDate(iso: string | null | undefined): string {
 
 // GET /api/suivi/[formationId]/export — export CSV du suivi d'une formation :
 // une ligne par apprenant, puis une colonne par leçon (date de fin).
-export async function GET(_req: NextRequest, { params }: Params) {
+// ?eligibles=1 : seulement les apprenants ayant atteint l'objectif au mérite.
+export async function GET(req: NextRequest, { params }: Params) {
   const { formationId } = await params;
   const supabase = createServiceRoleSupabaseClient();
 
@@ -38,6 +40,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (!data) return NextResponse.json({ error: "Formation introuvable" }, { status: 404 });
 
   const showTenant = scope.tenantId === null;
+  const reward = data.reward;
+  const onlyEligible = !!reward && req.nextUrl.searchParams.get("eligibles") === "1";
+  const learners = onlyEligible ? data.learners.filter((l) => l.merit.status === "eligible") : data.learners;
   const header = [
     "Apprenant",
     "Email",
@@ -47,11 +52,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
     "Temps passé (min)",
     "Score moyen aux quiz (%)",
     "Quiz réussis",
+    ...(reward ? ["Score 1re tentative (%)", "Quiz faits", `Objectif ${reward.minScorePct} % (${reward.rewardLabel})`] : []),
     "Dernière activité",
     "Statut",
     ...data.funnel.map((l, i) => `${i + 1}. ${l.title}`),
   ];
-  const rows = data.learners.map((l) => [
+  const rows = learners.map((l) => [
     l.name,
     l.email,
     ...(showTenant ? [l.tenantName] : []),
@@ -60,13 +66,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
     l.timeMinutes,
     l.quizAvgPct,
     l.quizzesPassed,
+    ...(reward ? [l.merit.scorePct, `${l.merit.quizzesTaken}/${l.merit.totalQuizzes}`, l.merit.status ? MERIT_LABEL[l.merit.status] : ""] : []),
     frDate(l.lastActivity),
     STATUS_LABEL[l.status],
     ...data.funnel.map((lesson) => frDate(l.completedAt[lesson.lessonId])),
   ]);
 
   const csv = "﻿" + [header, ...rows].map((r) => r.map(csvCell).join(";")).join("\r\n");
-  const filename = `suivi-${slugify(data.formation.title) || "formation"}-${new Date().toISOString().slice(0, 10)}.csv`;
+  const filename = `${onlyEligible ? "eligibles" : "suivi"}-${slugify(data.formation.title) || "formation"}-${new Date().toISOString().slice(0, 10)}.csv`;
 
   return new NextResponse(csv, {
     headers: {
